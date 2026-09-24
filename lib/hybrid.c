@@ -39,6 +39,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -837,17 +838,29 @@ error:
 int
 pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
 {
+        static pthread_mutex_t discover_mutex = PTHREAD_MUTEX_INITIALIZER;
         const enum pqos_interface topologies[] = {PQOS_INTER_MSR,
 #ifdef __linux__
                                                   PQOS_INTER_OS
 #endif
         };
         int log_owned = 0;
+        int ret = PQOS_RETVAL_RESOURCE;
         unsigned i;
 
         if (cap == NULL)
                 return PQOS_RETVAL_PARAM;
         *cap = NULL;
+
+        /* One discovery at a time in this process. Not for the topology, which
+         * each call now owns, but for the log below: a second caller would see
+         * the temporary log as initialized, take no ownership of it, and then
+         * find it gone when the first caller released it - and a DEBUG build
+         * asserts on that. Serializing the whole call is cheaper to reason
+         * about than reference counting a global, and this is not a hot path.
+         */
+        if (pthread_mutex_lock(&discover_mutex) != 0)
+                return PQOS_RETVAL_ERROR;
 
         /* Every path below this reports what it found through the library log,
          * and log_printf() asserts that the log has been initialized - which it
@@ -859,8 +872,10 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
          * is what the documentation promises it.
          */
         if (!log_is_initialized()) {
-                if (log_init(-1, NULL, NULL, LOG_VER_SILENT) != LOG_RETVAL_OK)
+                if (log_init(-1, NULL, NULL, LOG_VER_SILENT) != LOG_RETVAL_OK) {
+                        pthread_mutex_unlock(&discover_mutex);
                         return PQOS_RETVAL_ERROR;
+                }
                 log_owned = 1;
         }
 
@@ -872,25 +887,24 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                  * file limit is left as the caller set it
                  */
                 struct pqos_cpuinfo *cpu = cpuinfo_discover(topologies[i], 0);
-                int ret;
 
                 if (cpu == NULL)
                         continue;
 
                 ret = hybrid_cap_discover(cap, cpu);
                 free(cpu);
-                if (log_owned)
-                        log_fini();
-
-                return ret;
+                break;
         }
 
-        LOG_ERROR("CPU topology could not be read, so the hybrid capabilities "
-                  "of this platform are unknown\n");
+        if (i == DIM(topologies))
+                LOG_ERROR("CPU topology could not be read, so the hybrid "
+                          "capabilities of this platform are unknown\n");
+
         if (log_owned)
                 log_fini();
+        pthread_mutex_unlock(&discover_mutex);
 
-        return PQOS_RETVAL_RESOURCE;
+        return ret;
 }
 
 void
