@@ -295,16 +295,21 @@ log_printf(int type, const char *str, ...)
         if (size > AP_BUFFER_SIZE - 2)
                 size = AP_BUFFER_SIZE - 2;
 
-        /* outside the lock: the callback belongs to the application, and what
-         * it does with the message - including calling back into this library -
-         * is not for the log to serialize
+        /* the descriptor first: the callback belongs to the application, and an
+         * application that closes its log descriptor from inside it - having
+         * just finalized the library, say - would leave this write addressed to
+         * a descriptor that is closed, or worse, reused
          */
-        if (callback != NULL)
-                callback(context, size, ap_buffer);
-
         if (fd >= 0) {
                 if (write(fd, ap_buffer, size) < 0)
                         fprintf(stderr, "%s: printing to file failed\n",
                                 __func__);
         }
+
+        /* and the callback outside the lock, so that what it does with the
+         * message - including calling back into this library - is not for the
+         * log to serialize
+         */
+        if (callback != NULL)
+                callback(context, size, ap_buffer);
 }
