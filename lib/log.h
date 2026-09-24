@@ -137,7 +137,7 @@ PQOS_LOCAL int log_fini(void);
  *   had no destination for anyway.
  * - where the log *is* initialized, the destination is the application's, and
  *   this path runs outside pqos_init() and pqos_fini(). Writing to it would
- * mean either writing to a descriptor a concurrent pqos_fini() has let the
+ *   mean either writing to a descriptor a concurrent pqos_fini() has let the
  *   application close, or making that pqos_fini() wait - and it holds the API
  *   lock this path deliberately does not take, so waiting for a path that may
  *   itself call into the library inverts the two locks.

@@ -39,7 +39,6 @@
 
 #include <errno.h>
 #include <limits.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -946,7 +945,6 @@ error:
 int
 pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
 {
-        static pthread_mutex_t discover_mutex = PTHREAD_MUTEX_INITIALIZER;
         const enum pqos_interface topologies[] = {PQOS_INTER_MSR,
 #ifdef __linux__
                                                   PQOS_INTER_OS
@@ -958,15 +956,6 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
         if (cap == NULL)
                 return PQOS_RETVAL_PARAM;
         *cap = NULL;
-
-        /* One discovery at a time in this process: not for the topology, which
-         * each call now owns, but because the rest of this path reads state the
-         * library's initialization also writes, and this call deliberately runs
-         * outside the API lock - taking that lock would need write access to
-         * /var/lock, and reading CPUID needs no privileges at all.
-         */
-        if (pthread_mutex_lock(&discover_mutex) != 0)
-                return PQOS_RETVAL_ERROR;
 
         /* Every path below this reports what it found through the library log,
          * and this call writes nothing to it. Before pqos_init() there is no
@@ -1004,7 +993,6 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                           "capabilities of this platform are unknown\n");
 
         log_resume();
-        pthread_mutex_unlock(&discover_mutex);
 
         return ret;
 }

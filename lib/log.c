@@ -40,7 +40,6 @@
 #include "types.h"
 
 #include <errno.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -61,13 +60,14 @@ static void (*m_callback_log)(void *, const size_t, const char *);
 static int log_init_successful = 0; /**< log init gatekeeper */
 
 /**
- * The log is one object per process, and the library's initialization is not
- * the only thing that installs it: a read-only path may be called before
- * pqos_init(), with no log of its own, and still has to report what it found.
- * All of the state above is therefore guarded by this mutex, so that an
- * install, a teardown and a message cannot see each other half done.
+ * The state above is written by log_init() and log_fini() only, and the library
+ * calls those from pqos_init() and pqos_fini() with the API lock held - so the
+ * installs and teardowns are already serialized against each other, and no lock
+ * of this module's own would add anything to that. What is *not* synchronized
+ * is a message racing an install or a teardown, which this module has never
+ * synchronized: see log_printf().
  */
-static pthread_mutex_t m_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /** how deeply logging is suspended on this thread, which is thread local
  *  because it describes a call and not the log
  */
@@ -86,7 +86,7 @@ static __thread unsigned m_suspended = 0;
  */
 
 /**
- * @brief Installs the log, with \a m_log_mutex already held
+ * @brief Installs the log
  *
  * @param [in] fd_log file descriptor to write to, or -1 for none
  * @param [in] callback_log callback to hand messages to, or NULL for none
@@ -97,10 +97,10 @@ static __thread unsigned m_suspended = 0;
  * @retval LOG_RETVAL_OK success
  */
 static int
-log_init_unlocked(int fd_log,
-                  void (*callback_log)(void *, const size_t, const char *),
-                  void *context_log,
-                  int verbosity)
+log_install(int fd_log,
+            void (*callback_log)(void *, const size_t, const char *),
+            void *context_log,
+            int verbosity)
 {
         /**
          * Set log message verbosity
@@ -138,13 +138,13 @@ log_init_unlocked(int fd_log,
 }
 
 /**
- * @brief Takes the log down, with \a m_log_mutex already held
+ * @brief Takes the log down
  *
  * @return Operation status
  * @retval LOG_RETVAL_OK success
  */
 static int
-log_fini_unlocked(void)
+log_remove(void)
 {
         if (m_opt == LOG_OPT_SILENT) {
                 log_init_successful = 0;
@@ -166,31 +166,13 @@ log_init(int fd_log,
          void *context_log,
          int verbosity)
 {
-        int ret;
-
-        if (pthread_mutex_lock(&m_log_mutex) != 0)
-                return LOG_RETVAL_ERROR;
-
-        ret = log_init_unlocked(fd_log, callback_log, context_log, verbosity);
-
-        pthread_mutex_unlock(&m_log_mutex);
-
-        return ret;
+        return log_install(fd_log, callback_log, context_log, verbosity);
 }
 
 int
 log_fini(void)
 {
-        int ret;
-
-        if (pthread_mutex_lock(&m_log_mutex) != 0)
-                return LOG_RETVAL_ERROR;
-
-        ret = log_fini_unlocked();
-
-        pthread_mutex_unlock(&m_log_mutex);
-
-        return ret;
+        return log_remove();
 }
 
 void
@@ -209,19 +191,7 @@ log_resume(void)
 int
 log_is_initialized(void)
 {
-        int initialized;
-
-        /* under the lock like every other read of this state: the answer is
-         * used to decide whether log_printf() may be called, and an install or
-         * a teardown in another thread must be wholly before this answer or
-         * wholly after it
-         */
-        if (pthread_mutex_lock(&m_log_mutex) != 0)
-                return 0;
-        initialized = log_init_successful == 1;
-        pthread_mutex_unlock(&m_log_mutex);
-
-        return initialized;
+        return log_init_successful == 1;
 }
 
 void
@@ -244,22 +214,24 @@ log_printf(int type, const char *str, ...)
         if (m_suspended > 0)
                 return;
 
-        /* the destination is read once, under the lock, so that a message
-         * cannot be written half to one log and half to another - and so that
-         * an install or a teardown running in another thread is either wholly
-         * before this message or wholly after it. The assertion below reads the
-         * same snapshot, for the same reason: it is there to catch a message
-         * logged before initialization, not to fire on a log that was taken
-         * down after this message was already on its way
+        /* Each field of the destination is read once, so that the test of a
+         * descriptor and the write to it cannot be about different descriptors,
+         * and the assertion below is about the state this message actually
+         * used.
+         *
+         * That is all it is: reading them once is not reading them together. An
+         * install or a teardown in another thread can still land between these
+         * reads, and the write and the callback below happen after them in any
+         * case - so a message may still reach a destination the application has
+         * since reclaimed. The log has always been open to that; closing it
+         * needs the destination to be one object a message can hold a reference
+         * to, which is more than a lock here can do.
          */
-        if (pthread_mutex_lock(&m_log_mutex) != 0)
-                return;
         initialized = log_init_successful;
         opt = m_opt;
         fd = m_fd;
         callback = m_callback_log;
         context = m_context_log;
-        pthread_mutex_unlock(&m_log_mutex);
 
         /* If log_init has not been successful then
          * log_printf should not work. */
