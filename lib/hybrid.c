@@ -34,6 +34,7 @@
 
 #include "log.h"
 #include "machine.h"
+#include "types.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -54,6 +55,8 @@ typedef cpuset_t cpu_set_t;
 #define CPUID_NATIVE_MODEL    0x1aU
 #define CPUID_MONITORING      0xfU
 #define CPUID_ALLOCATION      0x10U
+#define CPUID_TOPOLOGY        0x0bU
+#define CPUID_TOPOLOGY_V2     0x1fU
 #define CPUID_ASYM_MONITORING 0x27U
 #define CPUID_ASYM_ALLOCATION 0x28U
 
@@ -68,6 +71,18 @@ typedef cpuset_t cpu_set_t;
  * to allocate once
  */
 #define AFFINITY_MAX_CORES (1U << 16)
+
+/* A topology leaf's subleaf 0 reports the logical processor domain: its
+ * ECX[15:8] says which domain the subleaf describes and its EAX[4:0] is how far
+ * right the x2APIC identifier in EDX has to be shifted to name the core the
+ * processor sits on - a shift of zero where a core carries one processor. Vol
+ * 3A of the SDM spells the walk out; only subleaf 0 is needed for a core
+ * identifier, which is why no walk is done here
+ */
+#define TOPOLOGY_DOMAIN_MASK              0xff00U
+#define TOPOLOGY_DOMAIN_SHIFT             8
+#define TOPOLOGY_DOMAIN_LOGICAL_PROCESSOR 1
+#define TOPOLOGY_SHIFT_MASK               0x1fU
 
 #define ASYM_MONITORING_BIT (1U << 0)
 #define ASYM_ALLOCATION_BIT (1U << 1)
@@ -218,6 +233,50 @@ read_capability(hybrid_cpuid_fn cpuid,
         return read_subleaves(cpuid, context, leaf, *resources, out);
 }
 
+/**
+ * @brief Reads the physical core identifier of the current logical processor
+ *
+ * Architectural topology, not a guess from the processor number: the x2APIC
+ * identifier of the processor this runs on, shifted right by the logical
+ * processor domain's shift, names the core the processor belongs to. Two SMT
+ * siblings therefore answer with one identifier, and a processor that is alone
+ * on its core answers with a shift of zero.
+ *
+ * The leaf is 1FH where the processor has it and 0BH otherwise, and a platform
+ * that reports neither - or reports one whose subleaf 0 describes some other
+ * domain - leaves the identifier invalid rather than guessed. A caller prints
+ * that as unavailable.
+ *
+ * @param [in] cpuid function executing CPUID on this processor
+ * @param [in] context context passed to @a cpuid
+ * @param [in,out] cap capability whose physical core fields are filled
+ */
+static void
+read_physical_core(hybrid_cpuid_fn cpuid,
+                   void *context,
+                   struct pqos_hybrid_core_capability *cap)
+{
+        const unsigned leaves[] = {CPUID_TOPOLOGY_V2, CPUID_TOPOLOGY};
+        unsigned i;
+
+        for (i = 0; i < DIM(leaves); i++) {
+                struct pqos_hybrid_cpuid_out out;
+
+                if (cap->max_leaf < leaves[i])
+                        continue;
+                if (cpuid(leaves[i], 0, &out, context) != 0)
+                        continue;
+                if (((out.ecx & TOPOLOGY_DOMAIN_MASK) >>
+                     TOPOLOGY_DOMAIN_SHIFT) !=
+                    TOPOLOGY_DOMAIN_LOGICAL_PROCESSOR)
+                        continue;
+
+                cap->physical_core = out.edx >> (out.eax & TOPOLOGY_SHIFT_MASK);
+                cap->physical_core_valid = 1;
+                return;
+        }
+}
+
 int
 hybrid_cap_read(hybrid_cpuid_fn cpuid,
                 void *context,
@@ -239,6 +298,8 @@ hybrid_cap_read(hybrid_cpuid_fn cpuid,
 
         if ((leaf7.edx & HYBRID_BIT) == 0)
                 return PQOS_RETVAL_RESOURCE;
+        read_physical_core(cpuid, context, cap);
+
         if (cap->max_leaf >= CPUID_NATIVE_MODEL) {
                 struct pqos_hybrid_cpuid_out model;
 

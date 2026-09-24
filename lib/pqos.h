@@ -379,6 +379,12 @@ struct pqos_hybrid_core_capability {
         unsigned mem_size;           /**< Byte size of the structure */
         unsigned lcore;              /**< Logical processor identifier */
         unsigned socket;             /**< Socket identifier */
+        int physical_core_valid;     /**< Physical core identifier is valid */
+        unsigned physical_core;      /**< Physical core identifier, derived from
+                                      *   the x2APIC identifier of this
+                                      *   processor and the topology leaf's
+                                      *   logical processor shift
+                                      */
         uint32_t max_leaf;           /**< Maximum basic CPUID leaf */
         int core_type_valid;         /**< Core type information is valid */
         uint8_t core_type;           /**< Native core type */

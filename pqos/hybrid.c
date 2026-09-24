@@ -485,6 +485,10 @@ print_capabilities(const struct pqos_hybrid_core_capability *cap)
         unsigned i;
 
         printf("\nLogical Core %u\nSocket ID: %u\n", cap->lcore, cap->socket);
+        if (cap->physical_core_valid)
+                printf("Physical Core ID: %u\n", cap->physical_core);
+        else
+                printf("Physical Core ID: Not available\n");
         if (cap->core_type_valid)
                 printf("Core Type: %s (0x%02x), Native Model ID: 0x%06x\n",
                        core_type_name(cap->core_type), cap->core_type,

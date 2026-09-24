@@ -189,6 +189,83 @@ add_matching_data(struct cpuid_data *data)
 }
 
 static void
+test_physical_core_from_the_topology_leaf(void **state)
+{
+        struct cpuid_data first = {0}, sibling = {0}, older = {0};
+        struct pqos_hybrid_core_capability cap;
+
+        /* subleaf 0 of 1FH describes the logical processor domain (ECX[15:8] is
+         * 1), its EAX[4:0] shift is one, and EDX carries the x2APIC identifier
+         * of the processor the read runs on. 5 >> 1 names core 2
+         */
+        add(&first, 0, 0, 0x1f, 0, 0, 0);
+        add(&first, 7, 0, 1, 0, 0, 1U << 15);
+        add(&first, 7, 1, 0, 0, 0, 0);
+        add(&first, 0x1a, 0, 0, 0, 0, 0);
+        add(&first, 0x1f, 0, 1, 0, 0x0100, 5);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &first, &cap),
+                         PQOS_RETVAL_OK);
+        assert_true(cap.physical_core_valid);
+        assert_int_equal(cap.physical_core, 2);
+
+        /* its SMT sibling has the other x2APIC identifier of the same core and
+         * has to answer with the same core
+         */
+        add(&sibling, 0, 0, 0x1f, 0, 0, 0);
+        add(&sibling, 7, 0, 1, 0, 0, 1U << 15);
+        add(&sibling, 7, 1, 0, 0, 0, 0);
+        add(&sibling, 0x1a, 0, 0, 0, 0, 0);
+        add(&sibling, 0x1f, 0, 1, 0, 0x0100, 4);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &sibling, &cap),
+                         PQOS_RETVAL_OK);
+        assert_true(cap.physical_core_valid);
+        assert_int_equal(cap.physical_core, 2);
+
+        /* a processor with 0BH and not 1FH is read the same way, and a shift of
+         * zero is what a core carrying one processor reports
+         */
+        add(&older, 0, 0, 0x0b, 0, 0, 0);
+        add(&older, 7, 0, 1, 0, 0, 1U << 15);
+        add(&older, 7, 1, 0, 0, 0, 0);
+        add(&older, 0x0b, 0, 0, 0, 0x0100, 7);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &older, &cap),
+                         PQOS_RETVAL_OK);
+        assert_true(cap.physical_core_valid);
+        assert_int_equal(cap.physical_core, 7);
+        (void)state;
+}
+
+static void
+test_physical_core_left_unavailable(void **state)
+{
+        struct cpuid_data no_leaf = {0}, other_domain = {0};
+        struct pqos_hybrid_core_capability cap;
+
+        /* neither topology leaf is in range */
+        add(&no_leaf, 0, 0, 0x0a, 0, 0, 0);
+        add(&no_leaf, 7, 0, 1, 0, 0, 1U << 15);
+        add(&no_leaf, 7, 1, 0, 0, 0, 0);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &no_leaf, &cap),
+                         PQOS_RETVAL_OK);
+        assert_false(cap.physical_core_valid);
+
+        /* and a subleaf 0 describing some other domain is not read as a
+         * processor domain: the identifier stays unavailable rather than being
+         * shifted by a number that means something else
+         */
+        add(&other_domain, 0, 0, 0x1f, 0, 0, 0);
+        add(&other_domain, 7, 0, 1, 0, 0, 1U << 15);
+        add(&other_domain, 7, 1, 0, 0, 0, 0);
+        add(&other_domain, 0x1a, 0, 0, 0, 0, 0);
+        add(&other_domain, 0x1f, 0, 1, 0, 0x0200, 5);
+        add(&other_domain, 0x0b, 0, 1, 0, 0x0200, 5);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &other_domain, &cap),
+                         PQOS_RETVAL_OK);
+        assert_false(cap.physical_core_valid);
+        (void)state;
+}
+
+static void
 test_compare_ignores_reserved_and_reports_cbm(void **state)
 {
         struct cpuid_data data = {0};
@@ -335,6 +412,8 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_cap_read_checks_max_leaf),
             cmocka_unit_test(test_cap_read_decodes_asymmetric_leaves),
+            cmocka_unit_test(test_physical_core_from_the_topology_leaf),
+            cmocka_unit_test(test_physical_core_left_unavailable),
             cmocka_unit_test(test_compare_ignores_reserved_and_reports_cbm),
             cmocka_unit_test(test_resource_priority_support),
             /* the vendor gate answers before any affinity call, so this one
