@@ -481,6 +481,7 @@ $(BIN_DIR)/test_hybrid: test_hybrid.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=sched_getaffinity \
 		-Wl,--wrap=sched_setaffinity \
+		-Wl,--wrap=__sched_cpualloc \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

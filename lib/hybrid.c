@@ -666,18 +666,33 @@ read_affinity_mask(cpu_set_t **set, unsigned *cores)
  *
  * The original affinity mask is restored before returning.
  *
+ * hybrid_cap_read() answers PQOS_RETVAL_RESOURCE for a processor that is not
+ * hybrid, which is the same status this function needs for an affinity mask it
+ * cannot allocate - and the two are nothing alike: one is the platform's answer
+ * and the other is an out of memory. So hybridness is reported here as what it
+ * is, a fact about the processor, and the status is left to say whether the
+ * read happened at all.
+ *
  * @param [in] lcore Logical processor identifier
  * @param [in] max_cores Number of processors represented by affinity masks
  * @param [in] original Original CPU affinity mask
  * @param [out] cap Logical processor hybrid capability
+ * @param [out] is_hybrid Whether the processor reports itself hybrid, set only
+ *              when this function returns PQOS_RETVAL_OK
  *
  * @return PQoS operation status
+ * @retval PQOS_RETVAL_OK the processor was read, hybrid or not
+ * @retval PQOS_RETVAL_RESOURCE the affinity mask could not be allocated
+ * @retval PQOS_RETVAL_UNAVAILABLE the processor is not available to this
+ *         process
+ * @retval PQOS_RETVAL_ERROR the CPUID read or the affinity restore failed
  */
 static int
 read_core(unsigned lcore,
           unsigned max_cores,
           const cpu_set_t *original,
-          struct pqos_hybrid_core_capability *cap)
+          struct pqos_hybrid_core_capability *cap,
+          int *is_hybrid)
 {
         const size_t set_size = CPU_ALLOC_SIZE(max_cores);
         cpu_set_t *target = CPU_ALLOC(max_cores);
@@ -685,7 +700,7 @@ read_core(unsigned lcore,
 
         if (target == NULL) {
                 LOG_ERROR("Unable to allocate CPU affinity mask\n");
-                return PQOS_RETVAL_ERROR;
+                return PQOS_RETVAL_RESOURCE;
         }
         CPU_ZERO_S(set_size, target);
         CPU_SET_S(lcore, set_size, target);
@@ -698,6 +713,15 @@ read_core(unsigned lcore,
         }
 
         ret = hybrid_cap_read(native_cpuid, NULL, cap);
+        if (ret == PQOS_RETVAL_RESOURCE) {
+                /* this processor is not hybrid, which is an answer and not a
+                 * failure to read one
+                 */
+                *is_hybrid = 0;
+                ret = PQOS_RETVAL_OK;
+        } else if (ret == PQOS_RETVAL_OK) {
+                *is_hybrid = 1;
+        }
         if (set_affinity_mask(original, max_cores) != 0) {
                 LOG_ERROR("Unable to restore CPU affinity after logical core "
                           "%u: %s\n",
@@ -720,10 +744,12 @@ read_core(unsigned lcore,
  * @param [in] max_cores processors the affinity mask represents
  * @param [in] mask affinity of this process
  * @param [out] core capability read, on success
+ * @param [out] is_hybrid whether that processor reports itself hybrid, set only
+ *              when this function returns PQOS_RETVAL_OK
  *
  * @return Operation status
- * @retval PQOS_RETVAL_OK a processor was read
- * @retval PQOS_RETVAL_RESOURCE the processor read is not hybrid
+ * @retval PQOS_RETVAL_OK a processor was read, hybrid or not
+ * @retval PQOS_RETVAL_RESOURCE an affinity mask could not be allocated
  * @retval PQOS_RETVAL_UNAVAILABLE no processor of the topology could be read
  * @retval PQOS_RETVAL_ERROR a processor could not be enumerated
  */
@@ -731,7 +757,8 @@ static int
 probe_first_core(const struct pqos_cpuinfo *cpu,
                  unsigned max_cores,
                  const cpu_set_t *mask,
-                 struct pqos_hybrid_core_capability *core)
+                 struct pqos_hybrid_core_capability *core,
+                 int *is_hybrid)
 {
         unsigned i;
 
@@ -742,7 +769,8 @@ probe_first_core(const struct pqos_cpuinfo *cpu,
                                  mask))
                         continue;
 
-                ret = read_core(cpu->cores[i].lcore, max_cores, mask, core);
+                ret = read_core(cpu->cores[i].lcore, max_cores, mask, core,
+                                is_hybrid);
                 if (ret == PQOS_RETVAL_UNAVAILABLE)
                         continue;
 
@@ -759,6 +787,7 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
         struct pqos_hybrid_capabilities *hybrid = NULL;
         struct pqos_hybrid_core_capability probe;
         cpu_set_t *original = NULL;
+        int is_hybrid = 0;
         unsigned max_cores = 0, i;
         size_t size;
         int ret;
@@ -813,8 +842,8 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
          * A platform that is not hybrid is answered from it, and the per
          * processor array is never allocated for that answer
          */
-        ret = probe_first_core(cpu, max_cores, original, &probe);
-        if (ret == PQOS_RETVAL_RESOURCE) {
+        ret = probe_first_core(cpu, max_cores, original, &probe, &is_hybrid);
+        if (ret == PQOS_RETVAL_OK && !is_hybrid) {
                 CPU_FREE(original);
 
                 hybrid = calloc(1, sizeof(*hybrid));
@@ -857,18 +886,26 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                         continue;
                 }
                 core = &hybrid->cores[hybrid->num_cores];
-                ret = read_core(cpu->cores[i].lcore, max_cores, original, core);
+                ret = read_core(cpu->cores[i].lcore, max_cores, original, core,
+                                &is_hybrid);
                 if (ret == PQOS_RETVAL_UNAVAILABLE)
                         continue;
                 if (ret != PQOS_RETVAL_OK) {
-                        /* the probe above established that this platform is
-                         * hybrid, so a processor refusing the read now is a
-                         * disagreement between processors rather than the
-                         * platform's answer
-                         */
                         LOG_ERROR("Hybrid capability enumeration failed for "
                                   "logical core %u\n",
                                   cpu->cores[i].lcore);
+                        goto error;
+                }
+                if (!is_hybrid) {
+                        /* the probe above established that this platform is
+                         * hybrid, so a processor answering otherwise now is a
+                         * disagreement between processors rather than the
+                         * platform's answer
+                         */
+                        LOG_ERROR("Logical core %u does not report the hybrid "
+                                  "capability the platform does\n",
+                                  cpu->cores[i].lcore);
+                        ret = PQOS_RETVAL_ERROR;
                         goto error;
                 }
                 core->lcore = cpu->cores[i].lcore;

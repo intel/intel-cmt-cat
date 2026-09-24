@@ -61,6 +61,28 @@ struct cpuid_data {
 static size_t g_kernel_set_size;
 static size_t g_accepted_set_size;
 
+/* Which affinity mask allocation should fail, counted from one, and how many
+ * have been asked for. Zero means every one of them succeeds, which is what
+ * every case that is not about an allocation failure wants.
+ */
+static unsigned g_mask_alloc_fails_on;
+static unsigned g_mask_allocs;
+
+/* CPU_ALLOC() calls this, and the library reads each processor through a mask
+ * it allocates here - so this is where an out of memory can be put in front of
+ * the enumeration without troubling any other allocation in the process.
+ */
+cpu_set_t *
+__wrap___sched_cpualloc(size_t count)
+{
+        g_mask_allocs++;
+        if (g_mask_alloc_fails_on != 0 &&
+            g_mask_allocs == g_mask_alloc_fails_on)
+                return NULL;
+
+        return calloc(1, CPU_ALLOC_SIZE(count));
+}
+
 int
 __wrap_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask)
 {
@@ -571,6 +593,41 @@ test_discover_skips_inaccessible_topology_cpus(void **state)
 
 #ifdef __linux__
 static void
+test_discover_reports_a_failed_mask_allocation_as_resource(void **state)
+{
+        const size_t size =
+            sizeof(struct pqos_cpuinfo) + sizeof(struct pqos_coreinfo);
+        struct pqos_cpuinfo *cpu = calloc(1, size);
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        assert_non_null(cpu);
+        cpu->num_cores = 1;
+        cpu->cores[0].lcore = 0;
+        cpu->vendor = PQOS_VENDOR_INTEL;
+
+        /* the first mask is the process's own affinity, the second is the one
+         * the processor is read through. Both are the same kind of failure and
+         * both have to be named the same way, or a caller cannot tell an out of
+         * memory from a platform that could not be enumerated
+         */
+        g_mask_allocs = 0;
+        g_mask_alloc_fails_on = 1;
+        assert_int_equal(hybrid_cap_discover(&cap, cpu), PQOS_RETVAL_RESOURCE);
+        assert_null(cap);
+
+        g_mask_allocs = 0;
+        g_mask_alloc_fails_on = 2;
+        assert_int_equal(hybrid_cap_discover(&cap, cpu), PQOS_RETVAL_RESOURCE);
+        assert_null(cap);
+
+        g_mask_alloc_fails_on = 0;
+        free(cpu);
+        (void)state;
+}
+#endif
+
+#ifdef __linux__
+static void
 test_discover_grows_the_affinity_mask(void **state)
 {
         const size_t size =
@@ -664,6 +721,8 @@ main(void)
             cmocka_unit_test(test_discover_leaves_a_foreign_vendor_unknown),
 #ifdef __linux__
             cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
+            cmocka_unit_test(
+                test_discover_reports_a_failed_mask_allocation_as_resource),
             cmocka_unit_test(test_discover_grows_the_affinity_mask),
 #endif
             cmocka_unit_test(test_non_hybrid_is_not_a_hybrid_capability)};
