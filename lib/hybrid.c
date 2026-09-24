@@ -842,27 +842,51 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                                                   PQOS_INTER_OS
 #endif
         };
+        int log_owned = 0;
         unsigned i;
 
         if (cap == NULL)
                 return PQOS_RETVAL_PARAM;
         *cap = NULL;
 
+        /* Every path below this reports what it found through the library log,
+         * and log_printf() asserts that the log has been initialized - which it
+         * has not, since this function exists to be called before pqos_init().
+         * A caller that has a log keeps it and sees those messages; for one
+         * that has none a silent log is brought up for the duration, so the
+         * calls are safe and nothing is written to a destination the caller
+         * never chose. What such a caller learns is the status returned, which
+         * is what the documentation promises it.
+         */
+        if (!log_is_initialized()) {
+                if (log_init(-1, NULL, NULL, LOG_VER_SILENT) != LOG_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                log_owned = 1;
+        }
+
         for (i = 0; i < DIM(topologies); i++) {
                 struct pqos_cpuinfo *cpu = NULL;
                 int ret;
 
-                if (cpuinfo_init(topologies[i], &cpu) != 0 || cpu == NULL)
+                /* zero: a read of the topology opens no per core file, so
+                 * the process's open file limit is left as the caller set it
+                 */
+                if (cpuinfo_init(topologies[i], 0, &cpu) != 0 || cpu == NULL)
                         continue;
 
                 ret = hybrid_cap_discover(cap, cpu);
                 cpuinfo_fini();
+                if (log_owned)
+                        log_fini();
 
                 return ret;
         }
 
         LOG_ERROR("CPU topology could not be read, so the hybrid capabilities "
                   "of this platform are unknown\n");
+        if (log_owned)
+                log_fini();
+
         return PQOS_RETVAL_RESOURCE;
 }
 
