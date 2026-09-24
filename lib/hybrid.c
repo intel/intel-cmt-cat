@@ -865,17 +865,20 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
         }
 
         for (i = 0; i < DIM(topologies); i++) {
-                struct pqos_cpuinfo *cpu = NULL;
+                /* a topology of its own, not the library's singleton: two
+                 * callers of this function would otherwise both find the
+                 * singleton missing, build it twice and free each other's. Zero
+                 * because a read opens no per core file, so the process's open
+                 * file limit is left as the caller set it
+                 */
+                struct pqos_cpuinfo *cpu = cpuinfo_discover(topologies[i], 0);
                 int ret;
 
-                /* zero: a read of the topology opens no per core file, so
-                 * the process's open file limit is left as the caller set it
-                 */
-                if (cpuinfo_init(topologies[i], 0, &cpu) != 0 || cpu == NULL)
+                if (cpu == NULL)
                         continue;
 
                 ret = hybrid_cap_discover(cap, cpu);
-                cpuinfo_fini();
+                free(cpu);
                 if (log_owned)
                         log_fini();
 

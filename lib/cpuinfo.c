@@ -359,11 +359,15 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
  * @retval -1 input parameter error
  * @retval -2 error detecting APIC masks for cores & packages
  * @retval -3 error detecting APIC masks for cache levels
+ *
+ * The cache leaf comes from the caller's configuration rather than the module's
+ * copy of it, so a caller building a topology of its own - cpuinfo_discover() -
+ * does not have to write that copy to be able to read the caches
  */
 static int
-detect_apic_masks(struct apic_info *apic)
+detect_apic_masks(struct apic_info *apic, const struct cpuinfo_config *config)
 {
-        if (apic == NULL)
+        if (apic == NULL || config == NULL)
                 return -1;
 
         memset(apic, 0, sizeof(*apic));
@@ -371,7 +375,7 @@ detect_apic_masks(struct apic_info *apic)
         if (detect_apic_core_masks(apic) != 0)
                 return -2;
 
-        if (detect_apic_cache_masks(apic, m_config.cpuid_cache_leaf) != 0)
+        if (detect_apic_cache_masks(apic, config->cpuid_cache_leaf) != 0)
                 return -3;
 
         return 0;
@@ -632,6 +636,68 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
  * Detect number of logical processors on the machine
  * and their location.
  */
+/**
+ * @brief Builds a topology the caller owns
+ *
+ * The same work cpuinfo_init() does, without the singleton: a caller that only
+ * wants to read the topology gets one of its own, so two callers cannot find it
+ * missing at the same time, build it twice and free each other's. Nothing here
+ * writes the module's state - the cache information and the vendor are read and
+ * copied into the structure that is returned.
+ *
+ * Released with free().
+ *
+ * @param [in] interface interface whose topology is wanted
+ * @param [in] prepare_for_access non-zero where the caller will open the per
+ *             core files, as in cpuinfo_init()
+ *
+ * @return The topology, or NULL where it could not be built
+ */
+struct pqos_cpuinfo *
+cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
+{
+        struct pqos_cpuinfo *cpu = NULL;
+        struct cpuinfo_config config;
+        enum pqos_vendor vendor;
+        struct apic_info apic;
+        unsigned i;
+
+        vendor = detect_vendor();
+        if (init_config(&config, vendor) != 0)
+                return NULL;
+
+        if (detect_apic_masks(&apic, &config) != 0) {
+                LOG_ERROR("Couldn't retrieve APICID structure information!\n");
+                return NULL;
+        }
+
+        if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO)
+                cpu = cpuinfo_build_topo(&apic, prepare_for_access);
+#ifdef __linux__
+        else if (interface == PQOS_INTER_OS ||
+                 interface == PQOS_INTER_OS_RESCTRL_MON)
+                cpu = os_cpuinfo_topology(prepare_for_access);
+#endif
+        if (cpu == NULL)
+                return NULL;
+
+        cpu->vendor = vendor;
+        cpu->l2 = m_l2;
+        cpu->l3 = m_l3;
+
+        for (i = 0; i < cpu->num_cores; ++i) {
+                struct pqos_coreinfo *info = &cpu->cores[i];
+
+                info->l3cat_id = info->l3_id;
+                info->mba_id = info->l3_id;
+
+                if (vendor == PQOS_VENDOR_AMD)
+                        info->smba_id = info->l3_id;
+        }
+
+        return cpu;
+}
+
 int
 cpuinfo_init(enum pqos_interface interface,
              int prepare_for_access,
@@ -654,7 +720,7 @@ cpuinfo_init(enum pqos_interface interface,
         if (ret != 0)
                 return ret;
 
-        if (detect_apic_masks(&apic) != 0) {
+        if (detect_apic_masks(&apic, &m_config) != 0) {
                 LOG_ERROR("Couldn't retrieve APICID structure information!\n");
                 return -EFAULT;
         }

@@ -69,6 +69,26 @@ struct cpuinfo_config {
 };
 
 /**
+ * @brief Builds a topology the caller owns, without the module's singleton
+ *
+ * For a caller that wants to read the topology and nothing else: it gets a
+ * structure of its own, so two such callers cannot find the singleton missing
+ * at the same time, build it twice and free each other's. cpuinfo_init() is the
+ * call for a caller that is bringing the library up.
+ *
+ * Released with free().
+ *
+ * @param [in] interface interface whose topology is wanted
+ * @param [in] prepare_for_access non-zero where the caller will open the per
+ *             core files the interfaces use; zero leaves the process's open
+ * file limit alone
+ *
+ * @return The topology, or NULL where it could not be built
+ */
+PQOS_LOCAL struct pqos_cpuinfo *cpuinfo_discover(enum pqos_interface interface,
+                                                 int prepare_for_access);
+
+/**
  * @brief Initializes CPU information module
  *
  * CPU topology detection method is OS dependent.
