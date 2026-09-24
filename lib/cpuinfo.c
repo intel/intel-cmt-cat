@@ -717,17 +717,33 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
         if (init_config(&config, vendor) != 0)
                 return NULL;
 
-        if (detect_apic_masks(&apic, &config, &l2, &l3) != 0) {
-                LOG_ERROR("Couldn't retrieve APICID structure information!\n");
-                return NULL;
-        }
+        memset(&l2, 0, sizeof(l2));
+        memset(&l3, 0, sizeof(l3));
 
-        if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO)
+        if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO) {
+                /* the CPUID builder is the one that needs the APIC and cache
+                 * masks: it derives every identifier from them
+                 */
+                if (detect_apic_masks(&apic, &config, &l2, &l3) != 0) {
+                        LOG_ERROR("Couldn't retrieve APICID structure "
+                                  "information!\n");
+                        return NULL;
+                }
                 cpu = cpuinfo_build_topo(&apic, prepare_for_access);
+        }
 #ifdef __linux__
         else if (interface == PQOS_INTER_OS ||
-                 interface == PQOS_INTER_OS_RESCTRL_MON)
+                 interface == PQOS_INTER_OS_RESCTRL_MON) {
+                /* and the operating system's topology needs neither. Asking for
+                 * them here would make this path fail wherever CPUID's topology
+                 * or cache leaves are unavailable - a hypervisor filtering
+                 * them, say - which is exactly the case the operating system is
+                 * the fallback for. What it cannot report it leaves unreported:
+                 * the cache description stays as detected, which is "not
+                 * detected" when nothing detected it
+                 */
                 cpu = os_cpuinfo_topology(prepare_for_access);
+        }
 #endif
         if (cpu == NULL)
                 return NULL;

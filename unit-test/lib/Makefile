@@ -484,6 +484,16 @@ $(BIN_DIR)/test_hybrid: test_hybrid.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_hybrid_discover: test_hybrid_discover.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=lcpuid \
+		-Wl,--wrap=os_cpuinfo_topology \
+		-Wl,--wrap=sched_getaffinity \
+		-Wl,--wrap=sched_setaffinity \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_hw_cap_l3ca_cdp: test_hw_cap_l3ca_cdp.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
