@@ -1347,8 +1347,10 @@ int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
  * answer; both are reads. The capability is the caller's to release with
  * pqos_hybrid_free().
  *
- * Call it before pqos_init(): the topology this builds is the library's own
- * singleton, so it cannot be built while the library holds one.
+ * Independent of the library's state: the topology it reads is built for this
+ * call and released again, so it neither needs nor disturbs an initialized
+ * library, and it can be called before pqos_init(), after it, or without it.
+ * Concurrent calls are serialized inside the library.
  *
  * @param [out] cap location to store the hybrid capabilities at
  *
