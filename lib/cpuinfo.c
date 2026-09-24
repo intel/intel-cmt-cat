@@ -272,7 +272,9 @@ nearest_pow2(const unsigned n)
  * Assumes apic->pkg_shift is already set, this is in case
  * L3/LLC is not detected.
  *
- * Fills in information about L2 and L3 caches into \a m_l2 and \a m_l3
+ * Fills in information about L2 and L3 caches into \a l2 and \a l3, which the
+ * caller owns: a caller building a topology of its own keeps its cache data to
+ * itself rather than sharing the module's copies
  * data structures.
  *
  * @param [out] apic structure to be filled in with details
@@ -283,13 +285,16 @@ nearest_pow2(const unsigned n)
  * @retval -1 error
  */
 static int
-detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
+detect_apic_cache_masks(struct apic_info *apic,
+                        unsigned cpuid_cache,
+                        struct pqos_cacheinfo *l2,
+                        struct pqos_cacheinfo *l3)
 {
         unsigned cache_level_shift[4] = {0, 0, 0, 0};
         unsigned subleaf = 0;
 
-        memset(&m_l2, 0, sizeof(m_l2));
-        memset(&m_l3, 0, sizeof(m_l3));
+        memset(l2, 0, sizeof(*l2));
+        memset(l3, 0, sizeof(*l3));
 
         for (subleaf = 0;; subleaf++) {
                 struct cpuid_out cache_info;
@@ -331,10 +336,10 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
                           ci.num_partitions);
 
                 if (cache_level == 2)
-                        m_l2 = ci;
+                        *l2 = ci;
 
                 if (cache_level == 3)
-                        m_l3 = ci;
+                        *l3 = ci;
         }
 
         if (!cache_level_shift[2] || !cache_level_shift[1])
@@ -365,9 +370,12 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
  * does not have to write that copy to be able to read the caches
  */
 static int
-detect_apic_masks(struct apic_info *apic, const struct cpuinfo_config *config)
+detect_apic_masks(struct apic_info *apic,
+                  const struct cpuinfo_config *config,
+                  struct pqos_cacheinfo *l2,
+                  struct pqos_cacheinfo *l3)
 {
-        if (apic == NULL || config == NULL)
+        if (apic == NULL || config == NULL || l2 == NULL || l3 == NULL)
                 return -1;
 
         memset(apic, 0, sizeof(*apic));
@@ -375,7 +383,8 @@ detect_apic_masks(struct apic_info *apic, const struct cpuinfo_config *config)
         if (detect_apic_core_masks(apic) != 0)
                 return -2;
 
-        if (detect_apic_cache_masks(apic, config->cpuid_cache_leaf) != 0)
+        if (detect_apic_cache_masks(apic, config->cpuid_cache_leaf, l2, l3) !=
+            0)
                 return -3;
 
         return 0;
@@ -658,6 +667,7 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
 {
         struct pqos_cpuinfo *cpu = NULL;
         struct cpuinfo_config config;
+        struct pqos_cacheinfo l2, l3;
         enum pqos_vendor vendor;
         struct apic_info apic;
         unsigned i;
@@ -666,7 +676,7 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
         if (init_config(&config, vendor) != 0)
                 return NULL;
 
-        if (detect_apic_masks(&apic, &config) != 0) {
+        if (detect_apic_masks(&apic, &config, &l2, &l3) != 0) {
                 LOG_ERROR("Couldn't retrieve APICID structure information!\n");
                 return NULL;
         }
@@ -682,8 +692,8 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
                 return NULL;
 
         cpu->vendor = vendor;
-        cpu->l2 = m_l2;
-        cpu->l3 = m_l3;
+        cpu->l2 = l2;
+        cpu->l3 = l3;
 
         for (i = 0; i < cpu->num_cores; ++i) {
                 struct pqos_coreinfo *info = &cpu->cores[i];
@@ -720,7 +730,7 @@ cpuinfo_init(enum pqos_interface interface,
         if (ret != 0)
                 return ret;
 
-        if (detect_apic_masks(&apic, &m_config) != 0) {
+        if (detect_apic_masks(&apic, &m_config, &m_l2, &m_l3) != 0) {
                 LOG_ERROR("Couldn't retrieve APICID structure information!\n");
                 return -EFAULT;
         }
