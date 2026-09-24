@@ -5,6 +5,7 @@ Language: Cpp
 BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
+IndentGotoLabels: false
 UseTab: Never
 AlignConsecutiveMacros: true
 AlignTrailingComments: true
