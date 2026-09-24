@@ -68,6 +68,9 @@
 static unsigned g_os_topology_calls;
 static int g_os_topology_available = 1;
 
+/** Whether the fake platform reports itself hybrid in leaf 7 */
+static int g_hybrid = 1;
+
 /**
  * @brief A platform whose CPUID carries no topology
  *
@@ -92,7 +95,7 @@ __wrap_lcpuid(const unsigned leaf,
                 out->edx = VENDOR_EDX;
                 break;
         case 7:
-                if (subleaf == 0)
+                if (subleaf == 0 && g_hybrid)
                         out->edx = 1U << 15; /* hybrid */
                 break;
         default:
@@ -173,6 +176,30 @@ test_discover_falls_back_to_the_os_topology(void **state)
 }
 
 static void
+test_discover_answers_no_without_the_per_core_array(void **state)
+{
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        g_os_topology_calls = 0;
+        g_os_topology_available = 1;
+        g_hybrid = 0;
+
+        /* a processor that is not hybrid is answered from one read, and the
+         * capability handed back is the header alone - the per processor array
+         * is fifteen hundred bytes each and nothing would be in it
+         */
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        assert_int_equal(cap->status, PQOS_HYBRID_STATUS_NO);
+        assert_int_equal(cap->num_cores, 0);
+        assert_int_equal(cap->mem_size, sizeof(*cap));
+
+        pqos_hybrid_free(cap);
+        g_hybrid = 1;
+        (void)state;
+}
+
+static void
 test_discover_reports_no_topology_at_all(void **state)
 {
         struct pqos_hybrid_capabilities *cap = NULL;
@@ -207,6 +234,8 @@ main(void)
             cmocka_unit_test(test_discover_checks_its_parameter),
 #ifdef __linux__
             cmocka_unit_test(test_discover_falls_back_to_the_os_topology),
+            cmocka_unit_test(
+                test_discover_answers_no_without_the_per_core_array),
             cmocka_unit_test(test_discover_reports_no_topology_at_all),
 #endif
         };

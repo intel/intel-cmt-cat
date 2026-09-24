@@ -708,11 +708,56 @@ read_core(unsigned lcore,
         return ret;
 }
 
+/**
+ * @brief Reads the first processor this process can reach
+ *
+ * What the answer decides is how much to allocate: a platform that is not
+ * hybrid is answered from this one read, and the per processor array - fifteen
+ * hundred bytes each, so hundreds of kilobytes on a large machine - is never
+ * allocated for a negative answer.
+ *
+ * @param [in] cpu the topology to walk
+ * @param [in] max_cores processors the affinity mask represents
+ * @param [in] mask affinity of this process
+ * @param [out] core capability read, on success
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK a processor was read
+ * @retval PQOS_RETVAL_RESOURCE the processor read is not hybrid
+ * @retval PQOS_RETVAL_UNAVAILABLE no processor of the topology could be read
+ * @retval PQOS_RETVAL_ERROR a processor could not be enumerated
+ */
+static int
+probe_first_core(const struct pqos_cpuinfo *cpu,
+                 unsigned max_cores,
+                 const cpu_set_t *mask,
+                 struct pqos_hybrid_core_capability *core)
+{
+        unsigned i;
+
+        for (i = 0; i < cpu->num_cores; i++) {
+                int ret;
+
+                if (!CPU_ISSET_S(cpu->cores[i].lcore, CPU_ALLOC_SIZE(max_cores),
+                                 mask))
+                        continue;
+
+                ret = read_core(cpu->cores[i].lcore, max_cores, mask, core);
+                if (ret == PQOS_RETVAL_UNAVAILABLE)
+                        continue;
+
+                return ret;
+        }
+
+        return PQOS_RETVAL_UNAVAILABLE;
+}
+
 int
 hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                     const struct pqos_cpuinfo *cpu)
 {
         struct pqos_hybrid_capabilities *hybrid = NULL;
+        struct pqos_hybrid_core_capability probe;
         cpu_set_t *original = NULL;
         unsigned max_cores = 0, i;
         size_t size;
@@ -754,13 +799,6 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
         if (cpu->num_cores >
             (UINT_MAX - sizeof(*hybrid)) / sizeof(hybrid->cores[0]))
                 return PQOS_RETVAL_RESOURCE;
-        size =
-            sizeof(*hybrid) + (size_t)cpu->num_cores * sizeof(hybrid->cores[0]);
-        hybrid = calloc(1, size);
-        if (hybrid == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto error;
-        }
 
         /* the topology says which processors to enumerate; how wide the mask
          * has to be is a question for the kernel, and the two differ wherever a
@@ -769,7 +807,41 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
         max_cores = affinity_mask_cores(max_cores);
         ret = read_affinity_mask(&original, &max_cores);
         if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /* one processor first, into a capability that costs nothing to discard.
+         * A platform that is not hybrid is answered from it, and the per
+         * processor array is never allocated for that answer
+         */
+        ret = probe_first_core(cpu, max_cores, original, &probe);
+        if (ret == PQOS_RETVAL_RESOURCE) {
+                CPU_FREE(original);
+
+                hybrid = calloc(1, sizeof(*hybrid));
+                if (hybrid == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+                hybrid->mem_size = sizeof(*hybrid);
+                hybrid->status = PQOS_HYBRID_STATUS_NO;
+                hybrid->num_cores = 0;
+                *cap = hybrid;
+
+                return PQOS_RETVAL_OK;
+        }
+        if (ret != PQOS_RETVAL_OK) {
+                if (ret == PQOS_RETVAL_UNAVAILABLE)
+                        LOG_INFO("No topology CPUs are available to this "
+                                 "process\n");
+                CPU_FREE(original);
+                return ret;
+        }
+
+        size =
+            sizeof(*hybrid) + (size_t)cpu->num_cores * sizeof(hybrid->cores[0]);
+        hybrid = calloc(1, size);
+        if (hybrid == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
                 goto error;
+        }
 
         hybrid->mem_size = size;
         hybrid->status = PQOS_HYBRID_STATUS_YES;
@@ -789,12 +861,11 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                 if (ret == PQOS_RETVAL_UNAVAILABLE)
                         continue;
                 if (ret != PQOS_RETVAL_OK) {
-                        if (ret == PQOS_RETVAL_RESOURCE &&
-                            hybrid->num_cores == 0) {
-                                hybrid->status = PQOS_HYBRID_STATUS_NO;
-                                hybrid->num_cores = 0;
-                                break;
-                        }
+                        /* the probe above established that this platform is
+                         * hybrid, so a processor refusing the read now is a
+                         * disagreement between processors rather than the
+                         * platform's answer
+                         */
                         LOG_ERROR("Hybrid capability enumeration failed for "
                                   "logical core %u\n",
                                   cpu->cores[i].lcore);
