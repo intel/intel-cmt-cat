@@ -100,6 +100,12 @@ static pthread_mutex_t g_fini_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_fini_cond = PTHREAD_COND_INITIALIZER;
 static int g_fini_done;
 static int g_fini_ret = LOG_RETVAL_ERROR;
+/** whether the application's callback should finalize the log when it is next
+ *  called, which is what an application finalizing from a callback does
+ */
+static int g_callback_finalizes;
+/** and whether the discovery itself has returned */
+static int g_discovery_done;
 
 /**
  * @brief An application's log callback: it only counts
@@ -111,6 +117,16 @@ count_message(void *context, const size_t size, const char *message)
         (void)size;
         (void)message;
         g_messages++;
+
+        /* an application may finalize the library from its own log callback,
+         * and the callback runs on the thread of whatever logged - here, the
+         * discovery that is holding the log
+         */
+        if (g_callback_finalizes) {
+                g_callback_finalizes = 0;
+                g_fini_ret = log_fini();
+                g_fini_done = 1;
+        }
 }
 
 /**
@@ -274,6 +290,12 @@ discover_thread(void *arg)
 {
         (void)arg;
         g_discover_ret = pqos_hybrid_discover(&g_discover_cap);
+
+        pthread_mutex_lock(&g_fini_mutex);
+        g_discovery_done = 1;
+        pthread_cond_broadcast(&g_fini_cond);
+        pthread_mutex_unlock(&g_fini_mutex);
+
         return NULL;
 }
 
@@ -451,6 +473,75 @@ test_a_finalization_during_discovery_waits_for_it(void **state)
         (void)state;
 }
 
+/**
+ * @brief Whether the discovery has returned within \a millis milliseconds
+ */
+static int
+discovery_returned_within(unsigned millis)
+{
+        struct timespec deadline;
+        int done;
+
+        clock_gettime(CLOCK_REALTIME, &deadline);
+        deadline.tv_nsec += (long)millis * 1000000L;
+        deadline.tv_sec += deadline.tv_nsec / 1000000000L;
+        deadline.tv_nsec %= 1000000000L;
+
+        pthread_mutex_lock(&g_fini_mutex);
+        while (!g_discovery_done) {
+                if (pthread_cond_timedwait(&g_fini_cond, &g_fini_mutex,
+                                           &deadline) == ETIMEDOUT)
+                        break;
+        }
+        done = g_discovery_done;
+        pthread_mutex_unlock(&g_fini_mutex);
+
+        return done;
+}
+
+static void
+test_a_finalization_from_a_log_callback_returns(void **state)
+{
+        pthread_t thread;
+
+        while (log_is_initialized())
+                log_fini();
+        assert_int_equal(log_init(-1, count_message, NULL, LOG_VER_DEFAULT),
+                         LOG_RETVAL_OK);
+
+        g_os_topology_available = 1;
+        g_pause_in_topology = 0;
+        g_discovery_done = 0;
+        g_fini_done = 0;
+        g_fini_ret = LOG_RETVAL_ERROR;
+        g_messages = 0;
+        g_discover_ret = PQOS_RETVAL_ERROR;
+        g_discover_cap = NULL;
+
+        /* the first message the discovery logs reaches the application's
+         * callback, which finalizes the library from there - on the thread
+         * whose hold a waiting finalization would wait for. It has to come back
+         */
+        g_callback_finalizes = 1;
+        assert_int_equal(pthread_create(&thread, NULL, discover_thread, NULL),
+                         0);
+        assert_int_equal(discovery_returned_within(2000), 1);
+        assert_int_equal(pthread_join(thread, NULL), 0);
+
+        assert_int_equal(g_fini_done, 1);
+        assert_int_equal(g_fini_ret, LOG_RETVAL_OK);
+        assert_int_equal(g_discover_ret, PQOS_RETVAL_OK);
+        pqos_hybrid_free(g_discover_cap);
+
+        /* the application's log went when it asked, and the discovery reported
+         * the rest of its work to the silent log left in its place - so the
+         * callback was called once, and the log is gone now the hold is
+         */
+        assert_int_equal(g_messages, 1);
+        assert_int_equal(log_is_initialized(), 0);
+        (void)state;
+}
+
 static void
 test_discover_reports_no_topology_at_all(void **state)
 {
@@ -492,6 +583,7 @@ main(void)
             cmocka_unit_test(
                 test_an_initialization_during_discovery_keeps_its_log),
             cmocka_unit_test(test_a_finalization_during_discovery_waits_for_it),
+            cmocka_unit_test(test_a_finalization_from_a_log_callback_returns),
 #endif
         };
 

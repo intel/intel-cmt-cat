@@ -150,7 +150,12 @@ PQOS_LOCAL int log_fini(void);
  *   returns. Without that, the next message of this path would have nowhere to
  *   go - and worse, the application is free to close the descriptor and release
  *   the context it gave as soon as pqos_fini() returns, so a path still logging
- *   through them would be writing to whatever they have become.
+ *   through them would be writing to whatever they have become. It waits for
+ *   the holds of other threads only: a log callback runs outside the log's lock
+ *   so that it may call back into the library, and an application that
+ *   finalizes from one arrives on the very thread whose hold would be waited
+ *   for. Such a finalization releases the application's log at once and leaves
+ *   the holding path a silent log for what remains of it.
  *
  * Nesting is counted, so concurrent holders are safe.
  *

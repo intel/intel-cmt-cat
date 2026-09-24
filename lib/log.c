@@ -72,6 +72,10 @@ static pthread_mutex_t m_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t m_log_released = PTHREAD_COND_INITIALIZER;
 /** how many pre-initialization readers are logging through it right now */
 static unsigned m_holders = 0;
+/** how many of those are this thread's, so that a finalization reached from a
+ *  log callback does not wait for the path it was called from
+ */
+static __thread unsigned m_own_holds = 0;
 /** the log currently installed is the silent one a holder brought up */
 static int m_holder_installed = 0;
 
@@ -199,12 +203,27 @@ log_fini(void)
          * is free to close the descriptor and release the context this log is
          * addressed to as soon as this returns, and those are the application's
          * own. The wait is bounded by that read, which opens nothing and holds
-         * no other lock
+         * no other lock.
+         *
+         * Only for the holds of other threads, though. A log callback runs
+         * outside this mutex precisely so that it may call back into the
+         * library, and an application may finalize from one - reaching this
+         * function on the very thread whose hold it would be waiting for.
          */
-        while (m_holders > 0)
+        while (m_holders > m_own_holds)
                 pthread_cond_wait(&m_log_released, &m_log_mutex);
 
         ret = log_fini_unlocked();
+
+        /* the caller asked for the log to go while its own thread is still
+         * inside a path holding it. Its descriptor and its context are released
+         * here, as asked, and what remains of that path reports to a silent log
+         * of its own - rather than to a destination that is no longer the
+         * caller's to keep, or to none at all, which a DEBUG build asserts on
+         */
+        if (m_own_holds > 0 &&
+            log_init_unlocked(-1, NULL, NULL, LOG_VER_SILENT) == LOG_RETVAL_OK)
+                m_holder_installed = 1;
 
         pthread_mutex_unlock(&m_log_mutex);
 
@@ -224,8 +243,10 @@ log_hold(void)
                 if (ret == LOG_RETVAL_OK)
                         m_holder_installed = 1;
         }
-        if (ret == LOG_RETVAL_OK)
+        if (ret == LOG_RETVAL_OK) {
                 m_holders++;
+                m_own_holds++;
+        }
 
         pthread_mutex_unlock(&m_log_mutex);
 
@@ -242,18 +263,22 @@ log_release(void)
 
         if (m_holders > 0)
                 m_holders--;
+        if (m_own_holds > 0)
+                m_own_holds--;
 
         /* the silent log this path brought up is its own to remove; a log
-         * installed by the library's initialization outlives the hold. Either
-         * way a log_fini() may be waiting for this moment
+         * installed by the library's initialization outlives the hold
          */
-        if (m_holders == 0) {
-                if (m_holder_installed) {
-                        ret = log_fini_unlocked();
-                        m_holder_installed = 0;
-                }
-                pthread_cond_broadcast(&m_log_released);
+        if (m_holders == 0 && m_holder_installed) {
+                ret = log_fini_unlocked();
+                m_holder_installed = 0;
         }
+
+        /* every release, not only the last: a log_fini() waiting here is
+         * waiting for the holders that are not its own thread's, and this may
+         * have been the one it wanted
+         */
+        pthread_cond_broadcast(&m_log_released);
 
         pthread_mutex_unlock(&m_log_mutex);
 
