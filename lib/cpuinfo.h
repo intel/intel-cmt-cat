@@ -83,6 +83,7 @@ struct cpuinfo_config {
  * @retval -EFAULT error building & discovering the topology
  */
 PQOS_LOCAL int cpuinfo_init(enum pqos_interface interface,
+                            int prepare_for_access,
                             struct pqos_cpuinfo **topology);
 
 /**

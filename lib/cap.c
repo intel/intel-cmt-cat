@@ -895,7 +895,7 @@ pqos_init(const struct pqos_config *config)
          * Topology not provided through config.
          * CPU discovery done through internal mechanism.
          */
-        ret = cpuinfo_init(interface, &cpu);
+        ret = cpuinfo_init(interface, 1, &cpu);
         if (ret != 0 || cpu == NULL) {
                 LOG_ERROR("cpuinfo_init() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;

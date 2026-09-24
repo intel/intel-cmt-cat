@@ -449,7 +449,7 @@ detect_cpu(const int cpu,
  * @retval NULL on error
  */
 static struct pqos_cpuinfo *
-cpuinfo_build_topo(struct apic_info *apic)
+cpuinfo_build_topo(struct apic_info *apic, int prepare_for_access)
 {
         int i, max_core_count;
         unsigned core_count = 0;
@@ -469,7 +469,12 @@ cpuinfo_build_topo(struct apic_info *apic)
                 return NULL;
         }
 
-        if (pqos_set_no_files_limit(max_core_count)) {
+        /* only where the caller will open those files: a read of the topology
+         * opens none, and raising the process's limit for it would change state
+         * the caller did not ask to have changed - and could fail for a limit
+         * that is never reached
+         */
+        if (prepare_for_access && pqos_set_no_files_limit(max_core_count)) {
                 LOG_ERROR("Open files limit not sufficient!\n");
                 CPU_FREE(current_mask);
                 return NULL;
@@ -628,7 +633,9 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
  * and their location.
  */
 int
-cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
+cpuinfo_init(enum pqos_interface interface,
+             int prepare_for_access,
+             struct pqos_cpuinfo **topology)
 {
         int ret;
         enum pqos_vendor vendor;
@@ -653,11 +660,11 @@ cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
         }
 
         if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO)
-                m_cpu = cpuinfo_build_topo(&apic);
+                m_cpu = cpuinfo_build_topo(&apic, prepare_for_access);
 #ifdef __linux__
         else if (interface == PQOS_INTER_OS ||
                  interface == PQOS_INTER_OS_RESCTRL_MON)
-                m_cpu = os_cpuinfo_topology();
+                m_cpu = os_cpuinfo_topology(prepare_for_access);
 #endif
         else
                 return -EINVAL;

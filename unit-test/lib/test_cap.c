@@ -50,6 +50,7 @@ __wrap_hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
 }
 int
 __wrap_cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
+                    int prepare_for_access __attribute__((unused)),
                     const struct pqos_cpuinfo **topology)
 {
         assert_non_null(topology);

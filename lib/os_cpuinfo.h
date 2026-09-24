@@ -47,7 +47,7 @@ extern "C" {
  * @return Pointer to CPU topology structure
  * @retval NULL on error
  */
-PQOS_LOCAL struct pqos_cpuinfo *os_cpuinfo_topology(void);
+PQOS_LOCAL struct pqos_cpuinfo *os_cpuinfo_topology(int prepare_for_access);
 
 /**
  * @brief Helper function to get number of numa nodes in the system form

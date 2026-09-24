@@ -184,7 +184,7 @@ test_os_cpuinfo_topology(void **state __attribute__((unused)))
         will_return_always(os_cpuinfo_cpu_node, PQOS_RETVAL_OK);
         will_return_always(os_cpuinfo_cpu_cache, PQOS_RETVAL_OK);
 
-        cpuinfo = os_cpuinfo_topology();
+        cpuinfo = os_cpuinfo_topology(1);
         assert_non_null(cpuinfo);
         assert_int_equal(cpuinfo->num_cores, CORE_COUNT - 1);
         for (i = 0; i < cpuinfo->num_cores; ++i) {
@@ -201,33 +201,56 @@ test_os_cpuinfo_topology(void **state __attribute__((unused)))
 }
 
 static void
+test_os_cpuinfo_topology_read_only(void **state __attribute__((unused)))
+{
+        struct pqos_cpuinfo *cpuinfo;
+
+        expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
+        will_return(__wrap_scandir, CORE_COUNT);
+
+        will_return_always(os_cpuinfo_cpu_socket, PQOS_RETVAL_OK);
+        will_return_always(os_cpuinfo_cpu_node, PQOS_RETVAL_OK);
+        will_return_always(os_cpuinfo_cpu_cache, PQOS_RETVAL_OK);
+
+        /* a caller that will not open the per core files asks for the topology
+         * with the flag clear, and gets the same topology without the open file
+         * limit of the process being touched
+         */
+        cpuinfo = os_cpuinfo_topology(0);
+        assert_non_null(cpuinfo);
+        assert_int_equal(cpuinfo->num_cores, CORE_COUNT - 1);
+
+        free(cpuinfo);
+}
+
+static void
 test_os_cpuinfo_topology_error(void **state __attribute__((unused)))
 {
         struct pqos_cpuinfo *cpuinfo;
 
         expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
         will_return(__wrap_scandir, -1);
-        cpuinfo = os_cpuinfo_topology();
+        cpuinfo = os_cpuinfo_topology(1);
         assert_null(cpuinfo);
 
         expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
         will_return(__wrap_scandir, CORE_COUNT);
         will_return(os_cpuinfo_cpu_socket, PQOS_RETVAL_ERROR);
-        cpuinfo = os_cpuinfo_topology();
+        cpuinfo = os_cpuinfo_topology(1);
         assert_null(cpuinfo);
 
         will_return_always(os_cpuinfo_cpu_socket, PQOS_RETVAL_OK);
         expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
         will_return(__wrap_scandir, CORE_COUNT);
         will_return(os_cpuinfo_cpu_node, PQOS_RETVAL_ERROR);
-        cpuinfo = os_cpuinfo_topology();
+        cpuinfo = os_cpuinfo_topology(1);
         assert_null(cpuinfo);
 
         expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
         will_return(__wrap_scandir, CORE_COUNT);
         will_return_always(os_cpuinfo_cpu_node, PQOS_RETVAL_OK);
         will_return(os_cpuinfo_cpu_cache, PQOS_RETVAL_ERROR);
-        cpuinfo = os_cpuinfo_topology();
+        cpuinfo = os_cpuinfo_topology(1);
         assert_null(cpuinfo);
 }
 
@@ -238,6 +261,7 @@ main(void)
 
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_os_cpuinfo_topology),
+            cmocka_unit_test(test_os_cpuinfo_topology_read_only),
             cmocka_unit_test(test_os_cpuinfo_topology_error),
         };
 

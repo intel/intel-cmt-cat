@@ -249,7 +249,7 @@ os_cpuinfo_cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2)
  * @retval NULL on error
  */
 struct pqos_cpuinfo *
-os_cpuinfo_topology(void)
+os_cpuinfo_topology(int prepare_for_access)
 {
         struct pqos_cpuinfo *cpu = NULL;
         struct dirent **namelist = NULL;
@@ -271,7 +271,10 @@ os_cpuinfo_topology(void)
                 return NULL;
         }
 
-        if (pqos_set_no_files_limit(num_cpus)) {
+        /* only for a caller that will open the per core files; a read of the
+         * topology opens none - see cpuinfo_init()
+         */
+        if (prepare_for_access && pqos_set_no_files_limit(num_cpus)) {
                 LOG_ERROR("Open files limit not sufficient!\n");
                 for (i = 0; i < num_cpus; i++)
                         free(namelist[i]);
