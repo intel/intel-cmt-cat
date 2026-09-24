@@ -71,10 +71,15 @@ void hybrid_print_status(const struct pqos_sysconfig *sys);
  * @param [in] selection Optional logical processor list. A malformed one is
  *             refused whatever the platform turns out to be
  *
+ * A platform that reports no asymmetric capability, or one whose status could
+ * not be determined, is not a failure: the status is printed, the absence is
+ * said plainly and the call succeeds.
+ *
  * @return Operation status
- * @retval 0 Success
- * @retval -1 Invalid selection, a processor the capability does not account
- *         for, or no capability to report
+ * @retval 0 Success, the platform's status included when there is nothing more
+ *         to print
+ * @retval -1 A malformed selection, a processor the capability does not account
+ *         for, or no capability passed at all
  */
 int hybrid_enum_cores(const struct pqos_hybrid_capabilities *cap,
                       const char *selection);
