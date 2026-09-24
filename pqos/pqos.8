@@ -72,8 +72,11 @@ Allocation (CPUID leaf 28H) capabilities for each selected logical processor.
 If CORE_LIST is omitted, all logical processors represented by the library are
 selected. CORE_LIST accepts comma-separated processor numbers, inclusive
 ranges, or both, for example "0-3,8,10-12". Duplicate entries are removed and
-processors are shown in ascending order. Malformed lists, reversed ranges, and
-processors the enumeration does not account for are rejected.
+processors are shown in ascending order. Malformed lists and reversed ranges are
+rejected whatever the platform reports; a processor the enumeration does not
+account for is rejected where the platform has asymmetric capabilities to
+enumerate, and on a platform that has none the command reports that and stops
+without reading the list further.
 The capabilities come from CPUID and the command reads them without
 initializing an interface: it works whichever interface would have been
 selected, including one that could not have been brought up on this platform,
