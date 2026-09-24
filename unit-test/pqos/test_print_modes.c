@@ -439,7 +439,7 @@ test_a_reset_without_the_enumeration_is_accepted(void **state)
  * stops being called as well as if it stops refusing
  */
 static void
-test_the_command_line_refuses_an_alloc_reset_with_the_enumeration(void **state)
+test_an_alloc_reset_on_the_enumeration_command_line(void **state)
 {
         int ret = EXIT_SUCCESS;
 
@@ -452,7 +452,7 @@ test_the_command_line_refuses_an_alloc_reset_with_the_enumeration(void **state)
 }
 
 static void
-test_the_command_line_refuses_a_mon_reset_with_the_enumeration(void **state)
+test_a_mon_reset_on_the_enumeration_command_line(void **state)
 {
         int ret = EXIT_SUCCESS;
 
@@ -563,9 +563,8 @@ main(void)
             cmocka_unit_test(test_mon_reset_with_the_enumeration_is_refused),
             cmocka_unit_test(test_a_reset_without_the_enumeration_is_accepted),
             cmocka_unit_test(
-                test_the_command_line_refuses_an_alloc_reset_with_the_enumeration),
-            cmocka_unit_test(
-                test_the_command_line_refuses_a_mon_reset_with_the_enumeration),
+                test_an_alloc_reset_on_the_enumeration_command_line),
+            cmocka_unit_test(test_a_mon_reset_on_the_enumeration_command_line),
             cmocka_unit_test(
                 test_the_enumeration_initializes_nothing_on_any_interface),
             /* last: the selection it leaves behind is the first of the list */
