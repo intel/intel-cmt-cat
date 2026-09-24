@@ -188,6 +188,241 @@ add_matching_data(struct cpuid_data *data)
             7 | 0xffff0000U);
 }
 
+/**
+ * @brief Replace what a leaf and subleaf answer, or add it where it is absent
+ *
+ * read_cpuid() answers with the first entry that matches, so a second entry for
+ * the same leaf and subleaf would never be read: a case changing one platform
+ * into another has to overwrite.
+ */
+static void
+override(struct cpuid_data *data,
+         unsigned leaf,
+         unsigned subleaf,
+         uint32_t eax,
+         uint32_t ebx,
+         uint32_t ecx,
+         uint32_t edx)
+{
+        unsigned i;
+
+        for (i = 0; i < data->count; i++)
+                if (data->results[i].leaf == leaf &&
+                    data->results[i].subleaf == subleaf) {
+                        data->results[i].out.eax = eax;
+                        data->results[i].out.ebx = ebx;
+                        data->results[i].out.ecx = ecx;
+                        data->results[i].out.edx = edx;
+                        return;
+                }
+
+        add(data, leaf, subleaf, eax, ebx, ecx, edx);
+}
+
+static void
+test_one_asymmetric_leaf_without_the_other(void **state)
+{
+        struct cpuid_data monitoring = {0}, allocation = {0};
+        struct pqos_hybrid_core_capability cap;
+
+        /* CPUID.7.1:ECX bit 0 alone: monitoring is enumerated and allocation is
+         * not, and the leaf that is not supported is never read - a subleaf for
+         * it is not in this data, so reading one would fail the call
+         */
+        add(&monitoring, 0, 0, 0x28, 0, 0, 0);
+        add(&monitoring, 7, 0, 1, 0, 0, 1U << 15);
+        add(&monitoring, 7, 1, 0, 0, 1, 0);
+        add(&monitoring, 0x1a, 0, 0, 0, 0, 0);
+        add(&monitoring, 0x27, 0, 0, 31, 0, 1U << 1);
+        add(&monitoring, 0x27, 1, 8, 64, 15, 7);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &monitoring, &cap),
+                         PQOS_RETVAL_OK);
+        assert_true(cap.mon_supported);
+        assert_false(cap.alloc_supported);
+        assert_int_equal(cap.mon[1].ebx, 64);
+
+        /* and bit 1 alone, which is the shape of the board this is tested on:
+         * allocation is enumerated, monitoring is not
+         */
+        add(&allocation, 0, 0, 0x28, 0, 0, 0);
+        add(&allocation, 7, 0, 1, 0, 0, 1U << 15);
+        add(&allocation, 7, 1, 0, 0, 2, 0);
+        add(&allocation, 0x1a, 0, 0, 0, 0, 0);
+        add(&allocation, 0x28, 0, 0, 1U << 6, 0, 0);
+        add(&allocation, 0x28, 6, 3, 0, 0, 0);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &allocation, &cap),
+                         PQOS_RETVAL_OK);
+        assert_false(cap.mon_supported);
+        assert_true(cap.alloc_supported);
+        assert_int_equal(cap.alloc[6].eax, 3);
+        (void)state;
+}
+
+static void
+test_only_the_named_subleaves_are_read(void **state)
+{
+        struct cpuid_data data = {0};
+        struct pqos_hybrid_core_capability cap;
+
+        /* the resource mask names subleaves 2 and 3, so those two are read and
+         * the others are not: subleaves 1, 5 and 6 are absent from this data
+         * and reading one would fail the call
+         */
+        add(&data, 0, 0, 0x28, 0, 0, 0);
+        add(&data, 7, 0, 1, 0, 0, 1U << 15);
+        add(&data, 7, 1, 0, 0, 2, 0);
+        add(&data, 0x1a, 0, 0, 0, 0, 0);
+        add(&data, 0x28, 0, 0, (1U << 2) | (1U << 3), 0, 0);
+        add(&data, 0x28, 2, 15, 0, 12, 7);
+        add(&data, 0x28, 3, 99, 0, 5, 7);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(cap.alloc_resources, (1U << 2) | (1U << 3));
+        assert_int_equal(cap.alloc[2].eax, 15);
+        assert_int_equal(cap.alloc[3].eax, 99);
+        (void)state;
+}
+
+static void
+test_a_subleaf_that_cannot_be_read_fails_the_call(void **state)
+{
+        struct cpuid_data data = {0};
+        struct pqos_hybrid_core_capability cap;
+
+        /* the mask names subleaf 2 and the platform does not answer for it:
+         * malformed enumeration, and half a capability is not published
+         */
+        add(&data, 0, 0, 0x28, 0, 0, 0);
+        add(&data, 7, 0, 1, 0, 0, 1U << 15);
+        add(&data, 7, 1, 0, 0, 2, 0);
+        add(&data, 0x1a, 0, 0, 0, 0, 0);
+        add(&data, 0x28, 0, 0, 1U << 2, 0, 0);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_ERROR);
+        (void)state;
+}
+
+/**
+ * @brief Find a difference of a resource and field in a capability
+ *
+ * @param [in] cap capability to search
+ * @param [in] resource resource the difference is about
+ * @param [in] field field the difference is about
+ *
+ * @return The difference, or NULL where there is none
+ */
+static const struct pqos_hybrid_difference *
+difference_of(const struct pqos_hybrid_core_capability *cap,
+              enum pqos_hybrid_resource resource,
+              enum pqos_hybrid_field field)
+{
+        unsigned i;
+
+        for (i = 0; i < cap->num_differences; i++)
+                if (cap->differences[i].resource == resource &&
+                    cap->differences[i].field == field)
+                        return &cap->differences[i];
+
+        return NULL;
+}
+
+static void
+test_differences_between_the_two_enumerations(void **state)
+{
+        struct cpuid_data data = {0};
+        struct pqos_hybrid_core_capability cap;
+        const struct pqos_hybrid_difference *diff;
+
+        /* the matching platform first, so that each difference below is the one
+         * the case introduced and not one that was always there
+         */
+        add_matching_data(&data);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
+        assert_int_equal(cap.num_differences, 0);
+
+        /* a resource the asymmetric enumeration has and the regular one does
+         * not: 0x10's mask carries L2 CAT, 0x28's carries L2 CAT and MBA
+         */
+        override(&data, 0x28, 0, UINT32_MAX, (1U << 2) | (1U << 3), UINT32_MAX,
+                 UINT32_MAX);
+        override(&data, 0x28, 3, 99, 0, 5, 7);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
+        diff = difference_of(&cap, PQOS_HYBRID_RESOURCE_MBA,
+                             PQOS_HYBRID_FIELD_SUPPORT);
+        assert_non_null(diff);
+        assert_int_equal(diff->regular, 0);
+        assert_int_equal(diff->asymmetric, 1);
+
+        /* a class count that differs, which is EDX[15:0] of the L2 subleaf */
+        data.count = 0;
+        add_matching_data(&data);
+        override(&data, 0x28, 2, 15 | 0xffffffe0U, 0x1234, 12 | 0xfffffff0U,
+                 9 | 0xffff0000U);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
+        diff = difference_of(&cap, PQOS_HYBRID_RESOURCE_L2_CAT,
+                             PQOS_HYBRID_FIELD_MAX_CLOS);
+        assert_non_null(diff);
+        assert_int_equal(diff->regular, 7);
+        assert_int_equal(diff->asymmetric, 9);
+
+        /* and CDP, which is ECX[2] of the same subleaf */
+        data.count = 0;
+        add_matching_data(&data);
+        override(&data, 0x28, 2, 15 | 0xffffffe0U, 0x1234, 8 | 0xfffffff0U,
+                 7 | 0xffff0000U);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
+        diff = difference_of(&cap, PQOS_HYBRID_RESOURCE_L2_CAT,
+                             PQOS_HYBRID_FIELD_CDP);
+        assert_non_null(diff);
+        assert_int_equal(diff->regular, 1);
+        assert_int_equal(diff->asymmetric, 0);
+        (void)state;
+}
+
+static void
+test_monitoring_differences_between_the_two_enumerations(void **state)
+{
+        struct cpuid_data data = {0};
+        struct pqos_hybrid_core_capability cap;
+        const struct pqos_hybrid_difference *diff;
+
+        /* the RMID limit of the main subleaf, reported by both enumerations */
+        add_matching_data(&data);
+        override(&data, 0x27, 0, 0, 15, 0, 0);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
+        diff = difference_of(&cap, PQOS_HYBRID_RESOURCE_MONITORING,
+                             PQOS_HYBRID_FIELD_MAX_RMID);
+        assert_non_null(diff);
+        assert_int_equal(diff->regular, 7);
+        assert_int_equal(diff->asymmetric, 15);
+
+        /* monitoring enumerated by one mechanism and not the other: the regular
+         * leaf is in range and its feature bit is clear
+         */
+        data.count = 0;
+        add_matching_data(&data);
+        override(&data, 7, 0, 1, 1U << 15, 0, 1U << 15);
+        assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
+        diff = difference_of(&cap, PQOS_HYBRID_RESOURCE_MONITORING,
+                             PQOS_HYBRID_FIELD_ENUMERATION_SUPPORT);
+        assert_non_null(diff);
+        assert_int_equal(diff->regular, 0);
+        assert_int_equal(diff->asymmetric, 1);
+        (void)state;
+}
+
 static void
 test_physical_core_from_the_topology_leaf(void **state)
 {
@@ -412,6 +647,12 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_cap_read_checks_max_leaf),
             cmocka_unit_test(test_cap_read_decodes_asymmetric_leaves),
+            cmocka_unit_test(test_one_asymmetric_leaf_without_the_other),
+            cmocka_unit_test(test_only_the_named_subleaves_are_read),
+            cmocka_unit_test(test_a_subleaf_that_cannot_be_read_fails_the_call),
+            cmocka_unit_test(test_differences_between_the_two_enumerations),
+            cmocka_unit_test(
+                test_monitoring_differences_between_the_two_enumerations),
             cmocka_unit_test(test_physical_core_from_the_topology_leaf),
             cmocka_unit_test(test_physical_core_left_unavailable),
             cmocka_unit_test(test_compare_ignores_reserved_and_reports_cbm),
