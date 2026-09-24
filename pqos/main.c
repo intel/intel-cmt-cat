@@ -2136,11 +2136,12 @@ check_read_only_print_options(void)
                 if (*reset_options[i].selected == 0)
                         continue;
 
-                printf("--enum-hybrid-cores reads CPUID and exits before the "
-                       "library is initialized, so the %s given with it would "
-                       "be dropped. Ask for the reset with a command of its "
-                       "own, then print!\n",
-                       reset_options[i].name);
+                fprintf(stderr,
+                        "--enum-hybrid-cores reads CPUID and exits before the "
+                        "library is initialized, so the %s given with it would "
+                        "be dropped. Ask for the reset with a command of its "
+                        "own, then print!\n",
+                        reset_options[i].name);
                 return -1;
         }
 
@@ -2575,7 +2576,10 @@ main(int argc, char **argv)
 
                 ret = pqos_hybrid_discover(&hybrid);
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("Error discovering hybrid capabilities!\n");
+                        fprintf(stderr,
+                                "Error discovering hybrid capabilities: %s "
+                                "(%d)!\n",
+                                pqos_retval_to_string(ret), ret);
                         return EXIT_FAILURE;
                 }
 

@@ -32,6 +32,7 @@
 #ifndef __OUTPUT_H__
 #define __OUTPUT_H__
 #include <setjmp.h>
+#include <stdio.h>
 
 #define run_void_function(function_name, ...)                                  \
         do {                                                                   \
@@ -59,6 +60,7 @@ int output_get_exit_status(void);
 int output_has_text(const char *format_string, ...);
 void __wrap_exit(int __status);
 int __wrap_printf(const char *format_string, ...);
+int __wrap_fprintf(FILE *stream, const char *format_string, ...);
 int __wrap_puts(const char *__s);
 int __wrap_putchar(int __c);
 #endif /* __OUTPUT_H__ */

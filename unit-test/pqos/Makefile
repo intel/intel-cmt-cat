@@ -163,6 +163,7 @@ $(BIN_DIR)/test_print_modes: ./test_print_modes.c $(PQOS_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=puts \
 		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
 		-Wl,--wrap=alloc_requested_option \

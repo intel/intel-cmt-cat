@@ -131,6 +131,44 @@ __wrap_printf(const char *format_string, ...)
         return str_len;
 }
 
+int __real_fprintf(FILE *stream, const char *format_string, ...);
+
+/**
+ * @brief Captures what the utility writes to a stream
+ *
+ * The utility reports its errors on stderr, and a case asking what it said has
+ * to be able to see those too - so a write is captured while a grab is in
+ * progress, whichever stream it was addressed to, and goes where it was
+ * addressed otherwise.
+ */
+int
+__wrap_fprintf(FILE *stream, const char *format_string, ...)
+{
+        int str_len = 0;
+        char *tmp_buff = NULL;
+        va_list args;
+
+        if (!grab_in_progress) {
+                va_start(args, format_string);
+                str_len = vfprintf(stream, format_string, args);
+                va_end(args);
+                return str_len;
+        }
+
+        va_start(args, format_string);
+        str_len = vasprintf(&tmp_buff, format_string, args);
+        va_end(args);
+        if (str_len > 0) {
+                strncpy(&buffer[chars_in_buffer], tmp_buff,
+                        BUFFER_LENGTH - chars_in_buffer);
+                chars_in_buffer += str_len;
+        }
+        if (tmp_buff != NULL)
+                free(tmp_buff);
+
+        return str_len;
+}
+
 int
 __wrap_puts(const char *__s)
 {
