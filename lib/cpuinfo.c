@@ -646,6 +646,48 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
  * and their location.
  */
 /**
+ * @brief Fills in what a built topology does not carry itself
+ *
+ * The builders report the processors and their cache and node identifiers; the
+ * vendor, the platform's cache description and the per-resource identifiers are
+ * the same work whoever asked for the topology, so both callers do it here
+ * rather than each in its own way.
+ *
+ * @param [in,out] cpu topology to complete
+ * @param [in] vendor vendor of this processor
+ * @param [in] l2 L2 cache description, as detected
+ * @param [in] l3 L3 cache description, as detected
+ */
+static void
+cpuinfo_finalize_topology(struct pqos_cpuinfo *cpu,
+                          enum pqos_vendor vendor,
+                          const struct pqos_cacheinfo *l2,
+                          const struct pqos_cacheinfo *l3)
+{
+        unsigned i;
+
+        cpu->vendor = vendor;
+        cpu->l2 = *l2;
+        cpu->l3 = *l3;
+
+        /*
+         * Use the same l3_id to initialize both CAT and
+         * MBA values. This could change in the future.
+         * Initialize SMBA id the same as MBA for AMD,
+         * as it is also based on L3 cluster.
+         */
+        for (i = 0; i < cpu->num_cores; ++i) {
+                struct pqos_coreinfo *info = &cpu->cores[i];
+
+                info->l3cat_id = info->l3_id;
+                info->mba_id = info->l3_id;
+
+                if (vendor == PQOS_VENDOR_AMD)
+                        info->smba_id = info->l3_id;
+        }
+}
+
+/**
  * @brief Builds a topology the caller owns
  *
  * The same work cpuinfo_init() does, without the singleton: a caller that only
@@ -670,7 +712,6 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
         struct pqos_cacheinfo l2, l3;
         enum pqos_vendor vendor;
         struct apic_info apic;
-        unsigned i;
 
         vendor = detect_vendor();
         if (init_config(&config, vendor) != 0)
@@ -691,19 +732,7 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
         if (cpu == NULL)
                 return NULL;
 
-        cpu->vendor = vendor;
-        cpu->l2 = l2;
-        cpu->l3 = l3;
-
-        for (i = 0; i < cpu->num_cores; ++i) {
-                struct pqos_coreinfo *info = &cpu->cores[i];
-
-                info->l3cat_id = info->l3_id;
-                info->mba_id = info->l3_id;
-
-                if (vendor == PQOS_VENDOR_AMD)
-                        info->smba_id = info->l3_id;
-        }
+        cpuinfo_finalize_topology(cpu, vendor, &l2, &l3);
 
         return cpu;
 }
@@ -715,7 +744,6 @@ cpuinfo_init(enum pqos_interface interface,
 {
         int ret;
         enum pqos_vendor vendor;
-        unsigned i;
         struct apic_info apic;
 
         if (topology == NULL)
@@ -749,25 +777,7 @@ cpuinfo_init(enum pqos_interface interface,
                 return -EFAULT;
         }
 
-        m_cpu->vendor = vendor;
-        m_cpu->l2 = m_l2;
-        m_cpu->l3 = m_l3;
-
-        /*
-         * Use the same l3_id to initialize both CAT and
-         * MBA values. This could change in the future.
-         * Initialize SMBA id the same as MBA for AMD,
-         * as it is also based on L3 cluster.
-         */
-        for (i = 0; i < m_cpu->num_cores; ++i) {
-                struct pqos_coreinfo *info = &m_cpu->cores[i];
-
-                info->l3cat_id = info->l3_id;
-                info->mba_id = info->l3_id;
-
-                if (vendor == PQOS_VENDOR_AMD)
-                        info->smba_id = info->l3_id;
-        }
+        cpuinfo_finalize_topology(m_cpu, vendor, &m_l2, &m_l3);
 
         *topology = m_cpu;
         return 0;
