@@ -73,11 +73,15 @@ If CORE_LIST is omitted, all logical processors represented by the library are
 selected. CORE_LIST accepts comma-separated processor numbers, inclusive
 ranges, or both, for example "0-3,8,10-12". Duplicate entries are removed and
 processors are shown in ascending order. Malformed lists, reversed ranges, and
-processors unavailable in the system configuration or inaccessible during
-initialization are rejected. The library enumerates each processor during
-initialization and returns the capabilities
-through the pqos_sysconfig structure; the command only selects and displays
-that data.
+processors the enumeration does not account for are rejected.
+The capabilities come from CPUID and the command reads them without
+initializing an interface: it works whichever interface would have been
+selected, including one that could not have been brought up on this platform,
+and it programs nothing \- no allocation, no monitoring state, no resctrl mount.
+An allocation or a reset asked for on the same command line is refused for that
+reason rather than silently dropped.
+Processors the calling thread may not run on are left out, which is what
+"represented by the library" above means.
 .TP
 .B \-f FILE, \-\-config\-file=FILE
 load commands from selected configuration FILE

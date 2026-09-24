@@ -61,15 +61,20 @@ void hybrid_print_status(const struct pqos_sysconfig *sys);
 /**
  * @brief Prints hybrid capabilities for selected logical processors
  *
- * If selection is NULL, capabilities for all logical processors represented
- * by the hybrid capability are printed.
+ * Prints the hybrid status, then a block per processor: its number, socket and
+ * physical core, its core type, what each asymmetric leaf reported, and where
+ * that differs from the regular enumeration. With no selection, every processor
+ * the capability accounts for is printed.
  *
- * @param [in] sys PQoS system configuration returned by pqos_sysconfig_get()
- * @param [in] selection Optional logical processor list
+ * @param [in] cap hybrid capabilities, as pqos_hybrid_discover() returns them -
+ *             CPUID's answer, read without initializing an interface
+ * @param [in] selection Optional logical processor list. A malformed one is
+ *             refused whatever the platform turns out to be
  *
  * @return Operation status
  * @retval 0 Success
- * @retval -1 Invalid selection or hybrid capability unavailable
+ * @retval -1 Invalid selection, a processor the capability does not account
+ *         for, or no capability to report
  */
 int hybrid_enum_cores(const struct pqos_hybrid_capabilities *cap,
                       const char *selection);
