@@ -99,13 +99,19 @@ check_malloc_force_fail(void)
 
 /* ======== mock ======== */
 
+/** What the hybrid discovery answers. UNAVAILABLE is "the processors could not
+ *  be read", which the library carries on without; RESOURCE means an allocation
+ *  failed, and a case below requires that to be fatal
+ */
+static int hybrid_discover_ret = PQOS_RETVAL_UNAVAILABLE;
+
 int
 __wrap_hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                            const struct pqos_cpuinfo *cpu)
 {
         assert_non_null(cap);
         assert_non_null(cpu);
-        return PQOS_RETVAL_RESOURCE;
+        return hybrid_discover_ret;
 }
 void *
 __wrap_malloc(size_t size)
@@ -905,6 +911,38 @@ test_cap_xxx_discover_malloc_fail(void **state __attribute__((unused)))
 }
 
 static void
+test_discover_capabilities_hybrid_allocation_failure(void **state
+                                                     __attribute__((unused)))
+{
+        struct pqos_cap *p_cap = NULL;
+        struct pqos_cpuinfo cpu;
+
+        memset(&cpu, 0, sizeof(cpu));
+
+        /* the hybrid discovery answers RESOURCE for an allocation that failed,
+         * never for a processor that is not hybrid - that one answers OK with a
+         * status of "no". Read as "not detected" it would let the library come
+         * up describing a platform it ran out of memory to describe
+         */
+        hybrid_discover_ret = PQOS_RETVAL_RESOURCE;
+
+        expect_function_call(__wrap_hw_cap_mon_discover);
+        will_return(__wrap_hw_cap_mon_discover, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_hw_cap_l3ca_discover);
+        will_return(__wrap_hw_cap_l3ca_discover, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_hw_cap_l2ca_discover);
+        will_return(__wrap_hw_cap_l2ca_discover, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_hw_cap_mba_discover);
+        will_return(__wrap_hw_cap_mba_discover, PQOS_RETVAL_OK);
+
+        assert_int_equal(discover_capabilities(&p_cap, &cpu, PQOS_INTER_MSR),
+                         PQOS_RETVAL_ERROR);
+        assert_null(p_cap);
+
+        hybrid_discover_ret = PQOS_RETVAL_UNAVAILABLE;
+}
+
+static void
 test_discover_capabilities(void **state __attribute__((unused)))
 {
         struct pqos_cap *p_cap = NULL;
@@ -1313,6 +1351,8 @@ main(void)
             cmocka_unit_test(test_cap_mba_discover),
             cmocka_unit_test(test_cap_xxx_discover_malloc_fail),
             cmocka_unit_test(test_discover_capabilities),
+            cmocka_unit_test(
+                test_discover_capabilities_hybrid_allocation_failure),
             cmocka_unit_test(test_discover_capabilities_malloc_fail),
             cmocka_unit_test(test_pqos_init_negative),
             cmocka_unit_test(test_pqos_fini_negative),

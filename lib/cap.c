@@ -545,14 +545,23 @@ discover_capabilities(struct pqos_cap **p_cap,
                                  "before using PQoS allocation features.\n");
                 sz += sizeof(struct pqos_capability);
                 break;
-        case PQOS_RETVAL_RESOURCE:
-                LOG_INFO("Hybrid processor capability not detected\n");
-                break;
         case PQOS_RETVAL_UNAVAILABLE:
+                /* the processors could not be reached to be read - a cpuset or
+                 * a container keeping this process off them. The rest of the
+                 * library is unaffected, so the platform is described without
+                 * this capability rather than not described at all
+                 */
                 LOG_INFO("Hybrid processor capability unavailable\n");
                 break;
         default:
-                LOG_ERROR("Hybrid processor capability discovery failed\n");
+                /* including PQOS_RETVAL_RESOURCE, which this discovery uses for
+                 * an allocation that failed and not for a processor that is not
+                 * hybrid - that one answers OK with a status of "no". Reading
+                 * it as "not detected" would let the library come up describing
+                 * a platform it ran out of memory to describe
+                 */
+                LOG_ERROR("Hybrid processor capability discovery failed: %s\n",
+                          pqos_retval_to_string(ret));
                 ret = PQOS_RETVAL_ERROR;
                 goto error_exit;
         }

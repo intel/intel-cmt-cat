@@ -46,7 +46,10 @@ __wrap_hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
 {
         assert_non_null(cap);
         assert_non_null(cpu);
-        return PQOS_RETVAL_RESOURCE;
+        /* "the processors could not be read", which the library carries on
+         * without. RESOURCE would mean an allocation failed, and that is fatal
+         */
+        return PQOS_RETVAL_UNAVAILABLE;
 }
 int
 __wrap_cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
