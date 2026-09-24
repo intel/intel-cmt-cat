@@ -714,16 +714,22 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
         struct apic_info apic;
 
         vendor = detect_vendor();
-        if (init_config(&config, vendor) != 0)
-                return NULL;
 
         memset(&l2, 0, sizeof(l2));
         memset(&l3, 0, sizeof(l3));
 
         if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO) {
                 /* the CPUID builder is the one that needs the APIC and cache
-                 * masks: it derives every identifier from them
+                 * masks: it derives every identifier from them - and the cache
+                 * leaf to read them from is the vendor's, so the configuration
+                 * is a prerequisite of this branch and of nothing else.
+                 * init_config() refuses a vendor it does not know, and asking
+                 * it here for the operating system's topology would refuse that
+                 * platform a topology it has no need of CPUID for - and with it
+                 * the unknown-vendor answer a caller is documented to get
                  */
+                if (init_config(&config, vendor) != 0)
+                        return NULL;
                 if (detect_apic_masks(&apic, &config, &l2, &l3) != 0) {
                         LOG_ERROR("Couldn't retrieve APICID structure "
                                   "information!\n");
