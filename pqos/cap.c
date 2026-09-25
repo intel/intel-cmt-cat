@@ -1026,6 +1026,68 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
 }
 
 /**
+ * @brief Prints the CXL devices behind one region
+ *
+ * Three answers, one shape: the devices, or that none map here, or that there
+ * was no bus to ask. The heading is printed in all three cases and always
+ * carries a line under it, because a field that comes and goes is a field a
+ * test has to guess at - the rule the rest of this report follows.
+ *
+ * The third answer is what keeps the report honest where this cannot be read at
+ * all. A kernel without CXL support, and an operating system that publishes no
+ * such bus, know nothing about the devices behind these ranges; printing an
+ * empty list there would say the platform has none.
+ *
+ * A device's own capacity is deliberately absent. The one platform this was
+ * measured on reports a device holding half of the region it is the only target
+ * of, and printing both numbers before that is understood would invite a
+ * comparison nobody can explain.
+ *
+ * @param [in] regions the memory regions
+ * @param [in] region the region to print the devices of
+ */
+static void
+cap_print_region_devices(const struct pqos_mem_regions *regions,
+                         const struct pqos_mem_region *region)
+{
+        unsigned i;
+
+        printf("\n  CXL Devices:\n");
+
+        if (!regions->cxl_devices_available) {
+                printf("    Not available - no CXL bus in sysfs\n");
+
+                return;
+        }
+        if (region->num_cxl_devices == 0) {
+                printf("    None mapped into this region's windows\n");
+
+                return;
+        }
+
+        for (i = 0; i < region->num_cxl_devices; i++) {
+                const unsigned idx = region->cxl_device_index[i];
+                const struct pqos_cxl_device *dev = &regions->cxl_device[idx];
+
+                /* a name the operating system laid out in a way the library
+                 * could not follow is unknown rather than absent: what places
+                 * the device in this region is the address range, and that was
+                 * read
+                 */
+                printf(
+                    "    %s  %s  %s  ",
+                    dev->pci_address[0] != '\0' ? dev->pci_address : "unknown",
+                    dev->mem_name[0] != '\0' ? dev->mem_name : "unknown",
+                    dev->region_name[0] != '\0' ? dev->region_name : "unknown");
+                if (dev->address_valid)
+                        printf("0x%" PRIx64 " + 0x%" PRIx64 "\n",
+                               dev->base_address, dev->size);
+                else
+                        printf("Address Not Available\n");
+        }
+}
+
+/**
  * @brief Prints one region: its ranges, and what the tables say about them
  *
  * @param [in] regions all the regions, for the range array
@@ -1089,6 +1151,7 @@ cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
         printf("\n");
         cap_print_region_acpi(regions, region);
         cap_print_region_locality(regions, region);
+        cap_print_region_devices(regions, region);
         printf("\n");
 }
 
