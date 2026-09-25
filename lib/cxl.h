@@ -60,10 +60,15 @@ extern "C" {
  * address range of their region, which is what makes them comparable to the
  * ranges MRRM describes.
  *
- * Capacities the devices declare are deliberately not among the fields. On the
- * one platform available a device reports half the capacity of the region it is
- * the only target of, and until that is understood a report carrying both
- * numbers would invite a comparison nobody can explain.
+ * Capacities the devices declare are deliberately not among the fields, and the
+ * reason is not that they disagree with the region size but that they agree
+ * with it in a way this report cannot yet show. On the platform this was
+ * measured on the region is twice the device: the region's size covers the
+ * device's memory and the extended linear cache in front of it, which the
+ * kernel reports as the region's extended_linear_cache_size and HMAT declares
+ * as a memory side cache for the same proximity domain. A device capacity
+ * printed beside a region size would need that third figure to make sense, and
+ * that figure is HMAT's to give.
  *
  * @param [out] available whether the operating system has a CXL bus to ask -
  *              set on every return, because "no devices" and "no bus to ask"

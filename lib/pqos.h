@@ -926,10 +926,12 @@ struct pqos_mem_region {
  * the link out in a way this library could not follow - an empty name is
  * unknown, not absent, and a report says so rather than dropping the device.
  *
- * No capacity of the device itself appears here. On the platform this was
- * measured on a device reports half the capacity of the region it is the only
- * target of, and until that is understood a figure beside the region size would
- * invite a comparison nobody can explain.
+ * No capacity of the device itself appears here, because a capacity beside a
+ * region size is not the comparison it looks like: where the platform puts an
+ * extended linear cache in front of the device, the region covers both and is
+ * twice the size of the device that backs it. The third figure that explains
+ * that is a memory side cache, which HMAT declares and this description does
+ * not carry yet.
  */
 struct pqos_cxl_device {
         /** the PCI function the device sits on, e.g. "0000:11:00.0" */

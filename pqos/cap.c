@@ -1038,10 +1038,11 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
  * such bus, know nothing about the devices behind these ranges; printing an
  * empty list there would say the platform has none.
  *
- * A device's own capacity is deliberately absent. The one platform this was
- * measured on reports a device holding half of the region it is the only target
- * of, and printing both numbers before that is understood would invite a
- * comparison nobody can explain.
+ * A device's own capacity is deliberately absent. Where the platform puts an
+ * extended linear cache in front of the device, a region covers the device and
+ * the cache both and is twice the size of what backs it, so a capacity printed
+ * beside a region size reads as a contradiction without the third figure - the
+ * memory side cache HMAT declares, which this report does not carry yet.
  *
  * @param [in] regions the memory regions
  * @param [in] region the region to print the devices of
