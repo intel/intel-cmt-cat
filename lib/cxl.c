@@ -64,9 +64,11 @@
 #include "log.h"
 
 #include <dirent.h> /**< scandir() */
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h> /**< access() */
 
 #ifdef __linux__
 
@@ -118,6 +120,42 @@ filter_region(const struct dirent *dir)
 
         return strspn(dir->d_name + len, "0123456789") ==
                strlen(dir->d_name + len);
+}
+
+/**
+ * @brief Whether a path is there, and whether the answer is trustworthy
+ *
+ * pqos_file_exists() answers with access(F_OK), which reports "no" for a name
+ * that is absent and for a name nobody was allowed to ask about. Those are the
+ * two answers this reader has to keep apart: one ends a list of targets, the
+ * other is a list whose end was never found.
+ *
+ * @param [in] path the path to ask about
+ * @param [out] known whether the answer means what it says. Cleared where the
+ *              question could not be put - no permission on a directory along
+ *              the way, an I/O error, too many links
+ *
+ * @return whether the path is there
+ * @retval 1 it is
+ * @retval 0 it is not, or the answer is not known - which \a known reports
+ */
+static int
+path_exists(const char *path, int *known)
+{
+        if (access(path, F_OK) == 0)
+                return 1;
+
+        /* ENOENT and ENOTDIR are the name not being there; a name under a
+         * directory that does not exist does not exist either. Anything else is
+         * the filesystem declining to answer
+         */
+        if (errno != ENOENT && errno != ENOTDIR) {
+                LOG_WARN("CXL: %s could not be asked about: %s\n", path,
+                         strerror(errno));
+                *known = 0;
+        }
+
+        return 0;
 }
 
 /**
@@ -239,10 +277,20 @@ count_targets(const char *region, int *complete)
         unsigned targets = 0;
 
         while (targets < CXL_MAX_TARGETS) {
+                int known = 1;
+
                 snprintf(path, sizeof(path), CXL_DEVICES_PATH "/%s/target%u",
                          region, targets);
-                if (!pqos_file_exists(path))
+                if (!path_exists(path, &known)) {
+                        /* the end of the targets, or a question that could not
+                         * be put - in which case the list ends here and is
+                         * known to be short of wherever it really ends
+                         */
+                        if (!known)
+                                *complete = 0;
+
                         return targets;
+                }
 
                 targets++;
         }
@@ -365,9 +413,22 @@ cxl_devices_read(int *available,
         *devices = NULL;
 
         /* no bus is not no devices: the report says which of the two it is, so
-         * the answer here is the question's, not an empty list
+         * the answer here is the question's, not an empty list. And a bus
+         * nobody may look at is not a bus that is not there: that one is
+         * available and unread, the same answer a listing that failed gets
+         * below
          */
         if (!pqos_dir_exists(CXL_DEVICES_PATH)) {
+                int known = 1;
+
+                (void)path_exists(CXL_DEVICES_PATH, &known);
+                if (!known) {
+                        *available = 1;
+                        *complete = 0;
+
+                        return PQOS_RETVAL_OK;
+                }
+
                 LOG_INFO("CXL: %s is not present, so which devices are behind "
                          "a memory range is unknown\n",
                          CXL_DEVICES_PATH);

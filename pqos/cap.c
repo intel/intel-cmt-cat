@@ -1028,15 +1028,18 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
 /**
  * @brief Prints the CXL devices behind one region
  *
- * Three answers, one shape: the devices, or that none map here, or that there
- * was no bus to ask. The heading is printed in all three cases and always
- * carries a line under it, because a field that comes and goes is a field a
- * test has to guess at - the rule the rest of this report follows.
+ * Four answers, one shape: the devices; that none map here; that the bus could
+ * not be read to the end, so whether any map here is unknown; or that there was
+ * no bus to ask at all. The heading is printed in every case and always carries
+ * a line under it, because a field that comes and goes is a field a test has to
+ * guess at - the rule the rest of this report follows.
  *
- * The third answer is what keeps the report honest where this cannot be read at
- * all. A kernel without CXL support, and an operating system that publishes no
- * such bus, know nothing about the devices behind these ranges; printing an
- * empty list there would say the platform has none.
+ * The last two are what keep the report honest where it cannot read what it
+ * needs. A kernel without CXL support, and an operating system that publishes
+ * no such bus, know nothing about the devices behind these ranges; a bus that
+ * is there and could not be listed, or a region that does not say whether it is
+ * committed, leaves the same question open. Printing an empty list for any of
+ * them would say the platform has no devices.
  *
  * A device's own capacity is deliberately absent. Where the platform puts an
  * extended linear cache in front of the device, a region covers the device and
