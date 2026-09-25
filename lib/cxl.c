@@ -506,10 +506,19 @@ cxl_devices_read(int *available,
                 if (!address_valid) {
                         /* the device is still reported, because it is there,
                          * and no memory range can be told whether it is behind
-                         * it - which is the incompleteness, not an empty region
+                         * it - which is the incompleteness, not an empty
+                         * region.
+                         *
+                         * Half of an address range is not an address range: the
+                         * base is dropped along with the size it has no meaning
+                         * without, which is what the structure documents and
+                         * what stops a caller reading a plausible base beside a
+                         * flag saying there is none
                          */
                         LOG_WARN("CXL: %s does not report an address range\n",
                                  region);
+                        base = 0;
+                        size = 0;
                         *complete = 0;
                 }
 
