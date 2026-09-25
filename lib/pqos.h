@@ -892,6 +892,49 @@ struct pqos_mem_region {
         struct pqos_mem_locality locality;
 };
 
+/** room for a sysfs device name or a PCI address, both of which are short:
+ *  "0000:11:00.0" is twelve characters and "region10" eight
+ */
+#define PQOS_CXL_NAME_LEN 32
+
+/**
+ * One CXL memory device the operating system has mapped
+ *
+ * ACPI enumerates address ranges and windows and never devices, so which device
+ * is behind a memory range is a question only the operating system can answer.
+ * This is its answer: a device that a mapped CXL region names, with the address
+ * range of that region - which is what makes it comparable to the ranges MRRM
+ * describes.
+ *
+ * A device the platform has not mapped is not here, because it covers no
+ * address for a memory range to name. An interleaved region names one of these
+ * per way, each carrying the region's whole range: which part of it a given way
+ * holds is not published per device.
+ *
+ * The three names are NUL terminated, and empty where the operating system laid
+ * the link out in a way this library could not follow - an empty name is
+ * unknown, not absent, and a report says so rather than dropping the device.
+ *
+ * No capacity of the device itself appears here. On the platform this was
+ * measured on a device reports half the capacity of the region it is the only
+ * target of, and until that is understood a figure beside the region size would
+ * invite a comparison nobody can explain.
+ */
+struct pqos_cxl_device {
+        /** the PCI function the device sits on, e.g. "0000:11:00.0" */
+        char pci_address[PQOS_CXL_NAME_LEN];
+        /** the operating system's name for the device, e.g. "mem0" */
+        char mem_name[PQOS_CXL_NAME_LEN];
+        /** the mapped region that names it, e.g. "region0" */
+        char region_name[PQOS_CXL_NAME_LEN];
+        /** whether the region reported both an address and a size, without
+         *  which the two fields below are zero and the device cannot be placed
+         */
+        int address_valid;
+        uint64_t base_address;
+        uint64_t size;
+};
+
 /**
  * The memory regions of the platform
  *
@@ -933,6 +976,19 @@ struct pqos_mem_regions {
         unsigned num_regions;
         /** one per distinct local region ID. Library-owned, as above */
         struct pqos_mem_region *region;
+        /** whether the operating system had a CXL bus to ask at all. Clear
+         *  means nothing is known about the devices behind these ranges, which
+         *  is not the same as there being none: a kernel without CXL support,
+         *  or an operating system that publishes no such bus, answers the same
+         *  way as a platform with no CXL hardware, and a report that printed an
+         *  empty list for either would be asserting an absence nothing checked
+         */
+        int cxl_devices_available;
+        unsigned num_cxl_devices;
+        /** every mapped CXL device the operating system enumerates, whether or
+         *  not a region below names it. Library-owned, as above
+         */
+        struct pqos_cxl_device *cxl_device;
 };
 
 /**
