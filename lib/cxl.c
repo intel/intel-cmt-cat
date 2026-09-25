@@ -440,12 +440,25 @@ cxl_devices_read(int *available,
         regions =
             scandir(CXL_DEVICES_PATH, &namelist, filter_region, alphasort);
         if (regions < 0) {
-                /* the bus is there and could not be listed - no permission, an
-                 * I/O error, out of memory in the library call. The bus is
-                 * still there, and what is on it is unknown: saying it is
-                 * absent would answer a question this did not get to ask
+                /* out of memory is not a fact about the platform, and this
+                 * function documents a status of its own for it: a caller that
+                 * cannot allocate wants to hear that, rather than read a report
+                 * describing a bus nobody listed
                  */
-                LOG_WARN("CXL: %s could not be listed\n", CXL_DEVICES_PATH);
+                if (errno == ENOMEM) {
+                        LOG_ERROR("CXL: out of memory listing %s\n",
+                                  CXL_DEVICES_PATH);
+
+                        return PQOS_RETVAL_RESOURCE;
+                }
+
+                /* the bus is there and could not be listed - no permission, an
+                 * I/O error. The bus is still there, and what is on it is
+                 * unknown: saying it is absent would answer a question this did
+                 * not get to ask
+                 */
+                LOG_WARN("CXL: %s could not be listed: %s\n", CXL_DEVICES_PATH,
+                         strerror(errno));
                 *complete = 0;
 
                 return PQOS_RETVAL_OK;
@@ -526,6 +539,18 @@ cxl_devices_read(int *available,
                 for (t = 0; t < targets && filled < count; t++)
                         read_target(region, t, base, size, address_valid,
                                     &out[filled++]);
+
+                /* the array was sized by the walk before this one, and the bus
+                 * is a live thing: a region that has gained a target since then
+                 * has more to report than there is room for, and a list that
+                 * stops because it ran out of room is short - not complete
+                 */
+                if (t < targets) {
+                        LOG_WARN("CXL: %s gained targets while it was being "
+                                 "read, so its device list is short\n",
+                                 region);
+                        *complete = 0;
+                }
         }
 
         /* the regions are walked twice and the bus is a live thing: a region
