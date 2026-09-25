@@ -890,6 +890,17 @@ struct pqos_mem_region {
         unsigned unclassified_mres;
 
         struct pqos_mem_locality locality;
+
+        /** how many mapped CXL devices this region's ranges meet */
+        unsigned num_cxl_devices;
+        /** indices into pqos_mem_regions::cxl_device, on the same terms as
+         *  range_index above: the library's, valid until pqos_fini(), to be
+         *  read and not written. A device is listed here where the range its
+         *  region maps meets any range of this region - overlap, the same test
+         *  cedt_match uses for a window, because a device reaching part of a
+         *  region is behind part of it
+         */
+        unsigned *cxl_device_index;
 };
 
 /** room for a sysfs device name or a PCI address, both of which are short:

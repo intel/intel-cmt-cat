@@ -39,6 +39,7 @@
 
 #include "acpi.h"
 #include "common.h"
+#include "cxl.h"
 #include "log.h"
 #include "mrrm.h"
 #include "types.h"
@@ -1889,12 +1890,145 @@ regions_free(struct pqos_mem_regions *regions)
         if (regions == NULL)
                 return;
 
-        for (i = 0; i < regions->num_regions; i++)
+        for (i = 0; i < regions->num_regions; i++) {
                 free(regions->region[i].range_index);
+                free(regions->region[i].cxl_device_index);
+        }
 
         free(regions->region);
         free(regions->range);
+        cxl_devices_free(regions->cxl_device);
         free(regions);
+}
+
+/**
+ * @brief Asks the operating system which CXL devices it has mapped
+ *
+ * Whether it had a bus to ask is part of the answer and is kept either way: a
+ * platform with no CXL hardware and a kernel that publishes no CXL bus are
+ * different facts, and a report with an empty list for both would assert an
+ * absence nothing checked.
+ *
+ * @param [in,out] regions the description to record the devices in
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK read, including a platform with no bus and one with no
+ *         devices
+ * @retval PQOS_RETVAL_RESOURCE out of memory
+ */
+static int
+devices_read(struct pqos_mem_regions *regions)
+{
+        int ret;
+
+        ret = cxl_devices_read(&regions->cxl_devices_available,
+                               &regions->num_cxl_devices, &regions->cxl_device);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        LOG_DEBUG("CXL: bus %s, %u mapped device(s)\n",
+                  regions->cxl_devices_available ? "present" : "not present",
+                  regions->num_cxl_devices);
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Attaches the mapped CXL devices to the regions whose ranges they meet
+ *
+ * A device is behind a region where the address range its CXL region maps meets
+ * any range of that region. Overlap and not containment, which is the test
+ * cedt_match already applies to a window: a device reaching part of a region is
+ * behind part of it, and a report that asked for containment would answer "no
+ * devices" for a region whose ranges a device covers between them.
+ *
+ * Out of memory here is fatal to the description, as it is for the ranges: a
+ * region silently missing a device it has would be wrong rather than partial.
+ *
+ * @param [in,out] regions the regions to attach the devices to
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK done, including a platform with no devices
+ * @retval PQOS_RETVAL_RESOURCE out of memory
+ */
+static int
+regions_attach_devices(struct pqos_mem_regions *regions)
+{
+        unsigned i;
+
+        if (regions->num_cxl_devices == 0)
+                return PQOS_RETVAL_OK;
+
+        for (i = 0; i < regions->num_regions; i++) {
+                struct pqos_mem_region *region = &regions->region[i];
+                unsigned d;
+
+                /* counted first, so that the array is the size of what is
+                 * there: most regions on a platform with one device have none
+                 */
+                for (d = 0; d < regions->num_cxl_devices; d++) {
+                        const struct pqos_cxl_device *dev =
+                            &regions->cxl_device[d];
+                        unsigned k;
+
+                        if (!dev->address_valid)
+                                continue;
+
+                        for (k = 0; k < region->num_ranges; k++) {
+                                const struct pqos_mem_range *r =
+                                    &regions->range[region->range_index[k]];
+
+                                if (!ranges_overlap(r->base_address, r->length,
+                                                    dev->base_address,
+                                                    dev->size))
+                                        continue;
+
+                                region->num_cxl_devices++;
+                                break;
+                        }
+                }
+
+                if (region->num_cxl_devices == 0)
+                        continue;
+
+                region->cxl_device_index = calloc(
+                    region->num_cxl_devices, sizeof(*region->cxl_device_index));
+                if (region->cxl_device_index == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+
+                /* filled by the pass below, which counts them again as it goes,
+                 * the way the ranges are filled in
+                 */
+                region->num_cxl_devices = 0;
+
+                for (d = 0; d < regions->num_cxl_devices; d++) {
+                        const struct pqos_cxl_device *dev =
+                            &regions->cxl_device[d];
+                        unsigned k;
+
+                        if (!dev->address_valid)
+                                continue;
+
+                        for (k = 0; k < region->num_ranges; k++) {
+                                const struct pqos_mem_range *r =
+                                    &regions->range[region->range_index[k]];
+
+                                if (!ranges_overlap(r->base_address, r->length,
+                                                    dev->base_address,
+                                                    dev->size))
+                                        continue;
+
+                                region->cxl_device_index
+                                    [region->num_cxl_devices++] = d;
+                                break;
+                        }
+                }
+
+                LOG_DEBUG("Region 0x%x: %u mapped CXL device(s) behind it\n",
+                          region->local_region_id, region->num_cxl_devices);
+        }
+
+        return PQOS_RETVAL_OK;
 }
 
 int
@@ -1937,6 +2071,11 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
                 }
 
                 facts_free(&facts);
+                if (devices_read(out) != PQOS_RETVAL_OK) {
+                        regions_free(out);
+
+                        return PQOS_RETVAL_RESOURCE;
+                }
                 *regions = out;
                 m_regions = out;
 
@@ -2014,6 +2153,11 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
                         }
 
                         facts_free(&facts);
+                        if (devices_read(out) != PQOS_RETVAL_OK) {
+                                regions_free(out);
+
+                                return PQOS_RETVAL_RESOURCE;
+                        }
                         m_regions = out;
                         *regions = out;
 
@@ -2159,6 +2303,17 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
                 region_describe(&facts, out, &out->region[i]);
 
         facts_free(&facts);
+
+        /* the operating system's answer last, and attached to the regions the
+         * tables described: ACPI says where the memory is, and only the kernel
+         * says what is behind it
+         */
+        if (devices_read(out) != PQOS_RETVAL_OK ||
+            regions_attach_devices(out) != PQOS_RETVAL_OK) {
+                regions_free(out);
+
+                return PQOS_RETVAL_RESOURCE;
+        }
 
         LOG_DEBUG("Memory regions: %u region(s) over %u range(s)\n",
                   out->num_regions, out->num_range_entries);
