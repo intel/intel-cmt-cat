@@ -997,6 +997,15 @@ struct pqos_mem_regions {
          *  empty list for either would be asserting an absence nothing checked
          */
         int cxl_devices_available;
+        /** whether every region on that bus was read and placed. Clear where
+         *  one could not be - no permission to list the bus, a region that does
+         *  not say whether it is committed, a region that reports no address
+         *  range - which leaves the devices read so far standing and says that
+         *  a region with none of them may still have one. The same distinction
+         *  cedt_complete draws for a window, for the same reason: a region
+         *  nobody could read cannot be reported as a region with nothing in it
+         */
+        int cxl_devices_complete;
         unsigned num_cxl_devices;
         /** every mapped CXL device the operating system enumerates, whether or
          *  not a region below names it. Library-owned, as above

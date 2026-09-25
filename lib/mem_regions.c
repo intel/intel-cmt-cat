@@ -1922,12 +1922,14 @@ devices_read(struct pqos_mem_regions *regions)
         int ret;
 
         ret = cxl_devices_read(&regions->cxl_devices_available,
+                               &regions->cxl_devices_complete,
                                &regions->num_cxl_devices, &regions->cxl_device);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        LOG_DEBUG("CXL: bus %s, %u mapped device(s)\n",
+        LOG_DEBUG("CXL: bus %s, read %s, %u committed device(s)\n",
                   regions->cxl_devices_available ? "present" : "not present",
+                  regions->cxl_devices_complete ? "complete" : "incomplete",
                   regions->num_cxl_devices);
 
         return PQOS_RETVAL_OK;
@@ -1971,6 +1973,12 @@ regions_attach_devices(struct pqos_mem_regions *regions)
                             &regions->cxl_device[d];
                         unsigned k;
 
+                        /* a device whose region reported no address range
+                         * cannot be placed by an address, and the read that
+                         * failed to get one has already said the list is
+                         * incomplete - so a region it might have belonged to
+                         * reports that, rather than reporting itself empty
+                         */
                         if (!dev->address_valid)
                                 continue;
 

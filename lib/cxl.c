@@ -84,6 +84,15 @@
 /** the prefix of a CXL region device's name */
 #define CXL_REGION_PREFIX "region"
 
+/** How far the walk over a region's targets goes before giving up on it. The
+ *  architecture interleaves across at most sixteen ways at a decoder, so this
+ * is far past anything a platform declares - it is here because the walk asks
+ * the filesystem where to stop, and something that always answers "yes" - a
+ * test's wrapper, a pseudo filesystem that does not behave like one - would
+ * otherwise never stop being asked
+ */
+#define CXL_MAX_TARGETS 256
+
 /**
  * @brief Whether a directory entry is a CXL region device
  *
@@ -216,25 +225,78 @@ name_device(const char *decoder, struct pqos_cxl_device *device)
  * @brief Counts the targets one CXL region has
  *
  * @param [in] region the region's device name, e.g. "region0"
+ * @param [out] complete cleared where the bound was reached rather than the end
+ *              of the targets, which leaves the region's device list short and
+ *              known to be short
  *
- * @return how many target attributes the region publishes
+ * @return how many target attributes the region publishes, at most
+ *         CXL_MAX_TARGETS
  */
 static unsigned
-count_targets(const char *region)
+count_targets(const char *region, int *complete)
 {
         char path[PATH_MAX];
         unsigned targets = 0;
 
-        for (;;) {
+        while (targets < CXL_MAX_TARGETS) {
                 snprintf(path, sizeof(path), CXL_DEVICES_PATH "/%s/target%u",
                          region, targets);
                 if (!pqos_file_exists(path))
-                        break;
+                        return targets;
 
                 targets++;
         }
 
+        LOG_WARN("CXL: %s declares at least %u targets, which is past what any "
+                 "interleave can be\n",
+                 region, targets);
+        *complete = 0;
+
         return targets;
+}
+
+/**
+ * @brief Whether the operating system says a region is decoding its range
+ *
+ * A region is configured before it is committed - it has its targets and its
+ * address range, and answers no address until the commit. A device behind an
+ * uncommitted region is behind no memory range.
+ *
+ * @param [in] region the region's device name
+ * @param [out] complete cleared where the answer could not be read, which is
+ *              not the same as the region not decoding
+ *
+ * @return whether the region is committed
+ * @retval 1 committed, so the addresses it was configured with are answered
+ * @retval 0 not committed, or not known to be
+ */
+static int
+region_committed(const char *region, int *complete)
+{
+        char path[PATH_MAX];
+        char value[PQOS_CXL_NAME_LEN];
+
+        snprintf(path, sizeof(path), CXL_DEVICES_PATH "/%s/commit", region);
+        if (read_attribute(path, value, sizeof(value)) != PQOS_RETVAL_OK) {
+                /* a region that does not say leaves what it decodes unknown,
+                 * and reporting it as decoding nothing would be an answer this
+                 * did not get
+                 */
+                LOG_WARN("CXL: %s does not say whether it is committed\n",
+                         region);
+                *complete = 0;
+
+                return 0;
+        }
+
+        if (strcmp(value, "1") == 0)
+                return 1;
+
+        LOG_INFO("CXL: %s is configured and not committed, so it decodes no "
+                 "address\n",
+                 region);
+
+        return 0;
 }
 
 /**
@@ -279,6 +341,7 @@ read_target(const char *region,
 
 int
 cxl_devices_read(int *available,
+                 int *complete,
                  unsigned *num_devices,
                  struct pqos_cxl_device **devices)
 {
@@ -289,10 +352,15 @@ cxl_devices_read(int *available,
         int regions;
         int i;
 
-        if (available == NULL || num_devices == NULL || devices == NULL)
+        if (available == NULL || complete == NULL || num_devices == NULL ||
+            devices == NULL)
                 return PQOS_RETVAL_PARAM;
 
         *available = 0;
+        /* nothing unread until something is: a platform with no bus has no
+         * region anybody failed to read
+         */
+        *complete = 1;
         *num_devices = 0;
         *devices = NULL;
 
@@ -311,24 +379,32 @@ cxl_devices_read(int *available,
         regions =
             scandir(CXL_DEVICES_PATH, &namelist, filter_region, alphasort);
         if (regions < 0) {
-                /* the bus is there and its devices could not be listed, which
-                 * is not the same as it having none
+                /* the bus is there and could not be listed - no permission, an
+                 * I/O error, out of memory in the library call. The bus is
+                 * still there, and what is on it is unknown: saying it is
+                 * absent would answer a question this did not get to ask
                  */
                 LOG_WARN("CXL: %s could not be listed\n", CXL_DEVICES_PATH);
-                *available = 0;
+                *complete = 0;
 
                 return PQOS_RETVAL_OK;
         }
 
         /* a region has a target per interleave way, and each target is a device
          * of its own in the report, so the array is sized by targets and not by
-         * regions
+         * regions. Only committed regions are counted: the rest decode nothing
          */
-        for (i = 0; i < regions; i++)
-                count += count_targets(namelist[i]->d_name);
+        for (i = 0; i < regions; i++) {
+                const char *region = namelist[i]->d_name;
+
+                if (!region_committed(region, complete))
+                        continue;
+
+                count += count_targets(region, complete);
+        }
 
         if (count == 0) {
-                LOG_INFO("CXL: the bus carries no mapped region\n");
+                LOG_INFO("CXL: the bus carries no committed region\n");
                 goto free_list;
         }
 
@@ -350,9 +426,12 @@ cxl_devices_read(int *available,
                 unsigned targets;
                 unsigned t;
 
+                if (!region_committed(region, complete))
+                        continue;
+
                 /* the address range first: it is the whole reason this region
                  * is interesting to a report about memory ranges, and the one
-                 * thing the devices below cannot be found without
+                 * thing the devices below cannot be placed without
                  */
                 snprintf(path, sizeof(path), CXL_DEVICES_PATH "/%s/resource",
                          region);
@@ -363,14 +442,32 @@ cxl_devices_read(int *available,
                             PQOS_RETVAL_OK)
                                 address_valid = 1;
                 }
-                if (!address_valid)
+                if (!address_valid) {
+                        /* the device is still reported, because it is there,
+                         * and no memory range can be told whether it is behind
+                         * it - which is the incompleteness, not an empty region
+                         */
                         LOG_WARN("CXL: %s does not report an address range\n",
                                  region);
+                        *complete = 0;
+                }
 
-                targets = count_targets(region);
+                targets = count_targets(region, complete);
                 for (t = 0; t < targets && filled < count; t++)
                         read_target(region, t, base, size, address_valid,
                                     &out[filled++]);
+        }
+
+        /* the regions are walked twice and the bus is a live thing: a region
+         * removed in between leaves an allocation with nothing in it, and the
+         * contract here is that no devices means no array
+         */
+        if (filled == 0) {
+                LOG_INFO("CXL: the committed regions went away while they were "
+                         "being read\n");
+                *complete = 0;
+                free(out);
+                goto free_list;
         }
 
         *num_devices = filled;
@@ -388,16 +485,20 @@ free_list:
 
 int
 cxl_devices_read(int *available,
+                 int *complete,
                  unsigned *num_devices,
                  struct pqos_cxl_device **devices)
 {
-        if (available == NULL || num_devices == NULL || devices == NULL)
+        if (available == NULL || complete == NULL || num_devices == NULL ||
+            devices == NULL)
                 return PQOS_RETVAL_PARAM;
 
         /* the operating system publishes no CXL bus to ask, which the report
-         * states as such rather than as an empty list of devices
+         * states as such rather than as an empty list of devices. Nothing went
+         * unread, because there was nothing to read
          */
         *available = 0;
+        *complete = 1;
         *num_devices = 0;
         *devices = NULL;
 

@@ -1055,13 +1055,22 @@ cap_print_region_devices(const struct pqos_mem_regions *regions,
 
         printf("\n  CXL Devices:\n");
 
-        if (!regions->cxl_devices_available) {
-                printf("    Not available - no CXL bus in sysfs\n");
-
-                return;
-        }
+        /* Four answers, in the order the CEDT lines above answer in. A device
+         * that was read is a device, whatever else could not be. Without one,
+         * either there was no bus to ask - one answer - or there was a bus that
+         * could not be read to the end, and then the region that might have
+         * been behind this one is exactly the region nobody could read, so the
+         * answer is unknown. Only a bus read to the end can say a region has
+         * none
+         */
         if (region->num_cxl_devices == 0) {
-                printf("    None mapped into this region's windows\n");
+                if (!regions->cxl_devices_available)
+                        printf("    Not available - no CXL bus in sysfs\n");
+                else if (!regions->cxl_devices_complete)
+                        printf("    Unknown - the CXL bus could not be read in "
+                               "full\n");
+                else
+                        printf("    None mapped into this region's windows\n");
 
                 return;
         }

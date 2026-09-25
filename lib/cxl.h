@@ -70,20 +70,39 @@ extern "C" {
  * printed beside a region size would need that third figure to make sense, and
  * that figure is HMAT's to give.
  *
+ * A region is read only where the operating system says it is committed, which
+ * is the point at which it decodes the address range it was configured with.
+ * An uncommitted region has its targets and its range and answers no address,
+ * so a device behind one is behind no memory range.
+ *
+ * Three answers rather than two, for the reason the rest of this report gives
+ * everywhere: an absence has to have been checked. A bus that is not there is
+ * one answer; a bus that is there and was read to the end is another; and a bus
+ * that is there and could not be read - no permission, an I/O error, a region
+ * that does not say whether it is committed - is a third, which is what
+ * \a complete reports. Without it, a region nobody could read would be
+ * printed as a region with nothing in it.
+ *
  * @param [out] available whether the operating system has a CXL bus to ask -
  *              set on every return, because "no devices" and "no bus to ask"
  *              are different answers and the report states which it is
+ * @param [out] complete whether every region on that bus was read and placed.
+ *              Clear where one could not be, which leaves the devices read so
+ *              far standing and the regions they do not account for unknown
+ *              rather than empty
  * @param [out] num_devices how many devices were read, zero where the bus
  *              carries none
  * @param [out] devices the devices, allocated here and released by the caller
  *              with cxl_devices_free(). NULL where there are none
  *
  * @return Operational status
- * @retval PQOS_RETVAL_OK the bus was read, or there was none to read
+ * @retval PQOS_RETVAL_OK the bus was read, or there was none to read, or it
+ *         could not be read in full - which \a complete reports
  * @retval PQOS_RETVAL_RESOURCE out of memory
  * @retval PQOS_RETVAL_PARAM a parameter was NULL
  */
 PQOS_LOCAL int cxl_devices_read(int *available,
+                                int *complete,
                                 unsigned *num_devices,
                                 struct pqos_cxl_device **devices);
 

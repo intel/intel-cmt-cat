@@ -26,6 +26,12 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-D'PQOS_STATIC=__attribute__((weak))'
 
 CFLAGS += -DLOCKFILE=\"/tmp/libpqos_test_lockfile\"
+# and no test reads the machine's own CXL bus: the cases that mock the file
+# helpers would otherwise walk whatever /sys/bus/cxl the host happens to have,
+# and one answering "every file exists" would be asked for a region's targets
+# for as long as it kept answering. A path nothing can create is the whole
+# isolation; the cases for the reader itself point this at a fixture of their own
+CFLAGS += -DCXL_BUS_PATH=\"/nonexistent/pqos-unit-test/bus/cxl\"
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
 IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
