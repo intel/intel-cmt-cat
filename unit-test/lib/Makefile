@@ -736,6 +736,24 @@ $(BIN_DIR)/test_mrrm: test_mrrm.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+# The reader's bus path is a compile time constant, so this binary gets a copy of
+# the module compiled against the fixture's tree instead of the path every other
+# binary is built with. The shared object is filtered out of the link for that
+# reason - two definitions of cxl_devices_read() would not resolve - and the path
+# here is the one test_cxl.c builds and removes around every case.
+$(OBJ_DIR)/cxl_fixture.o: $(LIB_DIR)/cxl.c $(OBJ_DIR)/cxl.d
+	$(CC) $(CFLAGS) -UCXL_BUS_PATH \
+		-DCXL_BUS_PATH=\"/tmp/pqos-unit-test-cxl/bus/cxl\" \
+		-c $< -o $@
+
+$(BIN_DIR)/test_cxl: test_cxl.c $(filter-out $(OBJ_DIR)/cxl.o,$(LIB_OBJS)) \
+		$(OBJ_DIR)/cxl_fixture.o
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out $(OBJ_DIR)/cxl.o,$(LIB_OBJS)) \
+		$(OBJ_DIR)/cxl_fixture.o $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_mem_regions: test_mem_regions.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
