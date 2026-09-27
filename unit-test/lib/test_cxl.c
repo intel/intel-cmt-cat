@@ -69,6 +69,8 @@
 /** where the fake PCI functions live, which the endpoints point into */
 #define FIXTURE_PCI FIXTURE_ROOT "/pci"
 
+#ifdef __linux__
+
 /* ======== the fixture ======== */
 
 /**
@@ -200,6 +202,8 @@ fixture_one_device(void)
 
 /* ======== the cases ======== */
 
+#endif /* __linux__ */
+
 static void
 test_cxl_checks_its_parameters(void **state)
 {
@@ -219,6 +223,8 @@ test_cxl_checks_its_parameters(void **state)
                          PQOS_RETVAL_PARAM);
         (void)state;
 }
+
+#ifdef __linux__
 
 static void
 test_cxl_reports_no_bus_as_unavailable(void **state)
@@ -472,11 +478,42 @@ test_cxl_ignores_what_is_not_a_region(void **state)
         (void)state;
 }
 
+#else /* !__linux__ */
+
+/**
+ * @brief What the reader answers where the operating system publishes no bus
+ *
+ * The tree the cases above build is a Linux one, and so is the reader that
+ * walks it: elsewhere the module answers from its own stub, and that answer has
+ * to be the one a Linux machine without the bus gives - no bus, and nothing
+ * left unread, because there was nothing to read.
+ */
+static void
+test_cxl_answers_without_a_sysfs(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 99;
+        int available = -1;
+        int complete = -1;
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(available, 0);
+        assert_int_equal(complete, 1);
+        assert_int_equal(num, 0);
+        assert_null(devices);
+        (void)state;
+}
+
+#endif /* __linux__ */
+
 int
 main(void)
 {
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_cxl_checks_its_parameters),
+#ifdef __linux__
             cmocka_unit_test_setup_teardown(
                 test_cxl_reports_no_bus_as_unavailable, fixture_setup,
                 fixture_teardown),
@@ -504,6 +541,9 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_cxl_ignores_what_is_not_a_region, fixture_setup,
                 fixture_teardown),
+#else
+            cmocka_unit_test(test_cxl_answers_without_a_sysfs),
+#endif
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);
