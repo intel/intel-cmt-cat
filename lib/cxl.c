@@ -262,10 +262,18 @@ name_device(const char *decoder, struct pqos_cxl_device *device)
 /**
  * @brief Counts the targets one CXL region has
  *
+ * Called for a committed region only, which is what makes zero an answer this
+ * function does not accept: a region that decodes an address range has at least
+ * one target behind it. Zero means the region went away between the read that
+ * said it was committed and this one, or that it lays its targets out in a way
+ * this cannot walk - and both of those are a read that did not finish rather
+ * than a region with nothing in it.
+ *
  * @param [in] region the region's device name, e.g. "region0"
  * @param [out] complete cleared where the bound was reached rather than the end
- *              of the targets, which leaves the region's device list short and
- *              known to be short
+ *              of the targets, where a target could not be asked about, or
+ * where there were none at all - each of which leaves the region's device list
+ * short and known to be short
  *
  * @return how many target attributes the region publishes, at most
  *         CXL_MAX_TARGETS
@@ -288,6 +296,18 @@ count_targets(const char *region, int *complete)
                          */
                         if (!known)
                                 *complete = 0;
+                        else if (targets == 0) {
+                                /* and a committed region with no target at all
+                                 * is not a region with no devices behind it -
+                                 * see above
+                                 */
+                                LOG_WARN(
+                                    "CXL: %s is committed and publishes no "
+                                    "target, so what is behind it could "
+                                    "not be read\n",
+                                    region);
+                                *complete = 0;
+                        }
 
                         return targets;
                 }
