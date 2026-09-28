@@ -31,11 +31,13 @@
  */
 
 #include "hybrid.h"
+#include "output.h"
 
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
@@ -100,6 +102,257 @@ test_enum_cores_reads_the_capability_it_is_given(void **state)
         assert_int_equal(hybrid_enum_cores(hybrid, "3"), 0);
         assert_int_equal(hybrid_enum_cores(hybrid, "4"), -1);
         assert_int_equal(hybrid_enum_cores(NULL, "3"), -1);
+
+        free(hybrid);
+        (void)state;
+}
+
+/** one processor, described down to the fields the report decodes */
+struct fake_core {
+        struct pqos_hybrid_capabilities *hybrid;
+        struct pqos_hybrid_core_capability *core;
+};
+
+/**
+ * @brief Builds a capability for one processor, hybrid and fully readable
+ *
+ * The values are chosen to be recognisable in the output rather than realistic:
+ * a case asserting on "Maximum RMID: 31" is asserting that the report read
+ * mon[0].ebx and printed it, which is what a return value cannot say.
+ *
+ * @param [out] fake capability to fill in, released with free_core()
+ */
+static void
+build_core(struct fake_core *fake)
+{
+        const size_t size = sizeof(struct pqos_hybrid_capabilities) +
+                            sizeof(struct pqos_hybrid_core_capability);
+        struct pqos_hybrid_core_capability *core;
+
+        fake->hybrid = calloc(1, size);
+        assert_non_null(fake->hybrid);
+        fake->hybrid->mem_size = size;
+        fake->hybrid->status = PQOS_HYBRID_STATUS_YES;
+        fake->hybrid->num_cores = 1;
+
+        core = &fake->hybrid->cores[0];
+        fake->core = core;
+        core->mem_size = sizeof(*core);
+        core->lcore = 3;
+        core->socket = 1;
+        core->physical_core_valid = 1;
+        core->physical_core = 2;
+        core->core_type_valid = 1;
+        core->core_type = 0x40; /* Intel Core */
+        core->native_model_id = 4;
+
+        /* monitoring: the leaf is there, L3 monitoring with it */
+        core->mon_supported = 1;
+        core->mon_resources = 1U << 1;
+        core->mon[0].ebx = 31; /* Maximum RMID */
+        core->mon[1].eax = 0;  /* Counter width, which the report adds 24 to
+                                */
+        core->mon[1].ebx = 77; /* Conversion factor */
+        core->mon[1].ecx = 15; /* Maximum L3 RMID */
+        core->mon[1].edx = 1;  /* L3 occupancy support */
+
+        /* allocation: L3 CAT only, so the report has both answers to give */
+        core->alloc_supported = 1;
+        core->alloc_resources = 1U << 1;
+        core->alloc[1].eax = 10; /* CBM length, which the report adds 1 to */
+        core->alloc[1].edx = 8;  /* Maximum CLOS */
+}
+
+static void
+free_core(struct fake_core *fake)
+{
+        free(fake->hybrid);
+        fake->hybrid = NULL;
+        fake->core = NULL;
+}
+
+static void
+test_the_report_names_the_processor_it_read(void **state)
+{
+        struct fake_core fake;
+
+        build_core(&fake);
+
+        output_start();
+        assert_int_equal(hybrid_enum_cores(fake.hybrid, "3"), 0);
+        output_stop();
+
+        assert_int_equal(output_has_text("Hybrid Processor: Yes"), 1);
+        assert_int_equal(output_has_text("Logical Core 3"), 1);
+        assert_int_equal(output_has_text("Socket ID: 1"), 1);
+        assert_int_equal(output_has_text("Physical Core ID: 2"), 1);
+        assert_int_equal(
+            output_has_text(
+                "Core Type: Intel Core (0x40), Native Model ID: 0x000004"),
+            1);
+
+        free_core(&fake);
+        (void)state;
+}
+
+static void
+test_the_report_decodes_the_resources_the_leaves_carry(void **state)
+{
+        struct fake_core fake;
+
+        build_core(&fake);
+
+        output_start();
+        assert_int_equal(hybrid_enum_cores(fake.hybrid, "3"), 0);
+        output_stop();
+
+        /* what each leaf says about itself */
+        assert_int_equal(output_has_text("CPUID Leaf 0x27: Supported"), 1);
+        assert_int_equal(output_has_text("CPUID Leaf 0x28: Supported"), 1);
+
+        /* the monitoring fields, decoded: the RMID out of mon[0], the counter
+         * width out of mon[1] with the 24 the encoding leaves out
+         */
+        assert_int_equal(output_has_text("Maximum RMID: 31"), 1);
+        assert_int_equal(output_has_text("L3 Monitoring: Supported"), 1);
+        assert_int_equal(output_has_text("Counter width: 24"), 1);
+        assert_int_equal(output_has_text("Conversion factor: 77"), 1);
+        assert_int_equal(output_has_text("Maximum L3 RMID: 15"), 1);
+        assert_int_equal(output_has_text("L3 occupancy support: 1"), 1);
+
+        /* and the allocation side, where only L3 CAT is there - so the report
+         * has to say both things, and the CBM length carries its own +1
+         */
+        assert_int_equal(output_has_text("L3 CAT: Supported"), 1);
+        assert_int_equal(output_has_text("CBM length: 11"), 1);
+        assert_int_equal(output_has_text("Maximum CLOS: 8"), 1);
+        assert_int_equal(output_has_text("L2 CAT: Not supported"), 1);
+        assert_int_equal(output_has_text("MBA: Not supported"), 1);
+        assert_int_equal(output_has_text("CBA: Not supported"), 1);
+        assert_int_equal(output_has_text("Resource Priority: Not supported"),
+                         1);
+
+        /* a resource that is not supported is named and left there: none of its
+         * fields is printed as a measured zero
+         */
+        assert_int_equal(output_has_text("Per-thread enable"), 0);
+        assert_int_equal(output_has_text("Maximum throttling value"), 0);
+
+        free_core(&fake);
+        (void)state;
+}
+
+static void
+test_the_report_prints_the_difference_it_was_given(void **state)
+{
+        struct fake_core fake;
+
+        build_core(&fake);
+
+        output_start();
+        assert_int_equal(hybrid_enum_cores(fake.hybrid, "3"), 0);
+        output_stop();
+
+        /* nothing differs yet, and the report says so rather than saying
+         * nothing
+         */
+        assert_int_equal(output_has_text("Capability Differences:"), 1);
+        assert_int_equal(output_has_text("None"), 1);
+
+        fake.core->num_differences = 1;
+        fake.core->differences[0].resource = PQOS_HYBRID_RESOURCE_L3_CAT;
+        fake.core->differences[0].field = PQOS_HYBRID_FIELD_CBM_LENGTH;
+        fake.core->differences[0].regular = 11;
+        fake.core->differences[0].asymmetric = 7;
+
+        output_start();
+        assert_int_equal(hybrid_enum_cores(fake.hybrid, "3"), 0);
+        output_stop();
+
+        /* the whole point of the comparison: which processor, which resource,
+         * which field, and both values
+         */
+        assert_int_equal(
+            output_has_text("WARNING: Logical core 3, L3 CAT, "
+                            "CBM length: regular=11, asymmetric=7"),
+            1);
+        assert_int_equal(output_has_text("  None"), 0);
+
+        free_core(&fake);
+        (void)state;
+}
+
+static void
+test_the_report_says_what_it_could_not_read(void **state)
+{
+        struct fake_core fake;
+
+        build_core(&fake);
+        fake.core->physical_core_valid = 0;
+        fake.core->core_type_valid = 0;
+        fake.core->mon_supported = 0;
+        fake.core->alloc_supported = 0;
+
+        output_start();
+        assert_int_equal(hybrid_enum_cores(fake.hybrid, "3"), 0);
+        output_stop();
+
+        /* every line is still printed, and an absence is said rather than left
+         * to be inferred from a missing line
+         */
+        assert_int_equal(output_has_text("Physical Core ID: Not available"), 1);
+        assert_int_equal(output_has_text("Core Type: Not available"), 1);
+        assert_int_equal(output_has_text("CPUID Leaf 0x27: Not supported"), 1);
+        assert_int_equal(output_has_text("CPUID Leaf 0x28: Not supported"), 1);
+
+        /* and a leaf that is not supported has no fields to decode, so none of
+         * the values in the capability reaches the report
+         */
+        assert_int_equal(output_has_text("Maximum RMID"), 0);
+        assert_int_equal(output_has_text("L3 CAT"), 0);
+
+        free_core(&fake);
+        (void)state;
+}
+
+static void
+test_the_report_says_when_there_is_nothing_to_enumerate(void **state)
+{
+        const size_t size = sizeof(struct pqos_hybrid_capabilities);
+        struct pqos_hybrid_capabilities *hybrid = calloc(1, size);
+
+        assert_non_null(hybrid);
+        hybrid->mem_size = size;
+        hybrid->status = PQOS_HYBRID_STATUS_NO;
+
+        output_start();
+        assert_int_equal(hybrid_enum_cores(hybrid, "0-3"), 0);
+        output_stop();
+
+        assert_int_equal(output_has_text("Hybrid Processor: No"), 1);
+        assert_int_equal(output_has_text("Asymmetric RDT capability "
+                                         "enumeration is not available on this "
+                                         "processor."),
+                         1);
+        assert_int_equal(output_has_text("Logical Core"), 0);
+
+        /* a malformed list is refused on stderr, whatever the platform is */
+        output_start();
+        assert_int_equal(hybrid_enum_cores(hybrid, "0,,1"), -1);
+        output_stop();
+        assert_int_equal(
+            output_has_text("Invalid logical processor list: 0,,1"), 1);
+
+        /* and so is a processor the platform does not have, where there was
+         * something to enumerate
+         */
+        hybrid->status = PQOS_HYBRID_STATUS_YES;
+        output_start();
+        assert_int_equal(hybrid_enum_cores(hybrid, "9999"), -1);
+        output_stop();
+        assert_int_equal(output_has_text("Logical processor 9999 is not "
+                                         "available"),
+                         1);
 
         free(hybrid);
         (void)state;
@@ -170,6 +423,14 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_parse_core_list),
             cmocka_unit_test(test_enum_cores_reads_the_capability_it_is_given),
+            cmocka_unit_test(test_the_report_names_the_processor_it_read),
+            cmocka_unit_test(
+                test_the_report_decodes_the_resources_the_leaves_carry),
+            cmocka_unit_test(
+                test_the_report_prints_the_difference_it_was_given),
+            cmocka_unit_test(test_the_report_says_what_it_could_not_read),
+            cmocka_unit_test(
+                test_the_report_says_when_there_is_nothing_to_enumerate),
             cmocka_unit_test(test_print_status_reads_the_sysconfig),
             cmocka_unit_test(
                 test_enum_cores_rejects_a_list_on_a_non_hybrid_processor)};

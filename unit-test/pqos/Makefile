@@ -200,9 +200,18 @@ $(BIN_DIR)/test_iface_select: ./test_iface_select.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
+# printf and fprintf are wrapped so the cases can read what the enumeration
+# printed, which is the feature: a return value says the command ran, not that
+# it reported the processor's capabilities.
 $(BIN_DIR)/test_hybrid: ./test_hybrid.c $(OBJ_DIR)/hybrid.o
 	mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -Wl,--start-group -L$(LIB_DIR) -lpqos -lcmocka \
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=putchar \
+		-Wl,--start-group -L$(LIB_DIR) -L$(GRAB_OUTPUT_DIR) \
+		-lpqos -lcmocka -lgraboutput \
 		$(OBJ_DIR)/hybrid.o $< -Wl,--end-group -o $@
 
 # The capture the other binaries assert through, tested on its own: it is
