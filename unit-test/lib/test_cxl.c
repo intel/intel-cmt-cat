@@ -479,6 +479,49 @@ test_cxl_drops_half_an_address_range(void **state)
 }
 
 static void
+test_cxl_reports_a_device_it_cannot_place_beside_one_it_can(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* Two committed regions, adjacent, the second reporting an address and
+         * no size - the shape a memory range covering both would be described
+         * against. Both devices are read and only the first can be placed, so
+         * the memory region the first belongs to lists a device and is short of
+         * the second. What says so is the read being incomplete, which is why
+         * this case cares that both devices come back rather than one
+         */
+        fixture_region("region0", "1", "0x10000000000", "0x1000000000");
+        fixture_target("region0", 0, "endpoint4", "decoder4.0", "0000:11:00.0",
+                       "mem0");
+        fixture_region("region1", "1", "0x11000000000", NULL);
+        fixture_target("region1", 0, "endpoint5", "decoder5.0", "0000:22:00.0",
+                       "mem1");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(available, 1);
+        assert_int_equal(complete, 0);
+        assert_int_equal(num, 2);
+        assert_non_null(devices);
+
+        assert_string_equal(devices[0].mem_name, "mem0");
+        assert_int_equal(devices[0].address_valid, 1);
+        assert_true(devices[0].base_address == 0x10000000000ULL);
+
+        assert_string_equal(devices[1].mem_name, "mem1");
+        assert_int_equal(devices[1].address_valid, 0);
+        assert_true(devices[1].base_address == 0);
+        assert_true(devices[1].size == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
 test_cxl_ignores_what_is_not_a_region(void **state)
 {
         struct pqos_cxl_device *devices = NULL;
@@ -568,6 +611,9 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_cxl_drops_half_an_address_range, fixture_setup,
                 fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_reports_a_device_it_cannot_place_beside_one_it_can,
+                fixture_setup, fixture_teardown),
             cmocka_unit_test_setup_teardown(
                 test_cxl_ignores_what_is_not_a_region, fixture_setup,
                 fixture_teardown),
