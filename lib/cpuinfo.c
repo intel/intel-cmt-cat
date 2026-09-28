@@ -457,12 +457,20 @@ detect_cpu(const int cpu,
  * - restores initial task CPU affinity
  *
  * @param [in] apic information about APICID structure
+ * @param [in] prepare_for_access non-zero where the caller will open the per
+ *             core files
+ * @param [out] affinity_lost set to 1 where this function changed the calling
+ *              thread's affinity and could not put it back, so that a caller
+ *              that would otherwise try another source can tell that failure
+ *              apart from a source that has nothing to give. Optional
  *
  * @return Pointer to CPU topology structure
  * @retval NULL on error
  */
 static struct pqos_cpuinfo *
-cpuinfo_build_topo(struct apic_info *apic, int prepare_for_access)
+cpuinfo_build_topo(struct apic_info *apic,
+                   int prepare_for_access,
+                   int *affinity_lost)
 {
         int i, max_core_count;
         unsigned core_count = 0;
@@ -512,6 +520,8 @@ cpuinfo_build_topo(struct apic_info *apic, int prepare_for_access)
 
         if (set_affinity_mask(current_mask, max_core_count) != 0) {
                 LOG_ERROR("Couldn't restore original CPU affinity mask!");
+                if (affinity_lost != NULL)
+                        *affinity_lost = 1;
                 CPU_FREE(current_mask);
                 free(l_cpu);
                 return NULL;
@@ -701,11 +711,15 @@ cpuinfo_finalize_topology(struct pqos_cpuinfo *cpu,
  * @param [in] interface interface whose topology is wanted
  * @param [in] prepare_for_access non-zero where the caller will open the per
  *             core files, as in cpuinfo_init()
+ * @param [out] affinity_lost set to 1 where the read changed the calling
+ *              thread's affinity and could not put it back. Optional
  *
  * @return The topology, or NULL where it could not be built
  */
 struct pqos_cpuinfo *
-cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
+cpuinfo_discover(enum pqos_interface interface,
+                 int prepare_for_access,
+                 int *affinity_lost)
 {
         struct pqos_cpuinfo *cpu = NULL;
         struct cpuinfo_config config;
@@ -735,7 +749,8 @@ cpuinfo_discover(enum pqos_interface interface, int prepare_for_access)
                                   "information!\n");
                         return NULL;
                 }
-                cpu = cpuinfo_build_topo(&apic, prepare_for_access);
+                cpu = cpuinfo_build_topo(&apic, prepare_for_access,
+                                         affinity_lost);
         }
 #ifdef __linux__
         else if (interface == PQOS_INTER_OS ||
@@ -786,7 +801,11 @@ cpuinfo_init(enum pqos_interface interface,
         }
 
         if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO)
-                m_cpu = cpuinfo_build_topo(&apic, prepare_for_access);
+                /* NULL: this path has one source and reports a failure to
+                 * its caller either way, so there is nothing for it to tell
+                 * apart
+                 */
+                m_cpu = cpuinfo_build_topo(&apic, prepare_for_access, NULL);
 #ifdef __linux__
         else if (interface == PQOS_INTER_OS ||
                  interface == PQOS_INTER_OS_RESCTRL_MON)

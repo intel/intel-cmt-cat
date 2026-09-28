@@ -82,11 +82,18 @@ struct cpuinfo_config {
  * @param [in] prepare_for_access non-zero where the caller will open the per
  *             core files the interfaces use; zero leaves the process's open
  * file limit alone
+ * @param [out] affinity_lost set to 1 where the read changed the calling
+ *              thread's affinity and could not put it back - a failure a
+ *              caller must not answer by asking another source, since that
+ *              source would answer from a thread that is still pinned. Left
+ *              alone otherwise, so a caller initializes it. Optional: NULL
+ *              where the caller has nothing to tell apart
  *
  * @return The topology, or NULL where it could not be built
  */
 PQOS_LOCAL struct pqos_cpuinfo *cpuinfo_discover(enum pqos_interface interface,
-                                                 int prepare_for_access);
+                                                 int prepare_for_access,
+                                                 int *affinity_lost);
 
 /**
  * @brief Initializes CPU information module

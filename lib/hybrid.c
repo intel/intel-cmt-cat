@@ -980,16 +980,37 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
         log_suspend();
 
         for (i = 0; i < DIM(topologies); i++) {
+                struct pqos_cpuinfo *cpu;
+                int affinity_lost = 0;
+
                 /* a topology of its own, not the library's singleton: two
                  * callers of this function would otherwise both find the
                  * singleton missing, build it twice and free each other's. Zero
                  * because a read opens no per core file, so the process's open
                  * file limit is left as the caller set it
                  */
-                struct pqos_cpuinfo *cpu = cpuinfo_discover(topologies[i], 0);
+                cpu = cpuinfo_discover(topologies[i], 0, &affinity_lost);
 
-                if (cpu == NULL)
+                if (cpu == NULL) {
+                        /* not every failure is a source with nothing to give.
+                         * The CPUID builder reads each processor in turn, and
+                         * one that could not put this thread's affinity back
+                         * has left it pinned - so asking the next source would
+                         * answer from a pinned thread and report success,
+                         * having changed state the caller never asked to have
+                         * changed. That is the failure this call documents
+                         * PQOS_RETVAL_ERROR for.
+                         */
+                        if (affinity_lost) {
+                                LOG_ERROR("CPU affinity could not be restored "
+                                          "after reading the topology, so the "
+                                          "hybrid capabilities were not "
+                                          "read\n");
+                                ret = PQOS_RETVAL_ERROR;
+                                break;
+                        }
                         continue;
+                }
 
                 ret = hybrid_cap_discover(cap, cpu);
                 free(cpu);

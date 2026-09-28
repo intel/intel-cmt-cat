@@ -30,6 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cpuinfo.h"
 #include "hybrid.h"
 #include "test.h"
 
@@ -68,6 +69,20 @@ static size_t g_accepted_set_size;
 static unsigned g_mask_alloc_fails_on;
 static unsigned g_mask_allocs;
 
+/* How many processors sched_getaffinity() reports, which restore of that mask
+ * should fail, counted from one, and how many have been asked for. A restore is
+ * the only affinity call made with more than one processor in the mask, which
+ * is how the wrapper below tells it from the pin before each processor's read.
+ *
+ * One restore rather than all of them, because the cases below are about what
+ * the first failure makes the caller do: a topology read and the capability
+ * read that follows it each restore this mask once, and failing both would fail
+ * the call whatever the caller decided in between.
+ */
+static unsigned g_affinity_cpus = 1;
+static unsigned g_fail_restore_number;
+static unsigned g_restores;
+
 /* CPU_ALLOC() calls this, and the library reads each processor through a mask
  * it allocates here - so this is where an out of memory can be put in front of
  * the enumeration without troubling any other allocation in the process.
@@ -86,6 +101,8 @@ __wrap___sched_cpualloc(size_t count)
 int
 __wrap_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask)
 {
+        unsigned i;
+
         (void)pid;
         if (g_kernel_set_size != 0 && cpusetsize < g_kernel_set_size) {
                 errno = EINVAL;
@@ -93,7 +110,8 @@ __wrap_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask)
         }
         g_accepted_set_size = cpusetsize;
         CPU_ZERO_S(cpusetsize, mask);
-        CPU_SET_S(0, cpusetsize, mask);
+        for (i = 0; i < g_affinity_cpus; i++)
+                CPU_SET_S(i, cpusetsize, mask);
         return 0;
 }
 
@@ -105,8 +123,15 @@ __wrap_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask)
          * the result depend on the machine the tests run on
          */
         (void)pid;
-        (void)cpusetsize;
-        (void)mask;
+
+        if (CPU_COUNT_S(cpusetsize, mask) > 1) {
+                g_restores++;
+                if (g_fail_restore_number == g_restores) {
+                        errno = EINVAL;
+                        return -1;
+                }
+        }
+
         return 0;
 }
 #endif
@@ -685,6 +710,91 @@ test_discover_leaves_a_foreign_vendor_unknown(void **state)
         (void)state;
 }
 
+#ifdef __linux__
+/**
+ * @brief Skips the calling case where this platform has no CPUID topology
+ *
+ * @param [out] affinity_lost passed through to cpuinfo_discover()
+ */
+static void
+cpu_topology_or_skip(int *affinity_lost)
+{
+        struct pqos_cpuinfo *cpu =
+            cpuinfo_discover(PQOS_INTER_MSR, 0, affinity_lost);
+
+        if (cpu == NULL)
+                skip();
+        free(cpu);
+}
+#endif
+
+#ifdef __linux__
+static void
+test_a_topology_read_that_loses_the_affinity_says_so(void **state)
+{
+        struct pqos_cpuinfo *cpu;
+        int affinity_lost = 0;
+
+        /* The CPUID builder pins this thread to each processor in turn and puts
+         * the caller's mask back at the end. Where the platform has no CPUID
+         * topology to build, the read fails before any of that and there is
+         * nothing here to check - so ask first, with the restore allowed.
+         */
+        cpu = cpuinfo_discover(PQOS_INTER_MSR, 0, &affinity_lost);
+        if (cpu == NULL)
+                skip();
+        assert_int_equal(affinity_lost, 0);
+        free(cpu);
+
+        g_affinity_cpus = 2;
+        g_restores = 0;
+        g_fail_restore_number = 1;
+        affinity_lost = 0;
+
+        cpu = cpuinfo_discover(PQOS_INTER_MSR, 0, &affinity_lost);
+        assert_null(cpu);
+        assert_int_equal(affinity_lost, 1);
+
+        g_fail_restore_number = 0;
+        g_affinity_cpus = 1;
+        (void)state;
+}
+
+static void
+test_a_lost_affinity_is_not_answered_from_the_next_source(void **state)
+{
+        struct pqos_hybrid_capabilities *cap = NULL;
+        int affinity_lost = 0;
+
+        cpu_topology_or_skip(&affinity_lost);
+
+        g_affinity_cpus = 2;
+        g_restores = 0;
+        g_fail_restore_number = 1; /* the topology read's, and only it */
+
+        /* The operating system's topology needs no affinity call, so the next
+         * source would answer here and the capability read after it would
+         * succeed - reporting success from a thread the failed read has left
+         * pinned. The failure is the answer instead, and the count shows the
+         * capability read was never reached.
+         */
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_ERROR);
+        assert_null(cap);
+        assert_int_equal(g_restores, 1);
+
+        g_fail_restore_number = 0;
+        g_affinity_cpus = 1;
+
+        /* and with the restore allowed the same call answers, so what the case
+         * above met was the lost affinity and not a platform with no topology
+         */
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        pqos_hybrid_free(cap);
+        (void)state;
+}
+#endif
+
 static void
 test_non_hybrid_is_not_a_hybrid_capability(void **state)
 {
@@ -724,6 +834,10 @@ main(void)
             cmocka_unit_test(
                 test_discover_reports_a_failed_mask_allocation_as_resource),
             cmocka_unit_test(test_discover_grows_the_affinity_mask),
+            cmocka_unit_test(
+                test_a_topology_read_that_loses_the_affinity_says_so),
+            cmocka_unit_test(
+                test_a_lost_affinity_is_not_answered_from_the_next_source),
 #endif
             cmocka_unit_test(test_non_hybrid_is_not_a_hybrid_capability)};
 
