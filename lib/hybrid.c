@@ -839,7 +839,15 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
 
         /* one processor first, into a capability that costs nothing to discard.
          * A platform that is not hybrid is answered from it, and the per
-         * processor array is never allocated for that answer
+         * processor array is never allocated for that answer.
+         *
+         * Deliberately not read further: the bit describes the part, so every
+         * processor of a hybrid part enumerates it, and reading them all to
+         * publish a negative would cost an affinity migration each - 32 ms on a
+         * 576 processor machine - on every pqos_init(), for an answer no
+         * hardware disagrees about. Where the answer is positive there is per
+         * processor data to collect, every processor is read, and a processor
+         * that contradicts the platform then fails the call below.
          */
         ret = probe_first_core(cpu, max_cores, original, &probe, &is_hybrid);
         if (ret == PQOS_RETVAL_OK && !is_hybrid) {

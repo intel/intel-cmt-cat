@@ -80,6 +80,20 @@ static int g_os_topology_available = 1;
 /** Whether the fake platform reports itself hybrid in leaf 7 */
 static int g_hybrid = 1;
 
+/** How many processors the mask and the topology carry, and - where the
+ *  processors are to answer differently from one another - what each of them
+ *  reports in leaf 7 and how many such reads have been made. A platform whose
+ *  processors disagree is not a platform: the bit describes the part, so the
+ *  cases that set this are about what the discovery does with an answer it
+ *  cannot have got from real hardware.
+ */
+#define FAKE_CPUS 2
+static unsigned g_cpus = 1;
+static int g_hybrid_per_cpu;
+static int g_hybrid_of[FAKE_CPUS];
+static unsigned g_pinned;
+static unsigned g_hybrid_reads;
+
 /** and whether it names a vendor the library knows */
 static int g_intel = 1;
 
@@ -144,7 +158,15 @@ __wrap_lcpuid(const unsigned leaf,
                 out->edx = g_intel ? VENDOR_EDX : FOREIGN_EDX;
                 break;
         case 7:
-                if (subleaf == 0 && g_hybrid)
+                if (subleaf != 0)
+                        break;
+                if (g_hybrid_per_cpu) {
+                        g_hybrid_reads++;
+                        if (g_hybrid_of[g_pinned])
+                                out->edx = 1U << 15; /* hybrid */
+                        break;
+                }
+                if (g_hybrid)
                         out->edx = 1U << 15; /* hybrid */
                 break;
         default:
@@ -157,28 +179,45 @@ __wrap_lcpuid(const unsigned leaf,
 int
 __wrap_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask)
 {
+        unsigned i;
+
         (void)pid;
         CPU_ZERO_S(cpusetsize, mask);
-        CPU_SET_S(0, cpusetsize, mask);
+        for (i = 0; i < g_cpus; i++)
+                CPU_SET_S(i, cpusetsize, mask);
         return 0;
 }
 
 int
 __wrap_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask)
 {
+        unsigned i;
+
         (void)pid;
-        (void)cpusetsize;
-        (void)mask;
+
+        /* the thread does not really move - what the cases need is which
+         * processor the read that follows is for, and that is a mask with one
+         * processor in it. Restoring the caller's own mask sets more than one
+         * and says nothing about a read.
+         */
+        if (CPU_COUNT_S(cpusetsize, mask) == 1)
+                for (i = 0; i < FAKE_CPUS; i++)
+                        if (CPU_ISSET_S(i, cpusetsize, mask)) {
+                                g_pinned = i;
+                                break;
+                        }
+
         return 0;
 }
 
 /**
- * @brief The operating system's topology: one processor, or none to be had
+ * @brief The operating system's topology: g_cpus processors, or none to be had
  */
 struct pqos_cpuinfo *
 __wrap_os_cpuinfo_topology(int prepare_for_access)
 {
         struct pqos_cpuinfo *cpu;
+        unsigned i;
 
         g_os_topology_calls++;
 
@@ -204,11 +243,12 @@ __wrap_os_cpuinfo_topology(int prepare_for_access)
         if (!g_os_topology_available)
                 return NULL;
 
-        cpu = calloc(1, sizeof(*cpu) + sizeof(struct pqos_coreinfo));
+        cpu = calloc(1, sizeof(*cpu) + g_cpus * sizeof(struct pqos_coreinfo));
         assert_non_null(cpu);
-        cpu->mem_size = sizeof(*cpu) + sizeof(struct pqos_coreinfo);
-        cpu->num_cores = 1;
-        cpu->cores[0].lcore = 0;
+        cpu->mem_size = sizeof(*cpu) + g_cpus * sizeof(struct pqos_coreinfo);
+        cpu->num_cores = g_cpus;
+        for (i = 0; i < g_cpus; i++)
+                cpu->cores[i].lcore = i;
 
         return cpu;
 }
@@ -259,6 +299,107 @@ test_discover_answers_no_without_the_per_core_array(void **state)
 
         pqos_hybrid_free(cap);
         g_hybrid = 1;
+        (void)state;
+}
+
+/**
+ * @brief Puts the fake platform back the way the other cases expect it
+ */
+static void
+one_processor_again(void)
+{
+        g_hybrid_per_cpu = 0;
+        g_cpus = 1;
+        g_pinned = 0;
+        g_hybrid_reads = 0;
+        memset(g_hybrid_of, 0, sizeof(g_hybrid_of));
+}
+
+static void
+test_the_first_processor_read_answers_for_the_platform(void **state)
+{
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        g_os_topology_available = 1;
+        one_processor_again();
+        g_cpus = FAKE_CPUS;
+        g_hybrid_per_cpu = 1;
+        g_hybrid_of[0] = 0; /* the processor read first says no */
+        g_hybrid_of[1] = 1; /* and a later one would say yes */
+
+        /* The answer is the first processor that could be read, and the
+         * processors after it are not read for it. That is deliberate: the bit
+         * describes the part, so every processor of a hybrid part enumerates
+         * it, and reading them all to publish a negative costs an affinity
+         * migration each - 32 ms on a 576 processor machine, on every
+         * pqos_init() - for an answer no real platform disagrees about. A
+         * platform that does disagree has had its CPUID filtered, and what
+         * this case pins is that the discovery then reports what it read
+         * rather than going looking for a second opinion.
+         */
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        assert_int_equal(cap->status, PQOS_HYBRID_STATUS_NO);
+        assert_int_equal(cap->num_cores, 0);
+        assert_int_equal(g_hybrid_reads, 1);
+
+        pqos_hybrid_free(cap);
+        one_processor_again();
+        (void)state;
+}
+
+static void
+test_two_processors_that_agree_are_both_enumerated(void **state)
+{
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        g_os_topology_available = 1;
+        one_processor_again();
+        g_cpus = FAKE_CPUS;
+        g_hybrid_per_cpu = 1;
+        g_hybrid_of[0] = 1;
+        g_hybrid_of[1] = 1;
+
+        /* the same platform as the case below, with the contradiction taken
+         * out: what makes that one fail is the disagreement and not the second
+         * processor being read at all
+         */
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        assert_int_equal(cap->status, PQOS_HYBRID_STATUS_YES);
+        assert_int_equal(cap->num_cores, FAKE_CPUS);
+        assert_int_equal(cap->cores[0].lcore, 0);
+        assert_int_equal(cap->cores[1].lcore, 1);
+
+        pqos_hybrid_free(cap);
+        one_processor_again();
+        (void)state;
+}
+
+static void
+test_a_processor_that_contradicts_a_positive_is_an_error(void **state)
+{
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        g_os_topology_available = 1;
+        one_processor_again();
+        g_cpus = FAKE_CPUS;
+        g_hybrid_per_cpu = 1;
+        g_hybrid_of[0] = 1; /* the platform is hybrid, says the first read */
+        g_hybrid_of[1] = 0; /* and this processor says it is not */
+
+        /* The other direction, and here the disagreement is found because the
+         * positive answer is what makes every processor worth reading: each
+         * one carries its own asymmetric capabilities. A processor that then
+         * denies being part of a hybrid platform has not described itself, so
+         * the enumeration fails rather than describing the platform from the
+         * processors that agreed.
+         */
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_ERROR);
+        assert_null(cap);
+        assert_true(g_hybrid_reads > 1);
+
+        one_processor_again();
         (void)state;
 }
 
@@ -507,6 +648,12 @@ main(void)
             cmocka_unit_test(test_discover_falls_back_to_the_os_topology),
             cmocka_unit_test(
                 test_discover_answers_no_without_the_per_core_array),
+            cmocka_unit_test(
+                test_the_first_processor_read_answers_for_the_platform),
+            cmocka_unit_test(
+                test_two_processors_that_agree_are_both_enumerated),
+            cmocka_unit_test(
+                test_a_processor_that_contradicts_a_positive_is_an_error),
             cmocka_unit_test(test_discover_reports_no_topology_at_all),
             cmocka_unit_test(
                 test_an_initialization_during_discovery_is_untouched),

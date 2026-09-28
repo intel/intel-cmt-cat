@@ -1347,6 +1347,17 @@ int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
  * answer; both are reads. The capability is the caller's to release with
  * pqos_hybrid_free().
  *
+ * Which processors are read follows from the answer. The hybrid bit describes
+ * the part, so every processor of a hybrid part enumerates it: the first
+ * processor that can be read decides, and where it reports no hybrid
+ * capability that is the platform's answer and no further processor is read for
+ * it. Where it reports one, every processor of the topology is read - each
+ * carries its own asymmetric capabilities - and one that then reports no
+ * hybrid capability has contradicted the platform, which is reported as
+ * PQOS_RETVAL_ERROR rather than described from the processors that agreed. A
+ * platform whose processors disagree has had its CPUID filtered; no hardware
+ * reports it.
+ *
  * Independent of the library's state: the topology it reads is built for this
  * call and released again, so it neither needs nor disturbs an initialized
  * library, and it can be called before pqos_init(), after it, or without it.
