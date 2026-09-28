@@ -1364,6 +1364,9 @@ int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
  * @retval PQOS_RETVAL_PARAM a parameter was NULL
  * @retval PQOS_RETVAL_RESOURCE out of memory, or the topology is unavailable
  * @retval PQOS_RETVAL_UNAVAILABLE the processors cannot be reached to be read
+ * @retval PQOS_RETVAL_ERROR a processor could not be enumerated - a CPUID read
+ *         or the affinity restore failed - or the processors disagree on
+ *         whether the platform is hybrid
  */
 int pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap);
 
