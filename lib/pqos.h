@@ -941,7 +941,10 @@ struct pqos_cxl_device {
         /** the mapped region that names it, e.g. "region0" */
         char region_name[PQOS_CXL_NAME_LEN];
         /** whether the region reported both an address and a size, without
-         *  which the two fields below are zero and the device cannot be placed
+         *  which the two fields below are zero and the device cannot be placed.
+         *  Such a device is in this list and in no region's: nothing places it,
+         *  and what says a region's list may therefore be short of one is
+         *  cxl_devices_complete below
          */
         int address_valid;
         uint64_t base_address;

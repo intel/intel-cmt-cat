@@ -1034,6 +1034,11 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
  * a line under it, because a field that comes and goes is a field a test has to
  * guess at - the rule the rest of this report follows.
  *
+ * The third of those is printed under the devices as well, where a region has
+ * some: a bus that went unread may have left a device out of exactly this
+ * region, and without the line the region most likely to be short of one is the
+ * only region not saying so.
+ *
  * The last two are what keep the report honest where it cannot read what it
  * needs. A kernel without CXL support, and an operating system that publishes
  * no such bus, know nothing about the devices behind these ranges; a bus that
@@ -1085,19 +1090,30 @@ cap_print_region_devices(const struct pqos_mem_regions *regions,
                 /* a name the operating system laid out in a way the library
                  * could not follow is unknown rather than absent: what places
                  * the device in this region is the address range, and that was
-                 * read
+                 * read.
+                 *
+                 * That range is always printed, because a device reaches this
+                 * list only by having one: a device whose region reported an
+                 * address and no size is placed in no region at all, and what
+                 * says so is the line after the loop
                  */
                 printf(
-                    "    %s  %s  %s  ",
+                    "    %s  %s  %s  0x%" PRIx64 " + 0x%" PRIx64 "\n",
                     dev->pci_address[0] != '\0' ? dev->pci_address : "unknown",
                     dev->mem_name[0] != '\0' ? dev->mem_name : "unknown",
-                    dev->region_name[0] != '\0' ? dev->region_name : "unknown");
-                if (dev->address_valid)
-                        printf("0x%" PRIx64 " + 0x%" PRIx64 "\n",
-                               dev->base_address, dev->size);
-                else
-                        printf("Address Not Available\n");
+                    dev->region_name[0] != '\0' ? dev->region_name : "unknown",
+                    dev->base_address, dev->size);
         }
+
+        /* and a list of devices is not the claim that it is the whole list.
+         * Where the bus went unread, the device missing from it may be one that
+         * belonged here - a region that reported an address and no size is
+         * placed nowhere - so a region with devices says what a region with
+         * none says, in the same words. Otherwise the region most likely to be
+         * short of one is the only region not saying so
+         */
+        if (!regions->cxl_devices_complete)
+                printf("    Unknown - the CXL bus could not be read in full\n");
 }
 
 /**
