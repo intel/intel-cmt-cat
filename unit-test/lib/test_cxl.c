@@ -421,6 +421,33 @@ test_cxl_reports_a_region_that_does_not_say_as_unread(void **state)
 }
 
 static void
+test_cxl_reports_a_committed_region_with_no_target_as_unread(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 99;
+        int available = -1;
+        int complete = -1;
+
+        /* a committed region decodes an address range, so something is behind
+         * it: no target at all means the region went away between the read that
+         * said it was committed and the walk over its targets, or that it lays
+         * them out in a way this cannot follow. Either way the read did not
+         * finish, and a region nobody could read is not a region with nothing
+         * in it
+         */
+        fixture_region("region0", "1", "0x6200000000", "0x4000000000");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(available, 1);
+        assert_int_equal(complete, 0);
+        assert_int_equal(num, 0);
+        assert_null(devices);
+        (void)state;
+}
+
+static void
 test_cxl_drops_half_an_address_range(void **state)
 {
         struct pqos_cxl_device *devices = NULL;
@@ -534,6 +561,9 @@ main(void)
                 fixture_teardown),
             cmocka_unit_test_setup_teardown(
                 test_cxl_reports_a_region_that_does_not_say_as_unread,
+                fixture_setup, fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_reports_a_committed_region_with_no_target_as_unread,
                 fixture_setup, fixture_teardown),
             cmocka_unit_test_setup_teardown(
                 test_cxl_drops_half_an_address_range, fixture_setup,
