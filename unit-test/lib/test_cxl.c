@@ -43,10 +43,12 @@
  * kernel publishes, in a tree this file owns.
  *
  * The reader's bus path is a compile time constant, so this binary is linked
- * against a copy of the module compiled with the fixture's path (see the recipe
- * in unit-test/lib/Makefile). The path is fixed rather than made by mkdtemp()
- * for that reason; the fixture removes and rebuilds it around every case, so a
- * run starts from nothing whatever the last one left behind.
+ * against a copy of the module compiled with a *relative* one (see the recipe
+ * in unit-test/lib/Makefile). That is what lets the tree live in a directory of
+ * this process's own: the fixture makes one with mkdtemp() and changes into it,
+ * so the reader resolves "bus/cxl/devices" inside it and a concurrent run of
+ * this binary cannot unlink or replace what this one is asserting about. Same
+ * reason, and the same shape, as unit-test/lib/test_common.c.
  */
 
 #include "cxl.h"
@@ -54,20 +56,25 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-/** The tree this file owns, which is what the module under test was compiled to
- *  read. Kept in step with the recipe by hand, and asserted about below: a
- *  mismatch would test the machine's own bus instead of this fixture
+/** The tree this file owns, relative to the directory the fixture makes and
+ *  changes into - which is what the module under test was compiled to read.
+ *  Kept in step with the recipe by hand: a mismatch would have the reader
+ *  looking at the machine's own bus instead of this fixture
  */
-#define FIXTURE_ROOT "/tmp/pqos-unit-test-cxl"
-#define FIXTURE_BUS  FIXTURE_ROOT "/bus/cxl"
+#define FIXTURE_BUS  "bus/cxl"
 #define FIXTURE_DEVS FIXTURE_BUS "/devices"
-/** where the fake PCI functions live, which the endpoints point into */
-#define FIXTURE_PCI FIXTURE_ROOT "/pci"
+/** where the fake PCI functions live, which the endpoints point into. Absolute,
+ *  because an endpoint's uport is a symbolic link and a link relative to the
+ *  directory it sits in would not resolve from the working directory
+ */
+#define FIXTURE_PCI "pci"
 
 #ifdef __linux__
 
@@ -98,16 +105,27 @@ fixture_run(const char *format, ...)
         assert_int_equal(ret, 0);
 }
 
+/** the directory this process owns, and where it was entered from */
+static char fixture_root[PATH_MAX];
+static char fixture_home[PATH_MAX];
+
 /**
- * @brief An empty tree, with no bus in it at all
+ * @brief An empty tree of this process's own, with no bus in it at all
  */
 static int
 fixture_setup(void **state)
 {
         (void)state;
 
-        fixture_run("rm -rf %s", FIXTURE_ROOT);
-        fixture_run("mkdir -p %s", FIXTURE_ROOT);
+        if (getcwd(fixture_home, sizeof(fixture_home)) == NULL)
+                return -1;
+
+        snprintf(fixture_root, sizeof(fixture_root),
+                 "/tmp/pqos_ut_lib_cxl_XXXXXX");
+        if (mkdtemp(fixture_root) == NULL)
+                return -1;
+        if (chdir(fixture_root) != 0)
+                return -1;
 
         return 0;
 }
@@ -117,7 +135,11 @@ fixture_teardown(void **state)
 {
         (void)state;
 
-        fixture_run("rm -rf %s", FIXTURE_ROOT);
+        if (chdir(fixture_home) != 0)
+                return -1;
+
+        fixture_run("rm -rf %s", fixture_root);
+        fixture_root[0] = '\0';
 
         return 0;
 }
@@ -182,11 +204,14 @@ fixture_target(const char *region,
         fixture_run("echo %s > %s/%s/target%u", decoder, FIXTURE_DEVS, region,
                     target);
         fixture_run("mkdir -p %s/%s/%s", FIXTURE_DEVS, endpoint, decoder);
-        fixture_run("ln -sfn %s/%s/%s %s/%s", FIXTURE_DEVS, endpoint, decoder,
-                    FIXTURE_DEVS, decoder);
+        fixture_run("ln -sfn %s/%s/%s/%s %s/%s", fixture_root, FIXTURE_DEVS,
+                    endpoint, decoder, FIXTURE_DEVS, decoder);
         fixture_run("mkdir -p %s/%s/%s", FIXTURE_PCI, pci, mem);
-        fixture_run("ln -sfn %s/%s/%s %s/%s/uport", FIXTURE_PCI, pci, mem,
-                    FIXTURE_DEVS, endpoint);
+        /* absolute, because this link is resolved from the working directory
+         * rather than from the directory it sits in
+         */
+        fixture_run("ln -sfn %s/%s/%s/%s %s/%s/uport", fixture_root,
+                    FIXTURE_PCI, pci, mem, FIXTURE_DEVS, endpoint);
 }
 
 /** One region, one device, everything readable: the platform the report was
