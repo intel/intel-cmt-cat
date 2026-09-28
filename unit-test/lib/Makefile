@@ -742,7 +742,14 @@ $(BIN_DIR)/test_mrrm: test_mrrm.c $(LIB_OBJS)
 # reason - two definitions of cxl_devices_read() would not resolve. The path is
 # relative: test_cxl.c makes a directory of its own with mkdtemp() and changes
 # into it, so two runs of this binary cannot touch each other's fixture.
-$(OBJ_DIR)/cxl_fixture.o: $(LIB_DIR)/cxl.c $(OBJ_DIR)/cxl.d
+#
+# This Makefile is a prerequisite because the path above is only written here:
+# nothing under $(LIB_DIR) changes when it changes, so without this an existing
+# object stays up to date and the cases keep running against the tree the old
+# path names. That is not hypothetical - it is what happened when the path
+# became relative, and the ten fixture cases failed until the object was
+# deleted by hand.
+$(OBJ_DIR)/cxl_fixture.o: $(LIB_DIR)/cxl.c $(OBJ_DIR)/cxl.d Makefile
 	$(CC) $(CFLAGS) -UCXL_BUS_PATH -DCXL_BUS_PATH=\"bus/cxl\" \
 		-c $< -o $@
 
