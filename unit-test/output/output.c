@@ -41,6 +41,7 @@
 static char buffer[BUFFER_LENGTH + 1];
 static int grab_in_progress = 0;
 static int chars_in_buffer = 0;
+static int buffer_full = 0;
 static int exit_code = 0;
 static int exit_was_called = 0;
 
@@ -49,6 +50,7 @@ output_start(void)
 {
         memset(buffer, 0, BUFFER_LENGTH + 1);
         chars_in_buffer = 0;
+        buffer_full = 0;
         exit_code = 0;
         exit_was_called = 0;
         grab_in_progress = 1;
@@ -100,6 +102,50 @@ output_has_text(const char *format_string, ...)
         return ret;
 }
 
+/**
+ * @brief Appends captured output to the buffer, and never past the end of it
+ *
+ * Every wrapper below goes through this, because they share one cursor: a
+ * single unbounded write leaves chars_in_buffer past the end of the buffer, and
+ * then the next write of any of them is to a pointer outside the buffer with a
+ * negative remaining length - which strncpy() and snprintf() take as a size_t
+ * and read as gigabytes of room. What each wrapper still returns is what the
+ * function it stands in for would have returned, which is the formatted length
+ * whether the capture kept it or not.
+ *
+ * @param [in] text what was formatted
+ * @param [in] len its length, as the formatting reported it
+ */
+static void
+append_to_buffer(const char *text, int len)
+{
+        int room;
+
+        if (text == NULL || len <= 0)
+                return;
+
+        room = BUFFER_LENGTH - chars_in_buffer;
+        if (room <= 0 || len > room) {
+                /* said once per grab, and on the real stderr: a case that
+                 * asserts on output it cannot see would otherwise pass or fail
+                 * for a reason that is not in the buffer
+                 */
+                if (!buffer_full) {
+                        buffer_full = 1;
+                        fputs("output capture: the buffer is full, so the rest "
+                              "of this run's output is not in it\n",
+                              stderr);
+                }
+                if (room <= 0)
+                        return;
+                len = room;
+        }
+
+        memcpy(&buffer[chars_in_buffer], text, (size_t)len);
+        chars_in_buffer += len;
+        buffer[chars_in_buffer] = '\0';
+}
+
 __attribute__((noreturn)) void
 __wrap_exit(int __status)
 {
@@ -120,11 +166,7 @@ __wrap_printf(const char *format_string, ...)
                 va_start(args, format_string);
                 str_len = vasprintf(&tmp_buff, format_string, args);
                 va_end(args);
-                if (str_len > 0) {
-                        strncpy(&buffer[chars_in_buffer], tmp_buff,
-                                BUFFER_LENGTH - chars_in_buffer);
-                        chars_in_buffer += str_len;
-                }
+                append_to_buffer(tmp_buff, str_len);
         }
         if (tmp_buff != NULL)
                 free(tmp_buff);
@@ -158,11 +200,7 @@ __wrap_fprintf(FILE *stream, const char *format_string, ...)
         va_start(args, format_string);
         str_len = vasprintf(&tmp_buff, format_string, args);
         va_end(args);
-        if (str_len > 0) {
-                strncpy(&buffer[chars_in_buffer], tmp_buff,
-                        BUFFER_LENGTH - chars_in_buffer);
-                chars_in_buffer += str_len;
-        }
+        append_to_buffer(tmp_buff, str_len);
         if (tmp_buff != NULL)
                 free(tmp_buff);
 
@@ -173,9 +211,8 @@ int
 __wrap_puts(const char *__s)
 {
         if (grab_in_progress) {
-                chars_in_buffer +=
-                    snprintf(&buffer[chars_in_buffer],
-                             BUFFER_LENGTH - chars_in_buffer, "%s\n", __s);
+                append_to_buffer(__s, (int)strlen(__s));
+                append_to_buffer("\n", 1);
         }
 
         return strlen(__s);
@@ -184,7 +221,10 @@ __wrap_puts(const char *__s)
 int
 __wrap_putchar(int __c)
 {
-        if (grab_in_progress)
-                buffer[chars_in_buffer++] = __c;
+        if (grab_in_progress) {
+                const char one = (char)__c;
+
+                append_to_buffer(&one, 1);
+        }
         return __c;
 }

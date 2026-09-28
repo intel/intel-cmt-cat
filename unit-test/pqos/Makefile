@@ -205,6 +205,16 @@ $(BIN_DIR)/test_hybrid: ./test_hybrid.c $(OBJ_DIR)/hybrid.o
 	$(CC) $(CFLAGS) -Wl,--start-group -L$(LIB_DIR) -lpqos -lcmocka \
 		$(OBJ_DIR)/hybrid.o $< -Wl,--end-group -o $@
 
+# The capture the other binaries assert through, tested on its own: it is
+# linked without the wraps, because the cases call the wrappers by name to fill
+# the buffer and what they are checking is the capture rather than the utility.
+$(BIN_DIR)/test_output_capture: ./test_output_capture.c
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		-L$(GRAB_OUTPUT_DIR) -lcmocka -lgraboutput \
+		$< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_monitor_utils: ./test_monitor_utils.c
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
