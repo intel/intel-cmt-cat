@@ -1059,6 +1059,17 @@ $(BIN_DIR)/test_lock: test_lock.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=open \
+		-Wl,--wrap=read \
+		-Wl,--wrap=fread \
+		-Wl,--wrap=ferror \
+		-Wl,--wrap=mkostemp \
+		-Wl,--wrap=lstat \
+		-Wl,--wrap=fstat \
+		-Wl,--wrap=fchmod \
+		-Wl,--wrap=link \
+		-Wl,--wrap=write \
+		-Wl,--wrap=rmdir \
+		-Wl,--wrap=geteuid \
 		-Wl,--wrap=close \
 		-Wl,--wrap=lockf \
 		-Wl,--wrap=fprintf \

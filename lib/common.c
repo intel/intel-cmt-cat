@@ -54,8 +54,12 @@
 /**
  * The permissions a created file is given: 0666, which is what fopen() asks
  * for, narrowed by the umask exactly as it is there. Octal rather than the six
- * S_I* macros, which is the form the rest of this tree uses - lock.c spells the
- * same value LOCKFILE_PERMS 0666 - and the one checkpatch asks for.
+ * S_I* macros, which is the form the rest of this tree uses and the one
+ * checkpatch asks for.
+ *
+ * The umask is what makes this safe, and it is why this is not lock.c's
+ * LOCKFILE_PERMS: that one is set with fchmod() on a file in a world writable
+ * directory, so it names the mode it wants and has no umask behind it.
  */
 #define FOPEN_CREATE_PERMS 0666
 
