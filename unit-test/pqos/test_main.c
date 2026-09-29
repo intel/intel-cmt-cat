@@ -32,6 +32,7 @@
 #include "common.h"
 #include "main.h"
 #include "output.h"
+#include "utils.h"
 
 #include <getopt.h>
 #include <limits.h>
@@ -174,6 +175,131 @@ test_strlisttotabrealloc_large_range(void **state)
         assert_int_equal(tab[65534], 65535);
 
         free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_range_fills_the_table(void **state)
+{
+        unsigned count = 128;
+        char input[] = "0-127,200";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* A first range that fills the table exactly, and a token after it. The
+         * first range is stored by a path of its own - no duplicates to check
+         * against - which used to grow the table to the range's length and go
+         * straight back to the top of the loop, so the token after it wrote one
+         * element past the end. AddressSanitizer is what sees that; what this
+         * asserts is that both are stored and counted.
+         */
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 129);
+        assert_true(count > 129);
+        assert_int_equal(tab[0], 0);
+        assert_int_equal(tab[127], 127);
+        assert_int_equal(tab[128], 200);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_range_after_a_grown_range(void **state)
+{
+        unsigned count = 4;
+        char input[] = "0-7,8-15,100";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* the same thing where the first range had to grow the table to reach
+         * its own length: a second range then writes past the end, at the other
+         * of the two places that trusted there to be an element free
+         */
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 17);
+        assert_true(count > 17);
+        assert_int_equal(tab[0], 0);
+        assert_int_equal(tab[15], 15);
+        assert_int_equal(tab[16], 100);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_range_ending_at_the_top(void **state)
+{
+        unsigned count = 4;
+        char input[] = "18446744073709551615-18446744073709551615";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* An inclusive range of one, at the top of the width. "n <= end" is
+         * true again once n has wrapped past UINT64_MAX, so this used to fill
+         * the table with wrapped values and report a capacity error - or, in
+         * the reallocating parser, grow it until the allocation failed -
+         * instead of storing the one value asked for.
+         */
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 1);
+        assert_true(tab[0] == UINT64_MAX);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotab_range_ending_at_the_top(void **state)
+{
+        uint64_t tab[4] = {0};
+        char input[] = "18446744073709551614-18446744073709551615";
+        unsigned parsed;
+
+        /* the same endpoint in the parser that does not reallocate, and a range
+         * of two so the loop has to advance once before it stops
+         */
+        parsed = strlisttotab(input, tab, 4);
+        assert_int_equal(parsed, 2);
+        assert_true(tab[0] == UINT64_MAX - 1);
+        assert_true(tab[1] == UINT64_MAX);
+
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotab_range_of_duplicates_fits_a_full_table(void **state)
+{
+        unsigned parsed;
+        uint64_t tab[8] = {0};
+        char full[] = "0-7";
+        char single[] = "0-7,0";
+        char range[] = "0-7,0-5";
+
+        /* A duplicate is not stored, so it does not need room. The capacity
+         * check used to come first in the range branch and second in the
+         * single-number branch, which refused a range naming values the table
+         * already held while accepting the same value written on its own.
+         */
+        parsed = strlisttotab(full, tab, 8);
+        assert_int_equal(parsed, 8);
+
+        memset(tab, 0, sizeof(tab));
+        parsed = strlisttotab(single, tab, 8);
+        assert_int_equal(parsed, 8);
+
+        memset(tab, 0, sizeof(tab));
+        parsed = strlisttotab(range, tab, 8);
+        assert_int_equal(parsed, 8);
+        assert_int_equal(tab[0], 0);
+        assert_int_equal(tab[7], 7);
+
         (void)state; /* unused */
 }
 
@@ -436,6 +562,13 @@ main(void)
             cmocka_unit_test(test_strlisttotabrealloc_grows_array),
             cmocka_unit_test(test_strlisttotabrealloc_ignores_duplicates),
             cmocka_unit_test(test_strlisttotabrealloc_large_range),
+            cmocka_unit_test(test_strlisttotabrealloc_range_fills_the_table),
+            cmocka_unit_test(
+                test_strlisttotabrealloc_range_after_a_grown_range),
+            cmocka_unit_test(
+                test_strlisttotab_range_of_duplicates_fits_a_full_table),
+            cmocka_unit_test(test_strlisttotabrealloc_range_ending_at_the_top),
+            cmocka_unit_test(test_strlisttotab_range_ending_at_the_top),
             cmocka_unit_test(test_parse_uint64_formats_and_errors),
             cmocka_unit_test(test_parse_mem_regions_replaces_previous_values),
             cmocka_unit_test(test_parse_mem_regions_rejects_invalid_lists),

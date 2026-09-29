@@ -139,57 +139,6 @@ void narrow_iface(unsigned mask, const char *opt_descr);
 void narrow_iface_for_mon_events(const char *arg, const char *opt_descr);
 
 /**
- * @brief Converts string into 64-bit unsigned number.
- *
- * Numbers can be in decimal or hexadecimal format.
- *
- * On error, this functions causes process to exit with FAILURE code.
- *
- * @param s string to be converted into 64-bit unsigned number
- *
- * @return Numeric value of the string representing the number
- */
-uint64_t strtouint64(const char *s);
-
-/**
- * @brief Converts string into 64-bit unsigned number.
- *
- * For numbers in hexadecimal format only.
- *
- * On error, this functions causes process to exit with FAILURE code.
- *
- * @param s string to be converted into 64-bit unsigned number
- *
- * @return Numeric value of the string representing the number
- */
-uint64_t strhextouint64(const char *s);
-
-/**
- * @brief Converts string of characters representing list of
- *        numbers into table of numbers.
- *
- * Allowed formats are:
- *     0,1,2,3
- *     0-10,20-18
- *     1,3,5-8,10,0x10-12
- *
- * Numbers can be in decimal or hexadecimal format.
- *
- * On error, this functions causes process to exit with FAILURE code.
- *
- * @param s string representing list of unsigned numbers.
- * @param tab table to put converted numeric values into
- * @param max maximum number of elements that \a tab can accommodate
- *
- * @return Number of elements placed into \a tab
- */
-unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
-
-unsigned strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max);
-
-void *realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size);
-
-/**
  * @brief Duplicates \a arg and stores at \a sel
  *
  * @param sel place to store duplicate of \a arg

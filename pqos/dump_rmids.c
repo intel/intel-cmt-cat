@@ -42,6 +42,7 @@
 #include "log.h"
 #include "main.h"
 #include "pqos.h"
+#include "utils.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -126,50 +127,8 @@ selfn_dump_rmids(const char *arg)
 void
 selfn_dump_rmid_domain_ids(const char *arg)
 {
-        char *str = NULL;
-        unsigned int i = 0;
-        unsigned int j = 0;
-        unsigned int n = 0;
-
-        if (arg == NULL)
-                parse_error(arg, "NULL pointer!");
-
-        if (*arg == '\0')
-                parse_error(arg, "Empty string!");
-
-        selfn_strdup(&str, arg);
-
-        n = strlisttotab(str, sel_dump_rmids.domain_ids, MAX_DOMAIN_IDS);
-        if (n == 0) {
-                printf("No Domain ID specified: %s\n", str);
-                exit(EXIT_FAILURE);
-        }
-
-        sel_dump_rmids.num_domain_ids = n;
-
-        /* Check for invalid Domain ID */
-        for (i = 0; i < n; i++) {
-                if (sel_dump_rmids.domain_ids[i] >= MAX_DOMAINS) {
-                        printf("Domain ID out of range: %s\n", str);
-                        exit(EXIT_FAILURE);
-                }
-        }
-
-        /* Check duplicate Domain ID entry */
-        for (i = 0; i < n; i++) {
-                for (j = i + 1; j < n; j++) {
-                        if (sel_dump_rmids.domain_ids[i] ==
-                            sel_dump_rmids.domain_ids[j]) {
-                                parse_error(str,
-                                            "Duplicate Domain ID selection");
-                                printf("The Domain ID %ld is entered twice\n",
-                                       sel_dump_rmids.domain_ids[i]);
-                                exit(EXIT_FAILURE);
-                        }
-                }
-        }
-
-        free(str);
+        sel_dump_rmids.num_domain_ids = selfn_domain_id_list(
+            arg, sel_dump_rmids.domain_ids, MAX_DOMAIN_IDS);
 }
 
 void

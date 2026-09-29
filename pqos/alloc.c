@@ -39,6 +39,7 @@
 #include "common.h"
 #include "main.h"
 #include "pqos.h"
+#include "utils.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -2800,8 +2801,8 @@ free_and_return:
  *
  * @param [in] arg the list given to --alloc-mem-regions: region numbers in any
  *             form strlisttotab() reads - commas, ranges, decimal or
- *             hexadecimal - which this then checks for range, exiting where one
- *             is out of it
+ *             hexadecimal, and duplicates dropped as it reads them - which this
+ *             then checks for range, exiting where one is out of it
  */
 void
 selfn_alloc_mem_regions(const char *arg)
@@ -2900,56 +2901,15 @@ selfn_alloc_max_bw(const char *arg)
  *
  * @param [in] arg the list given to --alloc-domain-id: domain identifiers in
  *             any form strlisttotab() reads - commas, ranges, decimal or
- *             hexadecimal - which this then checks for range, exiting where one
+ *             hexadecimal, and duplicates dropped as it reads them - which
+ *             selfn_domain_id_list() then checks for range, exiting where one
  *             is out of it
  */
 void
 selfn_alloc_domain_id(const char *arg)
 {
-        char *str = NULL;
-        unsigned int i = 0;
-        unsigned int j = 0;
-        unsigned int n = 0;
-
-        if (arg == NULL)
-                parse_error(arg, "NULL pointer!");
-
-        if (*arg == '\0')
-                parse_error(arg, "Empty string!");
-
-        selfn_strdup(&str, arg);
-
-        n = strlisttotab(str, sel_alloc_domain_id.domain_ids, MAX_DOMAIN_IDS);
-        if (n == 0) {
-                printf("No Domain ID specified: %s\n", str);
-                exit(EXIT_FAILURE);
-        }
-
-        sel_alloc_domain_id.num_domain_ids = n;
-
-        /* check for invalid resource ID */
-        for (i = 0; i < n; i++) {
-                if (sel_alloc_domain_id.domain_ids[i] >= MAX_DOMAINS) {
-                        printf("Domain ID out of range: %s\n", str);
-                        exit(EXIT_FAILURE);
-                }
-        }
-
-        /* Check duplicate memry region entry */
-        for (i = 0; i < n; i++) {
-                for (j = i + 1; j < n; j++) {
-                        if (sel_alloc_domain_id.domain_ids[i] ==
-                            sel_alloc_domain_id.domain_ids[j]) {
-                                parse_error(str,
-                                            "Duplicate Domain ID selection");
-                                printf("The Domain ID %ld is entered 2 times\n",
-                                       sel_alloc_domain_id.domain_ids[i]);
-                                exit(EXIT_FAILURE);
-                        }
-                }
-        }
-
-        free(str);
+        sel_alloc_domain_id.num_domain_ids = selfn_domain_id_list(
+            arg, sel_alloc_domain_id.domain_ids, MAX_DOMAIN_IDS);
 }
 
 int

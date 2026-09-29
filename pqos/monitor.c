@@ -43,6 +43,7 @@
 #include "monitor_utils.h"
 #include "monitor_xml.h"
 #include "pqos.h"
+#include "utils.h"
 #ifdef PQOS_RMID_CUSTOM
 #include "pqos_internal.h"
 #endif

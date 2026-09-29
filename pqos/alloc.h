@@ -65,7 +65,7 @@ void selfn_allocation_assoc(const char *arg);
  *
  * @param [in] arg the list given to --alloc-mem-regions: region numbers in any
  *             form strlisttotab() reads - commas, ranges, decimal or
- *             hexadecimal
+ *             hexadecimal, with duplicates dropped
  */
 void selfn_alloc_mem_regions(const char *arg);
 
@@ -95,7 +95,7 @@ void selfn_alloc_max_bw(const char *arg);
  *
  * @param [in] arg the list given to --alloc-domain-id: domain identifiers in
  *             any form strlisttotab() reads - commas, ranges, decimal or
- *             hexadecimal
+ *             hexadecimal, with duplicates dropped
  */
 void selfn_alloc_domain_id(const char *arg);
 
