@@ -2796,9 +2796,12 @@ free_and_return:
 }
 
 /**
- * @brief Selects memory regions for allocation
+ * @brief Selects the memory regions an allocation applies to
  *
- * @param arg not used
+ * @param [in] arg the list given to --alloc-mem-regions: region numbers in any
+ *             form strlisttotab() reads - commas, ranges, decimal or
+ *             hexadecimal - which this then checks for range, exiting where one
+ *             is out of it
  */
 void
 selfn_alloc_mem_regions(const char *arg)
@@ -2893,9 +2896,12 @@ selfn_alloc_max_bw(const char *arg)
 }
 
 /**
- * @brief Selects domain id for allocation
+ * @brief Selects the domains an allocation applies to
  *
- * @param arg not used
+ * @param [in] arg the list given to --alloc-domain-id: domain identifiers in
+ *             any form strlisttotab() reads - commas, ranges, decimal or
+ *             hexadecimal - which this then checks for range, exiting where one
+ *             is out of it
  */
 void
 selfn_alloc_domain_id(const char *arg)
