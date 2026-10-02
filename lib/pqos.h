@@ -229,10 +229,30 @@ typedef uint32_t pqos_rmid_t;
  *
  * Two things the library asks of \a callback_log, which it cannot check:
  *
- * It must not leave by a non-local jump - a longjmp(), or a C++ exception
- * thrown through it. Such a callback never returns the reference its message
- * holds, so the descriptor and the context that message was using are held for
- * the life of the process.
+ * It must return. Not by a non-local jump - a longjmp(), or a C++ exception
+ * thrown through it - and not by pthread_exit() or a cancellation either.
+ *
+ * What each of those costs is different, and the difference is worth stating. A
+ * non-local jump keeps the reference the message holds, so the descriptor and
+ * the context that message was using are held for the life of the process.
+ * pthread_exit() and a cancellation do give that reference back, because the
+ * emission registers a cleanup handler and both run it - but that handler is
+ * the log's, and a message is usually being written from inside an API call
+ * that holds the library's own lock. Nothing gives that lock back, so a thread
+ * that leaves a callback either way while an API call is on its stack leaves
+ * the library locked, and the next API call made by any thread waits on it for
+ * ever. Only a callback reached outside an API call - pqos_open() and
+ * pqos_fopen() log without the lock - can be left that way without stopping the
+ * library.
+ *
+ * And a cancellation means one in the deferred mode, PTHREAD_CANCEL_DEFERRED,
+ * which is what a thread has unless it asks for the other one. A thread with
+ * PTHREAD_CANCEL_ASYNCHRONOUS set is not covered at all: such a cancellation
+ * can land on any instruction, including one inside the library that holds a
+ * lock of its own or has taken a reference it has not yet registered a handler
+ * for, and no arrangement of the code can make that safe - which is why POSIX
+ * lists almost no function as safe to call in that mode. An application that
+ * enables it must leave it off around calls into this library.
  *
  * And a message may still be on its way when the library is finalized, in one
  * case: one that has not finished within about a second of the teardown.
@@ -256,6 +276,41 @@ typedef uint32_t pqos_rmid_t;
  * application that reclaims them on the strength of the error return alone can
  * have them used after they are gone.
  *
+ * One more thing the library asks, which belongs here because it is about what
+ * a callback may do rather than how it must leave: a callback reached from
+ * inside a pqos API must not call a pqos API. Those calls hold the library's
+ * own lock for the whole of their work, that lock is not recursive, and the
+ * logging happens inside it - so a callback that calls back in blocks on a lock
+ * its own thread holds, and the thread stops there. Nothing about a teardown
+ * changes that; it is true of such a callback at any time.
+ *
+ * A callback reached *outside* an API call may call in, and two of them are:
+ * pqos_open() and pqos_fopen() log without the lock. For those, and only for
+ * those, there is a second case where \a context_log is still in use when a
+ * call returns: pqos_fini() called from such a callback does not wait for the
+ * message it is called from - that message cannot finish until the call
+ * returns, so waiting for it would wait for the caller - and it does not wait
+ * for any further callback frame this thread is inside either. So the call
+ * returns with \a context_log still in use by the callback that made it and by
+ * anything below it on that stack. Every other thread's message is waited for
+ * as usual, so an application that finalizes from a callback reclaims the
+ * context after that callback has returned rather than on the strength of
+ * pqos_fini() returning inside it.
+ *
+ * Four frames of that nesting are tracked per thread and no more. A callback
+ * nested deeper - repeated pqos_open() failures from inside one another, say -
+ * has its own message counted as another thread's, so the finalizing call waits
+ * the whole bound before it returns. That is a slow return and nothing else:
+ * the reference is still given back when the message ends, and what the call
+ * promises about other threads' messages is unchanged.
+ *
+ * And once the library is finalized, no callback may call in at all. Up to that
+ * point one reached outside the lock may: the wait is done with the API lock
+ * released, so a call made while the library is still finalizing takes a lock
+ * that is still there. Once the call returns, the library is finalized and
+ * its synchronization has been taken down with it, so an API called from such a
+ * callback is an API called after pqos_fini() - which no application may do at
+ * all, and which from here cannot even be refused in an orderly way.
  * @param verbose logging options
  *         LOG_VER_SILENT         - no messages
  *         LOG_VER_DEFAULT        - warning and error messages
@@ -300,8 +355,11 @@ int pqos_init(const struct pqos_config *config);
  * close the one and free what the other uses as soon as this returns. The wait
  * is bounded at about a second: a message that takes longer than that to finish
  * may still be using them afterwards - a callback that does not return, or a
- * write to the descriptor that blocks - which is the case where those two are
- * not yet free. See pqos_config::callback_log.
+ * write to the descriptor that blocks - which is one of the two cases where
+ * those two are not yet free. The other is this call made from inside the
+ * callback itself - which only a callback reached outside an API call can do,
+ * and which does not wait for the message it is called from or for any callback
+ * frame the calling thread is inside. See pqos_config::callback_log for both.
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success

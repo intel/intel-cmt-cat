@@ -120,6 +120,95 @@ finalizing_callback(void *context __attribute__((unused)),
         nested_teardown = 1;
 }
 
+/** the thread the case is running on, for the callback below */
+static pthread_t case_thread;
+/** the nested teardown has reached the drain */
+static int wait_entered;
+/** the held emitter had been let go by the time the drain returned */
+static int released_before_return;
+/** how long the releaser leaves the drain waiting, in microseconds. Not a
+ *  threshold anything is asserted against - what the case asserts is the order
+ *  of two events - only long enough that a drain which does not wait is seen to
+ *  return before the release rather than racing it
+ */
+#define HELD_FOR_US 50000
+
+/**
+ * @brief Finalizes on the case's thread and holds on any other
+ *
+ * One destination has one callback, and the two-emitter case needs the two
+ * threads to do different things in it: the case's thread takes the log down
+ * from inside its own message, and the other thread is the message that
+ * teardown has to wait for.
+ */
+static void
+finalizing_or_holding_callback(void *context __attribute__((unused)),
+                               const size_t size __attribute__((unused)),
+                               const char *message __attribute__((unused)))
+{
+        if (pthread_equal(pthread_self(), case_thread)) {
+                log_fini();
+
+                /* the releaser waits for this, so that what it is timing is the
+                 * drain and not the creation of a thread
+                 */
+                pthread_mutex_lock(&hold_mutex);
+                wait_entered = 1;
+                pthread_cond_broadcast(&hold_cond);
+                pthread_mutex_unlock(&hold_mutex);
+
+                log_wait_quiescent();
+
+                /* and the question the case asks: had the other emitter been
+                 * let go by the time this returned? A drain that waited for it
+                 * cannot return before it is released; one that skipped the
+                 * wait returns while it is still held
+                 */
+                pthread_mutex_lock(&hold_mutex);
+                released_before_return = callback_may_leave;
+                pthread_mutex_unlock(&hold_mutex);
+
+                nested_teardown = 1;
+
+                return;
+        }
+
+        pthread_mutex_lock(&hold_mutex);
+        callback_entered = 1;
+        pthread_cond_broadcast(&hold_cond);
+        while (!callback_may_leave)
+                pthread_cond_wait(&hold_cond, &hold_mutex);
+        pthread_mutex_unlock(&hold_mutex);
+}
+
+/**
+ * @brief Lets the held message go after a while
+ *
+ * From a thread of its own because the case's thread is inside the teardown
+ * that is waiting for it, and cannot release it itself.
+ */
+static void *
+releaser_thread(void *arg __attribute__((unused)))
+{
+        /* not a sleep of its own length: it waits for the drain to be entered,
+         * so the release cannot happen before the thing it is meant to outlast
+         * has started
+         */
+        pthread_mutex_lock(&hold_mutex);
+        while (!wait_entered)
+                pthread_cond_wait(&hold_cond, &hold_mutex);
+        pthread_mutex_unlock(&hold_mutex);
+
+        usleep(HELD_FOR_US);
+
+        pthread_mutex_lock(&hold_mutex);
+        callback_may_leave = 1;
+        pthread_cond_broadcast(&hold_cond);
+        pthread_mutex_unlock(&hold_mutex);
+
+        return NULL;
+}
+
 /** whether the streaming thread below should stop */
 static int stream_stop;
 
@@ -284,6 +373,101 @@ test_the_wait_ends_even_for_a_callback_that_does_not(void **state
 }
 
 static void
+test_a_teardown_from_inside_a_callback_is_quick(void **state
+                                                __attribute__((unused)))
+{
+        struct timespec start, end;
+        double seconds;
+
+        nested_teardown = 0;
+
+        assert_int_equal(
+            log_init(-1, finalizing_callback, NULL, LOG_VER_VERBOSE),
+            LOG_RETVAL_OK);
+
+        /* the callback does what pqos_fini() does - retire the destination and
+         * wait for the messages using it - from inside the one message there
+         * is. Waiting for that message would be waiting for itself, so it does
+         * not.
+         */
+        assert_int_equal(clock_gettime(CLOCK_MONOTONIC, &start), 0);
+        log_printf(LOG_OPT_INFO, "a message whose callback finalizes\n");
+        assert_int_equal(clock_gettime(CLOCK_MONOTONIC, &end), 0);
+
+        assert_int_equal(nested_teardown, 1);
+        assert_int_equal(log_is_initialized(), 0);
+
+        /* and it did not wait: without the guard this is the whole drain, a
+         * second of sleeping for a message that cannot finish until it returns.
+         * Half of that is the threshold rather than a tenth, because what
+         * distinguishes the two is a second and a case descheduled on a loaded
+         * machine should not be read as the guard failing
+         */
+        seconds = (double)(end.tv_sec - start.tv_sec) +
+                  (double)(end.tv_nsec - start.tv_nsec) / 1e9;
+        assert_true(seconds < 0.5);
+}
+
+static void
+test_a_teardown_from_a_callback_waits_for_the_other_emitter(
+    void **state __attribute__((unused)))
+{
+        pthread_t emitter, releaser;
+
+        /* Two messages on one destination, and a teardown reached from one of
+         * them. Its own message is the one it must not wait for - that message
+         * cannot finish until the teardown returns - and the other thread's is
+         * one it must. Returning as soon as this thread was inside an emission
+         * did both, so the second emitter kept using a destination the caller
+         * had been told was finished with.
+         *
+         * The case's own thread is the one that finalizes; the second emitter
+         * is held in the callback and let go by a thread of its own, because
+         * this one is inside the wait.
+         *
+         * What is asserted is the order of two events and not how long anything
+         * took: the releaser waits for the drain to be entered before it
+         * starts, and the drain records whether the other emitter had been let
+         * go by the time it returned. A wall-clock threshold would have this
+         * case fail on a loaded machine that descheduled either thread.
+         */
+        nested_teardown = 0;
+        callback_entered = 0;
+        callback_may_leave = 0;
+        wait_entered = 0;
+        released_before_return = 0;
+        case_thread = pthread_self();
+
+        assert_int_equal(
+            log_init(-1, finalizing_or_holding_callback, NULL, LOG_VER_VERBOSE),
+            LOG_RETVAL_OK);
+
+        assert_int_equal(pthread_create(&emitter, NULL, emit_thread, NULL), 0);
+        pthread_mutex_lock(&hold_mutex);
+        while (!callback_entered)
+                pthread_cond_wait(&hold_cond, &hold_mutex);
+        pthread_mutex_unlock(&hold_mutex);
+
+        assert_int_equal(pthread_create(&releaser, NULL, releaser_thread, NULL),
+                         0);
+
+        log_printf(LOG_OPT_INFO, "a message whose callback finalizes\n");
+
+        assert_int_equal(nested_teardown, 1);
+        assert_int_equal(log_is_initialized(), 0);
+
+        /* it waited for the other emitter: the drain cannot have returned
+         * before that emitter was released, and one that skipped the wait
+         * returns while it is still held - which is what returning on the
+         * strength of "this thread is inside an emission" did
+         */
+        assert_int_equal(released_before_return, 1);
+
+        assert_int_equal(pthread_join(emitter, NULL), 0);
+        assert_int_equal(pthread_join(releaser, NULL), 0);
+}
+
+static void
 test_an_install_and_a_teardown_beside_a_stream_of_messages(
     void **state __attribute__((unused)))
 {
@@ -337,6 +521,84 @@ test_an_install_and_a_teardown_beside_a_stream_of_messages(
         log_printf(LOG_OPT_INFO, "after the storm\n");
         assert_true(__atomic_load_n(&stream_calls, __ATOMIC_ACQUIRE) > 0);
         log_fini();
+}
+
+/** a pipe whose write end is full, so a message to it blocks in write() */
+static int blocked_pipe[2] = {-1, -1};
+
+/**
+ * @brief Logs until it is cancelled, which happens inside write()
+ */
+static void *
+blocked_emitter(void *arg __attribute__((unused)))
+{
+        /* and no return after it: the loop does not end, and the thread leaves
+         * by being cancelled inside the write(), which is what the case is
+         * about
+         */
+        for (;;)
+                log_printf(LOG_OPT_INFO, "a message that cannot be written\n");
+}
+
+static void
+test_a_cancelled_emission_gives_back_what_it_held(void **state
+                                                  __attribute__((unused)))
+{
+        pthread_t emitter;
+        struct timespec start, end;
+        double seconds;
+        char full[4096];
+
+        /* write() is a POSIX cancellation point, so a thread cancelled while
+         * blocked in it leaves the emission without running the code after it.
+         * The reference that emission holds is given back by a pthread cleanup
+         * handler - without one the destination would be held for the life of
+         * the process, and every later wait would spend the whole bound looking
+         * for it.
+         */
+        assert_int_equal(pipe(blocked_pipe), 0);
+        memset(full, 'x', sizeof(full));
+
+        /* non-blocking to fill it, blocking afterwards: a blocking write to a
+         * full pipe is what the emitter has to park in, and a blocking write is
+         * also what would park this loop for ever
+         */
+        assert_int_equal(fcntl(blocked_pipe[1], F_SETFL,
+                               fcntl(blocked_pipe[1], F_GETFL) | O_NONBLOCK),
+                         0);
+        while (write(blocked_pipe[1], full, sizeof(full)) > 0)
+                ;
+        assert_int_equal(fcntl(blocked_pipe[1], F_SETFL,
+                               fcntl(blocked_pipe[1], F_GETFL) & ~O_NONBLOCK),
+                         0);
+
+        assert_int_equal(log_init(blocked_pipe[1], NULL, NULL, LOG_VER_VERBOSE),
+                         LOG_RETVAL_OK);
+        assert_int_equal(pthread_create(&emitter, NULL, blocked_emitter, NULL),
+                         0);
+        sleep_a_moment();
+
+        assert_int_equal(pthread_cancel(emitter), 0);
+        assert_int_equal(pthread_join(emitter, NULL), 0);
+
+        log_fini();
+
+        assert_int_equal(clock_gettime(CLOCK_MONOTONIC, &start), 0);
+        log_wait_quiescent();
+        assert_int_equal(clock_gettime(CLOCK_MONOTONIC, &end), 0);
+
+        seconds = (double)(end.tv_sec - start.tv_sec) +
+                  (double)(end.tv_nsec - start.tv_nsec) / 1e9;
+
+        /* prompt, because nothing is holding the retired destination any more.
+         * Without the cleanup handler this is the whole bound
+         */
+        assert_true(seconds < 0.5);
+
+        close(blocked_pipe[0]);
+        close(blocked_pipe[1]);
+        blocked_pipe[0] = -1;
+        blocked_pipe[1] = -1;
 }
 
 static int
@@ -449,8 +711,13 @@ main(void)
                 test_a_teardown_waits_for_a_message_already_on_its_way),
             cmocka_unit_test(
                 test_the_wait_ends_even_for_a_callback_that_does_not),
+            cmocka_unit_test(test_a_teardown_from_inside_a_callback_is_quick),
             cmocka_unit_test(
-                test_an_install_and_a_teardown_beside_a_stream_of_messages)};
+                test_a_teardown_from_a_callback_waits_for_the_other_emitter),
+            cmocka_unit_test(
+                test_an_install_and_a_teardown_beside_a_stream_of_messages),
+            cmocka_unit_test(
+                test_a_cancelled_emission_gives_back_what_it_held)};
 
         result += cmocka_run_group_tests(tests_log, NULL, NULL);
 

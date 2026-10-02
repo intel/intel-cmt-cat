@@ -108,6 +108,27 @@ static pthread_mutex_t m_dest_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct log_destination *m_dest;
 static struct log_destination *m_retired;
 
+/** How deeply this thread is inside an emission, and which destination each of
+ *  those emissions is using. Thread local because it describes a call and not
+ *  the log: a teardown reached from a log callback must not wait for the
+ *  emission it is itself inside - but it must still wait for the emissions
+ *  other threads are inside, including ones using the same destination, so it
+ *  is not enough to know that this thread is somewhere inside one. What the
+ *  drain needs is the difference between the references a destination has and
+ *  the references this thread is holding on it, and that is what this records.
+ *
+ *  Four is how many frames are tracked, not how many an application can reach:
+ *  a callback that logs, whose callback logs, is nesting the application chose,
+ *  and pqos.h describes a caller recursing through pqos_open() failures. So
+ *  indices 0 to 3 are recorded and a fifth emission is counted without being
+ *  recorded, which makes the drain wait for a reference it could have skipped -
+ *  a teardown reached that deep pays the whole bound. Waiting too long is
+ *  bounded; not waiting is not, which is why the limit errs this way.
+ */
+#define LOG_NEST_MAX 4
+static __thread unsigned m_emitting = 0;
+static __thread const struct log_destination *m_held[LOG_NEST_MAX];
+
 /** how deeply logging is suspended on this thread, which is thread local
  *  because it describes a call and not the log
  */
@@ -367,11 +388,38 @@ log_is_initialized(void)
 }
 
 /**
- * @brief Whether a retired destination is still being used by a message
+ * @brief How many references this thread holds on one destination
  *
- * @return Whether a message is still holding one
- * @retval 1 one is held
- * @retval 0 the retired destinations have no references left
+ * @param [in] dest the destination to count
+ *
+ * @return the number of this thread's emissions using it
+ */
+static unsigned
+log_held_by_this_thread(const struct log_destination *dest)
+{
+        unsigned depth = m_emitting < LOG_NEST_MAX ? m_emitting : LOG_NEST_MAX;
+        unsigned held = 0;
+        unsigned i;
+
+        for (i = 0; i < depth; i++)
+                if (m_held[i] == dest)
+                        held++;
+
+        return held;
+}
+
+/**
+ * @brief Whether a retired destination is being used by anybody but this thread
+ *
+ * Its own references are left out, and nothing else is: a teardown reached from
+ * a callback cannot wait for the emission it is inside - that emission cannot
+ * finish until the teardown returns - but it must wait for the emissions other
+ * threads are inside, including ones using the same destination. Counting only
+ * "this thread is somewhere inside an emission" would abandon those.
+ *
+ * @return Whether a message on another thread is still holding one
+ * @retval 1 one is held elsewhere
+ * @retval 0 every reference left on the retired list is this thread's
  */
 static int
 log_retired_in_use(void)
@@ -382,7 +430,7 @@ log_retired_in_use(void)
         pthread_mutex_lock(&m_dest_mutex);
 
         for (dest = m_retired; dest != NULL; dest = dest->next)
-                if (dest->refs > 0) {
+                if (dest->refs > log_held_by_this_thread(dest)) {
                         in_use = 1;
                         break;
                 }
@@ -424,6 +472,13 @@ log_wait_quiescent(void)
          * now - an application logging from a thread of its own, which never
          * stops - is not what a teardown is about, and waiting for that would
          * make every pqos_fini() pay the whole bound.
+         *
+         * And not this thread's own references, which log_retired_in_use()
+         * subtracts: a teardown reached from a log callback is inside an
+         * emission that cannot finish until this returns, so waiting for it
+         * would wait for this thread. Only that emission is left out, though -
+         * another thread inside a callback on the same destination is waited
+         * for like any other.
          */
         if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
                 return;
@@ -443,10 +498,33 @@ log_wait_quiescent(void)
 }
 
 /**
+ * @brief Gives back what an emission holds, however it ends
+ *
+ * A cancellation handler as well as the ordinary path: write() is a POSIX
+ * cancellation point, so a thread cancelled while blocked in it would otherwise
+ * never reach the release - and the destination it was using would be held for
+ * the life of the process, leaving every later wait to spend the whole bound
+ * looking for it. The application's callback is the same case, which this
+ * covers too.
+ *
+ * @param [in] arg the destination the emission acquired, as a void pointer
+ */
+static void
+log_emission_cleanup(void *arg)
+{
+        m_emitting--;
+        if (m_emitting < LOG_NEST_MAX)
+                m_held[m_emitting] = NULL;
+        log_dest_release((struct log_destination *)arg);
+}
+
+/**
  * @brief Writes one message to a destination already acquired
  *
- * Separated from the entry point so that the acquire and the release around it
- * are written once, and so that this part may return wherever it likes.
+ * Separated from the two entry points so that the acquire, the release and the
+ * cancellation handler that joins them are written once, and so that this part
+ * may return wherever it likes without jumping out of that handler's scope -
+ * which pthread_cleanup_push() does not permit.
  *
  * @param [in] dest the destination, or NULL where there is none
  * @param [in] type log type to be made
@@ -530,8 +608,16 @@ log_message(int type, const char *str, va_list ap)
          * tests is the descriptor it writes to and the context is the one that
          * belongs to the callback beside it.
          *
+         * m_emitting says this thread is inside an emission, which is what
+         * stops a teardown reached from the callback below from waiting for the
+         * very message it is inside.
          */
         dest = log_dest_acquire();
+        if (m_emitting < LOG_NEST_MAX)
+                m_held[m_emitting] = dest;
+        m_emitting++;
+
+        pthread_cleanup_push(log_emission_cleanup, dest);
 
         /* If log_init has not been successful then log_printf should not
          * work
@@ -540,7 +626,10 @@ log_message(int type, const char *str, va_list ap)
 
         log_emit(dest, type, str, ap);
 
-        log_dest_release(dest);
+        /* 1, so the handler runs here as well as on a cancellation: the normal
+         * path and the cancelled one give back exactly the same things
+         */
+        pthread_cleanup_pop(1);
 }
 
 void

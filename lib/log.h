@@ -200,6 +200,27 @@ PQOS_LOCAL void log_resume(void);
  * Messages and teardowns after that one are unaffected, because each
  * destination is counted on its own.
  *
+ * pthread_exit() and cancellation are **not** in that list, with two
+ * qualifications. Both run the registered pthread cleanup handlers, and the
+ * emission registers one, so those paths give the reference back like a
+ * callback that returns: a thread cancelled inside a log callback, or one that
+ * exits from it, costs *this module* nothing.
+ *
+ * What it costs the rest of the library is another matter, and the public
+ * contract in pqos.h is where that is stated: a message is usually written from
+ * inside an API call holding the API lock, and no handler gives that lock back.
+ *
+ * That is cancellation in the deferred mode, which is PTHREAD_CANCEL_DEFERRED,
+ * the mode a thread has unless it asks for the other one. A thread with
+ * PTHREAD_CANCEL_ASYNCHRONOUS set is not covered and cannot be: asynchronous
+ * cancellation can land on any instruction, so it can land inside
+ * log_dest_acquire() with the module's mutex held - which stops every later
+ * emission and every later wait - or in the few instructions between taking the
+ * reference and registering the handler, which strands that reference for the
+ * life of the process. Nothing can be made async-cancel-safe by arranging the
+ * code differently, which is why POSIX lists almost no function as safe to call
+ * in that mode at all. An application that enables it must leave it off around
+ * calls into this library.
  */
 PQOS_LOCAL void log_wait_quiescent(void);
 
