@@ -935,8 +935,8 @@ test_common_pqos_open(void **state __attribute__((unused)))
 /* The contract pqos_open() took over from the utility's safe_open(), which the
  * library's own cases did not cover before: what it does with a name that is
  * not there yet, with the flag combinations a caller may pick, and with a name
- * that changes under the call. The reasoning behind each of these was settled
- * in review of PSWD-19861 and is kept with them.
+ * that changes under the call. The reasoning behind each of these is kept with
+ * the case it belongs to, which is the only place it is any use.
  */
 
 /* A file the caller offered to create does not exist yet, which is the whole
