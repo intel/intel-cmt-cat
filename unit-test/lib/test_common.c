@@ -433,11 +433,41 @@ group_teardown(void **state __attribute__((unused)))
  */
 static int log_printf_calls;
 
+/** calls to log_printf_if_init(), the entry point a caller that may run before
+ *  the log exists uses: it asks for a destination and says nothing where there
+ *  is none, so a call to it is not a message and is counted apart
+ */
+static int log_printf_if_init_calls;
+
 /* the real function, named through a typedef: a variadic prototype written out
  * in a .c file reads to checkpatch as an extern declaration
  */
 typedef void log_printf_fn(int type, const char *str, ...);
 log_printf_fn __real_log_printf;
+log_printf_fn __real_log_printf_if_init;
+
+/* The two entry points are counted apart, one counter each. LOG_ERROR_IF_INIT()
+ * goes through log_printf_if_init(), which is log_printf() without the
+ * assertion - a caller that may run before the log exists asks for a
+ * destination and says nothing where there is none, in one operation. Which of
+ * the two a call site uses is what the cases here are about, so
+ * log_printf_calls is the asserting entry point and log_printf_if_init_calls
+ * the asking one, and neither moves the other.
+ */
+void
+__wrap_log_printf_if_init(int type, const char *str, ...)
+{
+        char message[4 * 1024];
+        va_list args;
+
+        log_printf_if_init_calls++;
+
+        va_start(args, str);
+        vsnprintf(message, sizeof(message), str, args);
+        va_end(args);
+
+        __real_log_printf_if_init(type, "%s", message);
+}
 
 void
 __wrap_log_printf(int type, const char *str, ...)
@@ -1215,6 +1245,7 @@ test_common_refuses_a_symlink_before_the_log_exists(void **state
         int fd;
         int error;
         int before;
+        int before_if_init;
         FILE *stream;
 
         ut_write(ut_target, "keep me\n");
@@ -1223,6 +1254,7 @@ test_common_refuses_a_symlink_before_the_log_exists(void **state
 
         assert_int_equal(log_fini(), LOG_RETVAL_OK);
         before = log_printf_calls;
+        before_if_init = log_printf_if_init_calls;
 
         errno = 0;
         fd = pqos_open(ut_link, O_WRONLY, 0);
@@ -1236,13 +1268,19 @@ test_common_refuses_a_symlink_before_the_log_exists(void **state
         assert_null(stream);
         assert_int_equal(error, ELOOP);
 
-        /* log_printf() was not called, which is the claim: a guard that had
-         * been removed would call it and be dropped inside it, writing nothing
-         * either way, so the absence of output is not evidence on its own. Only
-         * a DEBUG build turns that call into an abort, and the default build is
-         * the one that gets run
+        /* The asserting entry point was not called, which is the claim: these
+         * two functions may run before pqos_init(), so they ask for a
+         * destination rather than assume one - log_printf_if_init(), which says
+         * nothing where there is none. Reaching log_printf() instead would be
+         * dropped inside it, writing nothing either way, so the absence of
+         * output is not evidence on its own; only a DEBUG build turns that call
+         * into an abort, and the default build is the one that gets run.
+         *
+         * The ask itself did happen, which is what makes the count above the
+         * right entry point being used rather than no logging attempt at all.
          */
         assert_int_equal(log_printf_calls, before);
+        assert_true(log_printf_if_init_calls > before_if_init);
 
         assert_int_equal(
             log_init(-1, log_callback, NULL, LOG_VER_SUPER_VERBOSE),
@@ -1257,11 +1295,11 @@ test_common_refuses_a_symlink_before_the_log_exists(void **state
         /* and the same refusal with a log to write to does call it, so the
          * count above is the guard working rather than the counter not
          */
-        before = log_printf_calls;
+        before_if_init = log_printf_if_init_calls;
         errno = 0;
         fd = pqos_open(ut_link, O_WRONLY, 0);
         assert_int_equal(fd, -1);
-        assert_true(log_printf_calls > before);
+        assert_true(log_printf_if_init_calls > before_if_init);
         assert_non_null(strstr(logged, "is a symlink"));
 
         assert_int_equal(unlink(ut_link), 0);

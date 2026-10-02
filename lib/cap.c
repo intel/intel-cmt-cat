@@ -152,13 +152,25 @@ _pqos_set_inter(const enum pqos_interface iface)
 int
 _pqos_check_init(const int expect)
 {
+        /* LOG_ERROR_IF_INIT and not LOG_ERROR, for the "not initialized" answer
+         * in particular: this is what an API called when there is no library
+         * says, and the places that can reach it are exactly the places where
+         * there may be no log to say it to. A callback that calls an API while
+         * pqos_fini() is finalizing arrives after the log has been taken down,
+         * and LOG_ERROR asserts on a destination that is not there - so in a
+         * DEBUG build the diagnostic aborted the application whose only mistake
+         * was the one being diagnosed.
+         *
+         * Both arms, because the other is the same shape: an API called before
+         * the library exists is told so by a library that has no log either.
+         */
         if (m_init_done && (!expect)) {
-                LOG_ERROR("PQoS library already initialized\n");
+                LOG_ERROR_IF_INIT("PQoS library already initialized\n");
                 return PQOS_RETVAL_INIT;
         }
 
         if ((!m_init_done) && expect) {
-                LOG_ERROR("PQoS library not initialized\n");
+                LOG_ERROR_IF_INIT("PQoS library not initialized\n");
                 return PQOS_RETVAL_INIT;
         }
 

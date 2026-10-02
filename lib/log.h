@@ -234,6 +234,25 @@ PQOS_LOCAL void log_wait_quiescent(void);
 PQOS_LOCAL void log_printf(int type, const char *str, ...);
 
 /**
+ * @brief PQoS log function for a caller that may run before the log exists
+ *
+ * log_printf() with the assertion left out: where there is no destination this
+ * says nothing and returns, rather than holding the caller to the rule that
+ * nothing logs before pqos_init().
+ *
+ * Asking in one operation is the point. A caller that tested
+ * log_is_initialized() and then called log_printf() could have the log taken
+ * down between the two - pqos_open() and pqos_fopen() are public and log
+ * without the API lock - and would then assert on a destination that was there
+ * when it looked. This takes the destination, or finds there is none, once.
+ *
+ * @param [in] type log type to be made
+ * @param [in] str format string compatible with printf().
+ *             Variadic arguments to follow depending on \a str.
+ */
+PQOS_LOCAL void log_printf_if_init(int type, const char *str, ...);
+
+/**
  * @brief Whether the log has been initialized
  *
  * What state the log is in, which is not the same as what a message would do
@@ -256,14 +275,25 @@ PQOS_LOCAL int log_is_initialized(void);
  * must do before it can initialize the library. Those two ask whether there is
  * anywhere to write instead of assuming it, and say nothing when there is not.
  *
+ * One call and not a test followed by a call: a teardown between the two would
+ * leave the second asserting on a destination that was there when the first
+ * looked, and those two callers log without the API lock, so that window is
+ * reachable. log_printf_if_init() takes the destination or finds there is none,
+ * once.
+ *
+ * One call also means the arguments are evaluated whether or not there is a
+ * log, where a test in front of them would not evaluate them at all. That is
+ * fine for what this macro is for: the three callers pass a pointer they
+ * already hold. A caller with an argument expensive enough to want deferring
+ * should ask log_is_initialized() itself rather than have every call here pay
+ * for the question - and nothing is unsafe either way, since this entry point
+ * says nothing where there is no destination.
+ *
  * @param [in] str format string compatible with printf().
  *             Variadic arguments to follow depending on \a str.
  */
 #define LOG_ERROR_IF_INIT(str...)                                              \
-        do {                                                                   \
-                if (log_is_initialized())                                      \
-                        LOG_ERROR(str);                                        \
-        } while (0)
+        log_printf_if_init(LOG_OPT_ERROR, "ERROR: " str)
 
 #ifdef __cplusplus
 }

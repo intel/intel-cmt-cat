@@ -586,12 +586,15 @@ log_emit(const struct log_destination *dest,
 /**
  * @brief One message, from the acquire to the release
  *
+ * @param [in] required a destination has to be there, and its absence is a
+ *             caller error a DEBUG build asserts on. Clear for the callers that
+ *             may run before the log exists and ask rather than assume.
  * @param [in] type log type to be made
  * @param [in] str format string compatible with printf()
  * @param [in] ap the arguments \a str describes
  */
 static void
-log_message(int type, const char *str, va_list ap)
+log_message(int required, int type, const char *str, va_list ap)
 {
         struct log_destination *dest;
 
@@ -619,10 +622,14 @@ log_message(int type, const char *str, va_list ap)
 
         pthread_cleanup_push(log_emission_cleanup, dest);
 
-        /* If log_init has not been successful then log_printf should not
-         * work
+        /* If log_init has not been successful then log_printf should not work -
+         * for every caller but the two that are allowed to ask first. One
+         * expression rather than an if, because ASSERT is nothing at all in a
+         * release build and the if would then have an empty body; and the cast
+         * for the same reason, since the parameter is then read nowhere.
          */
-        ASSERT(dest != NULL);
+        ASSERT(!required || dest != NULL);
+        UNUSED_PARAM(required);
 
         log_emit(dest, type, str, ap);
 
@@ -638,7 +645,16 @@ log_printf(int type, const char *str, ...)
         va_list ap;
 
         va_start(ap, str);
-        log_message(type, str, ap);
+        log_message(1, type, str, ap);
         va_end(ap);
 }
 
+void
+log_printf_if_init(int type, const char *str, ...)
+{
+        va_list ap;
+
+        va_start(ap, str);
+        log_message(0, type, str, ap);
+        va_end(ap);
+}

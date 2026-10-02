@@ -30,6 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cap.h"
 #include "log.h"
 #include "test.h"
 
@@ -468,6 +469,39 @@ test_a_teardown_from_a_callback_waits_for_the_other_emitter(
 }
 
 static void
+test_the_uninitialized_diagnostic_needs_no_destination(void **state
+                                                       __attribute__((unused)))
+{
+        /* What an API says when there is no library is said by a library that
+         * may have no log either: a callback that calls one while pqos_fini()
+         * is finalizing arrives after the log has been taken down, and so does
+         * any caller after it. LOG_ERROR asserts on a destination that is not
+         * there, so in a DEBUG build the diagnostic aborted the application
+         * whose only mistake was the one being diagnosed - LOG_ERROR_IF_INIT
+         * says nothing and returns.
+         *
+         * A regression shows as this binary dying on
+         * "log_message: Assertion `!required || dest != NULL' failed" in a
+         * DEBUG build, which is the thing being prevented and cannot be caught
+         * from inside.
+         */
+        assert_int_equal(log_fini(), LOG_RETVAL_OK);
+        assert_int_equal(log_is_initialized(), 0);
+
+        assert_int_equal(_pqos_check_init(1), PQOS_RETVAL_INIT);
+
+        /* and the library is not initialized here, so the other arm is the one
+         * that answers OK
+         */
+        assert_int_equal(_pqos_check_init(0), PQOS_RETVAL_OK);
+
+        /* the silent log back, because test.h installs one for every case and
+         * the next of them expects it
+         */
+        test_log_init_silent();
+}
+
+static void
 test_an_install_and_a_teardown_beside_a_stream_of_messages(
     void **state __attribute__((unused)))
 {
@@ -520,6 +554,35 @@ test_an_install_and_a_teardown_beside_a_stream_of_messages(
          */
         log_printf(LOG_OPT_INFO, "after the storm\n");
         assert_true(__atomic_load_n(&stream_calls, __ATOMIC_ACQUIRE) > 0);
+        log_fini();
+}
+
+static void
+test_a_caller_that_may_run_before_the_log_says_nothing(void **state
+                                                       __attribute__((unused)))
+{
+        /* LOG_ERROR_IF_INIT() is what pqos_open() and pqos_fopen() use, and
+         * they run before pqos_init(). It used to test log_is_initialized() and
+         * then call log_printf(), which asserts - so a teardown between the two
+         * left the second asserting on a destination that was there when the
+         * first looked, and a DEBUG build aborted. Both of those callers log
+         * without the API lock, so the window is reachable.
+         *
+         * One call now takes the destination or finds there is none. With no
+         * log installed at all - the strongest form of "there is none" - this
+         * must return quietly, in a DEBUG build as much as in a release one.
+         */
+        log_fini();
+        assert_int_equal(log_is_initialized(), 0);
+
+        log_printf_if_init(LOG_OPT_ERROR, "a message with nowhere to go\n");
+
+        /* and with one installed it writes, like any other message */
+        callback_calls = 0;
+        assert_int_equal(log_init(-1, log_callback, NULL, LOG_VER_VERBOSE),
+                         LOG_RETVAL_OK);
+        log_printf_if_init(LOG_OPT_ERROR, "a message with somewhere to go\n");
+        assert_int_equal(callback_calls, 1);
         log_fini();
 }
 
@@ -715,7 +778,11 @@ main(void)
             cmocka_unit_test(
                 test_a_teardown_from_a_callback_waits_for_the_other_emitter),
             cmocka_unit_test(
+                test_the_uninitialized_diagnostic_needs_no_destination),
+            cmocka_unit_test(
                 test_an_install_and_a_teardown_beside_a_stream_of_messages),
+            cmocka_unit_test(
+                test_a_caller_that_may_run_before_the_log_says_nothing),
             cmocka_unit_test(
                 test_a_cancelled_emission_gives_back_what_it_held)};
 

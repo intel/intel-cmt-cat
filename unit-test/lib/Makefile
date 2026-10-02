@@ -972,6 +972,7 @@ $(BIN_DIR)/test_common: ./test_common.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=getline \
 		-Wl,--wrap=log_printf \
+		-Wl,--wrap=log_printf_if_init \
 		-Wl,--wrap=lstat \
 		-Wl,--wrap=open \
 		-Wl,--wrap=fdopen \
