@@ -1147,7 +1147,12 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
                 else if (!regions->hmat_available)
                         printf("HMAT is not available, so the target domain "
                                "has no locality to look up\n");
-                else if (!region->hmat_match)
+                else if (!region->proximity_valid)
+                        /* the pair and not hmat_match, which is the wider
+                         * question of whether HMAT said anything about the
+                         * domain - a memory side cache is such a thing, and a
+                         * region can have one with no pair to report
+                         */
                         printf("No HMAT entry pairs an initiator with target "
                                "domain %u\n",
                                region->target_domain);
