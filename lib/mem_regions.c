@@ -69,6 +69,15 @@ struct cedt_window {
         uint64_t size;
 };
 
+/** One HMAT memory side cache structure, as parsed: the domain it was declared
+ *  for and the two figures the report states about it
+ */
+struct hmat_cache {
+        unsigned domain;
+        uint64_t size;
+        uint32_t attributes;
+};
+
 /** One HMAT locality matrix, as parsed */
 struct hmat_matrix {
         uint8_t data_type;
@@ -132,6 +141,11 @@ struct acpi_facts {
         unsigned *hmat_initiator;
         unsigned *hmat_target;
         unsigned num_hmat_domains;
+
+        /** the memory side caches HMAT declares, in the order it declares them
+         */
+        struct hmat_cache *hmat_cache;
+        unsigned num_hmat_cache;
 };
 
 /**
@@ -924,6 +938,7 @@ hmat_parse(struct acpi_facts *facts)
         const uint8_t *end;
         unsigned matrices = 0;
         unsigned domains = 0;
+        unsigned caches = 0;
 
         facts->hmat_tbl = acpi_get_sig(ACPI_TABLE_SIG_HMAT);
         if (facts->hmat_tbl == NULL) {
@@ -1013,6 +1028,18 @@ hmat_parse(struct acpi_facts *facts)
                         }
 
                         domains++;
+                } else if (e->type == ACPI_HMAT_TYPE_CACHE) {
+                        if (e->length < ACPI_HMAT_CACHE_MIN_LENGTH) {
+                                LOG_DEBUG("HMAT memory side cache structure of "
+                                          "length %u at offset %zd is too "
+                                          "short; ignoring HMAT\n",
+                                          e->length,
+                                          pos - facts->hmat_tbl->generic);
+
+                                return PQOS_RETVAL_OK;
+                        }
+
+                        caches++;
                 }
                 pos += e->length;
         }
@@ -1038,6 +1065,11 @@ hmat_parse(struct acpi_facts *facts)
                 if (facts->hmat_initiator == NULL || facts->hmat_target == NULL)
                         return PQOS_RETVAL_RESOURCE;
         }
+        if (caches > 0) {
+                facts->hmat_cache = calloc(caches, sizeof(*facts->hmat_cache));
+                if (facts->hmat_cache == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+        }
 
         for (pos = facts->hmat_tbl->generic + sizeof(*hmat);
              (size_t)(end - pos) >= sizeof(struct acpi_hmat_entry);) {
@@ -1046,6 +1078,21 @@ hmat_parse(struct acpi_facts *facts)
 
                 if (e->length < sizeof(*e) || (size_t)(end - pos) < e->length)
                         break;
+
+                if (e->type == ACPI_HMAT_TYPE_CACHE &&
+                    e->length >= ACPI_HMAT_CACHE_MIN_LENGTH &&
+                    facts->num_hmat_cache < caches) {
+                        const struct acpi_hmat_cache *c =
+                            (const struct acpi_hmat_cache *)pos;
+                        struct hmat_cache *kept =
+                            &facts->hmat_cache[facts->num_hmat_cache++];
+
+                        kept->domain = c->memory_domain;
+                        kept->size = c->cache_size;
+                        kept->attributes = c->attributes;
+                        pos += e->length;
+                        continue;
+                }
 
                 if (e->type == ACPI_HMAT_TYPE_PROXIMITY_DOMAIN &&
                     e->length >= ACPI_HMAT_PROXIMITY_MIN_LENGTH &&
@@ -1638,6 +1685,167 @@ locality_fill(const struct acpi_facts *facts,
 }
 
 /**
+ * @brief The cache level one structure states, where it states a usable one
+ *
+ * ACPI's Cache Level nibble is zero where the platform says nothing about which
+ * level a cache is. It is four bits wide, so firmware can also emit a level
+ * above the Total Cache Levels nibble of the very same structure - "level 2 of
+ * 1" - and that is the table contradicting itself rather than stating anything:
+ * a caller told that this is one of the platform's levels cannot square it with
+ * being told there is one level in total.
+ *
+ * Read as no level stated, and not as a reason to drop the structure: the size,
+ * the associativity, the write policy and the line size are each still what the
+ * platform said, and the level is the one field nobody can use. That also keeps
+ * the selection below honest, since a level this will not publish must not win
+ * the pick either.
+ *
+ * @param [in] c the structure
+ *
+ * @return the level it states, or zero where it states none this can use
+ */
+static unsigned
+cache_level_stated(const struct hmat_cache *c)
+{
+        const unsigned level = ACPI_HMAT_CACHE_LEVEL(c->attributes);
+
+        if (level == 0 || level > ACPI_HMAT_CACHE_TOTAL_LEVELS(c->attributes))
+                return 0;
+
+        return level;
+}
+
+/**
+ * @brief Describes the memory side cache HMAT declares for one domain
+ *
+ * ACPI carries one structure per cache level, so a domain may have several. The
+ * one described here is the lowest level the table states, and \a
+ * levels_declared says how many there are, because publishing one of several as
+ * though it were the whole story is what the rest of this report refuses to do.
+ * Not the first structure in table order: ACPI does not require these
+ * structures to be ordered by level, so two platforms declaring the same two
+ * levels the other way round would report different figures for the same
+ * memory.
+ *
+ * Where not one of them states a level there is no lowest to pick, and the
+ * first the table carried is kept - with \a level_valid clear, so the figures
+ * are published as belonging to no level a caller can name. That is the one
+ * case where the order does decide, and there is nothing in the table to decide
+ * it by.
+ *
+ * A Total Cache Levels nibble of zero declares no memory side cache at all -
+ * ACPI names that value None - so such a structure is not a cache to describe
+ * and not one to count. The nibbles below it are read the other way round:
+ * ACPI's None there is a platform saying nothing about a cache it has already
+ * said is there, and dropping the structure would throw away the figures it
+ * did state, so each of those carries whether it was stated. The size is on
+ * those terms too, since a cache of zero bytes is not a description either.
+ *
+ * @param [in] facts the parsed tables
+ * @param [in] domain the memory proximity domain to describe
+ * @param [out] cache filled in, and left as it was where no cache is declared
+ */
+static void
+cache_fill(const struct acpi_facts *facts,
+           const unsigned domain,
+           struct pqos_mem_side_cache *cache)
+{
+        const struct hmat_cache *lowest = NULL;
+        unsigned lowest_level = 0;
+        unsigned declared = 0;
+        unsigned i;
+
+        for (i = 0; i < facts->num_hmat_cache; i++) {
+                const struct hmat_cache *c = &facts->hmat_cache[i];
+                unsigned level;
+
+                if (c->domain != domain)
+                        continue;
+
+                /* a structure for this domain, which is what says the table
+                 * was asked about it and answered - whichever way
+                 */
+                cache->domain_declared = 1;
+
+                /* and the platform stating that the domain has no memory side
+                 * cache, which is a statement and not a gap
+                 */
+                if (ACPI_HMAT_CACHE_TOTAL_LEVELS(c->attributes) == 0)
+                        continue;
+
+                declared++;
+
+                /* the lowest level any structure states, and one that states no
+                 * level only where none of them does: whichever the table
+                 * carries first cannot decide this, or the same platform
+                 * described twice would answer differently
+                 */
+                level = cache_level_stated(c);
+                if (lowest == NULL || (level != 0 && (lowest_level == 0 ||
+                                                      level < lowest_level))) {
+                        lowest = c;
+                        lowest_level = level;
+                }
+        }
+
+        if (lowest == NULL)
+                return;
+
+        cache->valid = 1;
+        cache->memory_domain = domain;
+        cache->levels_declared = declared;
+        cache->total_levels = ACPI_HMAT_CACHE_TOTAL_LEVELS(lowest->attributes);
+
+        if (lowest->size != 0) {
+                cache->size_valid = 1;
+                cache->size = lowest->size;
+        }
+
+        if (cache_level_stated(lowest) != 0) {
+                cache->level_valid = 1;
+                cache->level = cache_level_stated(lowest);
+        }
+        if (ACPI_HMAT_CACHE_LINE_SIZE(lowest->attributes) != 0) {
+                cache->line_size_valid = 1;
+                cache->line_size =
+                    ACPI_HMAT_CACHE_LINE_SIZE(lowest->attributes);
+        }
+
+        switch (ACPI_HMAT_CACHE_ASSOCIATIVITY(lowest->attributes)) {
+        case 0:
+                cache->associativity = PQOS_MEM_CACHE_ASSOC_UNKNOWN;
+                break;
+        case 1:
+                cache->associativity = PQOS_MEM_CACHE_ASSOC_DIRECT_MAPPED;
+                break;
+        case 2:
+                cache->associativity = PQOS_MEM_CACHE_ASSOC_COMPLEX;
+                break;
+        default:
+                /* a value ACPI has defined since, or a platform's own: said to
+                 * be there without being named, which is what the report says
+                 */
+                cache->associativity = PQOS_MEM_CACHE_ASSOC_OTHER;
+                break;
+        }
+
+        switch (ACPI_HMAT_CACHE_WRITE_POLICY(lowest->attributes)) {
+        case 0:
+                cache->write_policy = PQOS_MEM_CACHE_WRITE_UNKNOWN;
+                break;
+        case 1:
+                cache->write_policy = PQOS_MEM_CACHE_WRITE_BACK;
+                break;
+        case 2:
+                cache->write_policy = PQOS_MEM_CACHE_WRITE_THROUGH;
+                break;
+        default:
+                cache->write_policy = PQOS_MEM_CACHE_WRITE_OTHER;
+                break;
+        }
+}
+
+/**
  * @brief Describes one region from the tables
  *
  * @param [in] facts the parsed tables
@@ -1802,17 +2010,40 @@ region_describe(const struct acpi_facts *facts,
          */
         region->target_domain = srat_domain;
 
+        /* the memory side cache is declared for that target domain alone, and
+         * needs no initiator: a region can have a cache in front of its memory
+         * and no locality figures at all
+         */
+        cache_fill(facts, srat_domain, &region->mem_side_cache);
+
         for (i = 0; i < facts->num_hmat_domains; i++) {
                 if (facts->hmat_target[i] != srat_domain)
                         continue;
 
                 region->initiator_domain = facts->hmat_initiator[i];
                 region->proximity_valid = 1;
-                region->hmat_match = 1;
                 locality_fill(facts, region->initiator_domain, srat_domain,
                               &region->locality);
                 break;
         }
+
+        /* HMAT describes the target domain if it said anything about it at all,
+         * and a memory side cache is such a thing: it is declared for the
+         * target domain alone and needs no initiator, so a region can have one
+         * and no locality pair. Reporting "HMAT Match: No" above a cache block
+         * with figures in it would contradict the block beneath it.
+         *
+         * domain_declared and not valid, because a structure saying the domain
+         * has no memory side cache is still an entry for the domain. "No" on
+         * that line means the table was consulted and had nothing, and a
+         * platform that took the trouble to declare an absence is not nothing.
+         *
+         * The pair keeps a flag of its own - proximity_valid, set just above -
+         * because that is the question the locality report asks: whether there
+         * is an initiator to pair with this target.
+         */
+        region->hmat_match =
+            region->proximity_valid || region->mem_side_cache.domain_declared;
 }
 
 /**
@@ -1828,6 +2059,7 @@ facts_free(struct acpi_facts *facts)
         free(facts->hmat);
         free(facts->hmat_initiator);
         free(facts->hmat_target);
+        free(facts->hmat_cache);
 
         if (facts->srat_tbl != NULL)
                 acpi_free(facts->srat_tbl);

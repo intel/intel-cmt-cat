@@ -223,6 +223,32 @@ hmat_proximity(struct fixture *f,
 }
 
 /**
+ * @brief Appends an HMAT memory side cache information structure
+ *
+ * @param [in] f the fixture
+ * @param [in] domain the memory proximity domain the cache is declared for
+ * @param [in] size its size in bytes
+ * @param [in] attributes ACPI's attributes word, as the macros lay it out
+ */
+static void
+hmat_cache(struct fixture *f,
+           unsigned domain,
+           uint64_t size,
+           uint32_t attributes)
+{
+        struct acpi_hmat_cache *c =
+            (struct acpi_hmat_cache *)table_end(f->hmat);
+
+        memset(c, 0, sizeof(*c));
+        c->entry.type = ACPI_HMAT_TYPE_CACHE;
+        c->entry.length = sizeof(*c);
+        c->memory_domain = domain;
+        c->cache_size = size;
+        c->attributes = attributes;
+        table_grew(f->hmat, sizeof(*c));
+}
+
+/**
  * @brief Appends an HMAT locality matrix
  *
  * @return where in the table it was put, for a case that wants to spoil it
@@ -378,8 +404,32 @@ init(struct fixture *f)
  * HMAT has its own numbers for. Cases that are about one table's failings start
  * here and spoil that one table.
  */
+/**
+ * @brief The proximity pairs and the locality numbers HMAT carries for them
+ *
+ * Separate from platform() so that a case can build a platform whose HMAT
+ * describes a domain without pairing an initiator with it - which is what a
+ * memory side cache on its own is.
+ *
+ * @param [in,out] f the fixture being built
+ */
 static void
-platform(struct fixture *f)
+platform_hmat_localities(struct fixture *f)
+{
+        hmat_proximity(f, DDR_DOMAIN, DDR_DOMAIN, ACPI_HMAT_INITIATOR_VALID);
+        hmat_proximity(f, DDR_DOMAIN, CXL_DOMAIN, ACPI_HMAT_INITIATOR_VALID);
+        hmat_locality(f, ACPI_HMAT_READ_LATENCY, 0, 0, ACPI_HMAT_PS_PER_NS,
+                      m_initiators, 1, m_targets, 2, m_latency);
+        hmat_locality(f, ACPI_HMAT_WRITE_LATENCY, 0, 0, ACPI_HMAT_PS_PER_NS,
+                      m_initiators, 1, m_targets, 2, m_latency);
+        hmat_locality(f, ACPI_HMAT_READ_BANDWIDTH, 0, 0, 1024, m_initiators, 1,
+                      m_targets, 2, m_bandwidth);
+        hmat_locality(f, ACPI_HMAT_WRITE_BANDWIDTH, 0, 0, 1024, m_initiators, 1,
+                      m_targets, 2, m_bandwidth);
+}
+
+static void
+platform_tables(struct fixture *f, int with_hmat_pairs)
 {
         init(f);
 
@@ -397,22 +447,37 @@ platform(struct fixture *f)
         f->hmat_found = 1;
         table_start(&f->hmat_table, f->hmat, sizeof(struct acpi_table_hmat),
                     ACPI_TABLE_SIG_HMAT, ACPI_HMAT_REVISION_PICOSECONDS);
-        hmat_proximity(f, DDR_DOMAIN, DDR_DOMAIN, ACPI_HMAT_INITIATOR_VALID);
-        hmat_proximity(f, DDR_DOMAIN, CXL_DOMAIN, ACPI_HMAT_INITIATOR_VALID);
-        hmat_locality(f, ACPI_HMAT_READ_LATENCY, 0, 0, ACPI_HMAT_PS_PER_NS,
-                      m_initiators, 1, m_targets, 2, m_latency);
-        hmat_locality(f, ACPI_HMAT_WRITE_LATENCY, 0, 0, ACPI_HMAT_PS_PER_NS,
-                      m_initiators, 1, m_targets, 2, m_latency);
-        hmat_locality(f, ACPI_HMAT_READ_BANDWIDTH, 0, 0, 1024, m_initiators, 1,
-                      m_targets, 2, m_bandwidth);
-        hmat_locality(f, ACPI_HMAT_WRITE_BANDWIDTH, 0, 0, 1024, m_initiators, 1,
-                      m_targets, 2, m_bandwidth);
+        if (with_hmat_pairs)
+                platform_hmat_localities(f);
 
         f->cedt_found = 1;
         table_start(&f->cedt_table, f->cedt, sizeof(struct acpi_table_header),
                     ACPI_TABLE_SIG_CEDT, 1);
         cedt_other(f, 32);
         cedt_window(f, CXL_BASE, CXL_SIZE, 0, 1);
+}
+
+/** the platform every case starts from */
+static void
+platform(struct fixture *f)
+{
+        platform_tables(f, 1);
+}
+
+/**
+ * @brief The same platform, with HMAT pairing no initiator with any target
+ *
+ * HMAT is present and says nothing about which initiator reaches which target,
+ * so a cache structure added afterwards is the only thing it says about the
+ * domain - which is the state a region with a memory side cache and no locality
+ * figures is in.
+ *
+ * @param [out] f the fixture
+ */
+static void
+platform_without_hmat_pairs(struct fixture *f)
+{
+        platform_tables(f, 0);
 }
 
 /**
@@ -1300,6 +1365,336 @@ test_total_size(void **state __attribute__((unused)))
         assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
 }
 
+/** the attributes a platform really declares: one total level, level 1,
+ *  direct mapped, write back, 64 byte line - which is 0x00401111 as ACPI
+ *  packs it
+ */
+#define DECLARED_CACHE_ATTRIBUTES 0x00401111U
+
+static void
+test_memory_side_cache(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+        const struct pqos_mem_side_cache *c;
+
+        /* a cache declared for the CXL region's target domain, with the figures
+         * a board really carries: the region is the device's memory plus this
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x2000000000ULL, DECLARED_CACHE_ATTRIBUTES);
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->valid, 1);
+        assert_int_equal(c->memory_domain, CXL_DOMAIN);
+        assert_int_equal(c->size_valid, 1);
+        assert_true(c->size == 0x2000000000ULL);
+        assert_int_equal(c->levels_declared, 1);
+        assert_int_equal(c->total_levels, 1);
+        assert_int_equal(c->level_valid, 1);
+        assert_int_equal(c->level, 1);
+        assert_int_equal(c->associativity, PQOS_MEM_CACHE_ASSOC_DIRECT_MAPPED);
+        assert_int_equal(c->write_policy, PQOS_MEM_CACHE_WRITE_BACK);
+        assert_int_equal(c->line_size_valid, 1);
+        assert_int_equal(c->line_size, 64);
+
+        /* and the DDR region, which no cache was declared for, says so rather
+         * than borrowing the one beside it
+         */
+        assert_int_equal(region_of(r, 0)->mem_side_cache.valid, 0);
+        assert_int_equal(region_of(r, 0)->mem_side_cache.size, 0);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_without_figures(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+        const struct pqos_mem_side_cache *c;
+
+        /* one level declared and nothing else said about it: the level within
+         * the total, the associativity, the write policy and the line size are
+         * each absent rather than zero, because ACPI's zero there is a platform
+         * saying nothing about a cache it has said is there
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 1U);
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->valid, 1);
+        assert_int_equal(c->size_valid, 1);
+        assert_true(c->size == 0x1000);
+        assert_int_equal(c->total_levels, 1);
+        assert_int_equal(c->level_valid, 0);
+        assert_int_equal(c->line_size_valid, 0);
+        assert_int_equal(c->associativity, PQOS_MEM_CACHE_ASSOC_UNKNOWN);
+        assert_int_equal(c->write_policy, PQOS_MEM_CACHE_WRITE_UNKNOWN);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* a value ACPI has defined since this was written is reported as there
+         * but unnamed, not as one of the values it is not
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 1U | (7U << 8) | (9U << 12));
+        r = describe(&f);
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->associativity, PQOS_MEM_CACHE_ASSOC_OTHER);
+        assert_int_equal(c->write_policy, PQOS_MEM_CACHE_WRITE_OTHER);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_without_a_locality_pair(void **state
+                                               __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+
+        /* A cache is declared for the target domain and nothing pairs an
+         * initiator with it: HMAT has described the domain - that is what the
+         * cache structure is - so hmat_match says yes, while proximity_valid
+         * says there is no pair to report locality for. Reporting "HMAT Match:
+         * No" above a cache block with figures in it would contradict itself.
+         */
+        platform_without_hmat_pairs(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x2000000000ULL, DECLARED_CACHE_ATTRIBUTES);
+        r = describe(&f);
+
+        assert_int_equal(region_of(r, 1)->mem_side_cache.valid, 1);
+        assert_int_equal(region_of(r, 1)->hmat_match, 1);
+        assert_int_equal(region_of(r, 1)->proximity_valid, 0);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_none_declared(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+
+        /* ACPI's Total Cache Levels nibble names zero None: a structure like
+         * this says the domain has no memory side cache, which is a statement
+         * and not a gap. Reporting it as a declared cache of unknown figures
+         * would assert a cache the table denies, and a caller subtracting its
+         * size from the region would misreport the device behind it
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 0);
+        r = describe(&f);
+
+        assert_int_equal(region_of(r, 1)->mem_side_cache.valid, 0);
+        assert_int_equal(region_of(r, 1)->mem_side_cache.levels_declared, 0);
+
+        /* and it is still an entry for the domain: the table was asked and it
+         * answered
+         */
+        assert_int_equal(region_of(r, 1)->mem_side_cache.domain_declared, 1);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* which is what the region matches HMAT on, with no locality pair to
+         * match on instead. "HMAT Match: No" there would say the table had
+         * nothing for the domain, and a declared absence is not nothing
+         */
+        platform_without_hmat_pairs(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 0);
+        r = describe(&f);
+
+        assert_int_equal(region_of(r, 1)->mem_side_cache.valid, 0);
+        assert_int_equal(region_of(r, 1)->mem_side_cache.domain_declared, 1);
+        assert_int_equal(region_of(r, 1)->proximity_valid, 0);
+        assert_int_equal(region_of(r, 1)->hmat_match, 1);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* and a table with no structure for this domain at all leaves both
+         * clear, which is the answer "No" is for
+         */
+        platform_without_hmat_pairs(&f);
+        hmat_cache(&f, CXL_DOMAIN + 1, 0x1000, 1U | (1U << 4));
+        r = describe(&f);
+
+        assert_int_equal(region_of(r, 1)->mem_side_cache.valid, 0);
+        assert_int_equal(region_of(r, 1)->mem_side_cache.domain_declared, 0);
+        assert_int_equal(region_of(r, 1)->hmat_match, 0);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* and the same structure beside one that does declare a cache: the
+         * denial is not counted as a level either
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 0);
+        hmat_cache(&f, CXL_DOMAIN, 0x2000, 1U | (1U << 4));
+        r = describe(&f);
+
+        assert_int_equal(region_of(r, 1)->mem_side_cache.valid, 1);
+        assert_int_equal(region_of(r, 1)->mem_side_cache.levels_declared, 1);
+        assert_true(region_of(r, 1)->mem_side_cache.size == 0x2000);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_without_a_size(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+        const struct pqos_mem_side_cache *c;
+
+        /* a declared cache whose size field is zero: the cache is reported,
+         * because the table says it is there and says what level it is, and the
+         * size is absent rather than a stated zero - a caller that read a zero
+         * here as a size would reconcile a region with its device by adding
+         * nothing, and lose the extended linear cache it was looking for
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0, DECLARED_CACHE_ATTRIBUTES);
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->valid, 1);
+        assert_int_equal(c->size_valid, 0);
+        assert_true(c->size == 0);
+        assert_int_equal(c->level, 1);
+        assert_int_equal(c->line_size, 64);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_levels(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+        const struct pqos_mem_side_cache *c;
+
+        /* two levels declared for one domain: the lowest is described and the
+         * count says the other is there, because one of several published as
+         * though it were the whole story is what this report refuses to do
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x2000000000ULL,
+                   (2U) | (1U << 4) | (1U << 8) | (1U << 12) | (64U << 16));
+        hmat_cache(&f, CXL_DOMAIN, 0x1000000000ULL,
+                   (2U) | (2U << 4) | (2U << 8) | (2U << 12) | (128U << 16));
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->valid, 1);
+        assert_int_equal(c->levels_declared, 2);
+        assert_true(c->size == 0x2000000000ULL);
+        assert_int_equal(c->level, 1);
+        assert_int_equal(c->total_levels, 2);
+        assert_int_equal(c->line_size, 64);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* the same two structures in the other order, which ACPI permits and
+         * which two boards of the same design can differ by: the answer is the
+         * level and not the position, so it is the same answer
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000000000ULL,
+                   (2U) | (2U << 4) | (2U << 8) | (2U << 12) | (128U << 16));
+        hmat_cache(&f, CXL_DOMAIN, 0x2000000000ULL,
+                   (2U) | (1U << 4) | (1U << 8) | (1U << 12) | (64U << 16));
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->levels_declared, 2);
+        assert_true(c->size == 0x2000000000ULL);
+        assert_int_equal(c->level, 1);
+        assert_int_equal(c->line_size, 64);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* two structures of which only one says which level it is: a stated
+         * level is what the pick is made on, so the structure that states one
+         * is chosen however the table orders them
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000000000ULL, 2U);
+        hmat_cache(&f, CXL_DOMAIN, 0x2000000000ULL, (2U) | (2U << 4));
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->levels_declared, 2);
+        assert_int_equal(c->level_valid, 1);
+        assert_int_equal(c->level, 2);
+        assert_true(c->size == 0x2000000000ULL);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_level_above_the_total(void **state
+                                             __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+        const struct pqos_mem_side_cache *c;
+
+        /* one total level and a cache claiming to be the second of them: the
+         * structure contradicts itself, and the level is the one field nobody
+         * can use. The cache is still described - the size and the line size
+         * are what the platform stated - with the level reported as not
+         * stated, because "level 2 of 1" is not an answer a caller can square
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 1U | (2U << 4) | (64U << 16));
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->valid, 1);
+        assert_int_equal(c->total_levels, 1);
+        assert_int_equal(c->level_valid, 0);
+        assert_int_equal(c->level, 0);
+        assert_int_equal(c->line_size, 64);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+
+        /* and such a level does not win the pick either. The first structure
+         * here claims level 2 of 1 and the second level 3 of 3: read as
+         * written, 2 is the lower of the two and the first structure would be
+         * the one described, so the figures published would be the ones whose
+         * level nobody can use. Read as this does, the first states no level
+         * and the second is the only structure that states one
+         */
+        platform(&f);
+        hmat_cache(&f, CXL_DOMAIN, 0x1000, 1U | (2U << 4) | (64U << 16));
+        hmat_cache(&f, CXL_DOMAIN, 0x2000, 3U | (3U << 4) | (128U << 16));
+        r = describe(&f);
+
+        c = &region_of(r, 1)->mem_side_cache;
+        assert_int_equal(c->levels_declared, 2);
+        assert_int_equal(c->level_valid, 1);
+        assert_int_equal(c->level, 3);
+        assert_int_equal(c->total_levels, 3);
+        assert_true(c->size == 0x2000);
+        assert_int_equal(c->line_size, 128);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
+static void
+test_memory_side_cache_malformed(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_mem_regions *r;
+        uint8_t *at;
+
+        /* a cache structure too short to hold the fields it must have drops the
+         * whole table, as a short locality or proximity structure does: the
+         * structures are read in order, so the next offset after a bad one is a
+         * guess
+         */
+        platform(&f);
+        at = table_end(f.hmat);
+        hmat_cache(&f, CXL_DOMAIN, 0x2000000000ULL, DECLARED_CACHE_ATTRIBUTES);
+        ((struct acpi_hmat_cache *)at)->entry.length =
+            sizeof(struct acpi_hmat_entry);
+        r = describe(&f);
+
+        assert_int_equal(r->hmat_available, 0);
+        assert_int_equal(region_of(r, 1)->mem_side_cache.valid, 0);
+        assert_int_equal(region_of(r, 1)->locality.valid, 0);
+        assert_int_equal(mem_regions_fini(), PQOS_RETVAL_OK);
+}
+
 int
 main(void)
 {
@@ -1321,7 +1716,15 @@ main(void)
             cmocka_unit_test(test_hmat_scaling),
             cmocka_unit_test(test_hmat_no_number),
             cmocka_unit_test(test_hmat_selection),
-            cmocka_unit_test(test_total_size)};
+            cmocka_unit_test(test_total_size),
+            cmocka_unit_test(test_memory_side_cache),
+            cmocka_unit_test(test_memory_side_cache_without_figures),
+            cmocka_unit_test(test_memory_side_cache_without_a_locality_pair),
+            cmocka_unit_test(test_memory_side_cache_none_declared),
+            cmocka_unit_test(test_memory_side_cache_without_a_size),
+            cmocka_unit_test(test_memory_side_cache_levels),
+            cmocka_unit_test(test_memory_side_cache_level_above_the_total),
+            cmocka_unit_test(test_memory_side_cache_malformed)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

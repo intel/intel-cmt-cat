@@ -973,6 +973,116 @@ struct pqos_mem_range {
 };
 
 /**
+ * How a memory side cache maps addresses, as HMAT states it
+ */
+enum pqos_mem_cache_associativity {
+        PQOS_MEM_CACHE_ASSOC_UNKNOWN = 0, /**< the table stated none */
+        PQOS_MEM_CACHE_ASSOC_DIRECT_MAPPED,
+        PQOS_MEM_CACHE_ASSOC_COMPLEX, /**< a scheme ACPI does not name */
+        PQOS_MEM_CACHE_ASSOC_OTHER    /**< a value this library does not know */
+};
+
+/**
+ * What a memory side cache does with a write, as HMAT states it
+ */
+enum pqos_mem_cache_write_policy {
+        PQOS_MEM_CACHE_WRITE_UNKNOWN = 0, /**< the table stated none */
+        PQOS_MEM_CACHE_WRITE_BACK,
+        PQOS_MEM_CACHE_WRITE_THROUGH,
+        PQOS_MEM_CACHE_WRITE_OTHER /**< a value this library does not know */
+};
+
+/**
+ * The memory side cache HMAT declares in front of a region's memory
+ *
+ * A cache the platform describes for the region's target proximity domain,
+ * which is what reconciles a region wider than the device behind it: an
+ * extended linear cache is counted in the region's address range, so the range
+ * is the device's capacity plus this size. The arithmetic is the one level
+ * described here, so it accounts for the region as a whole only where that
+ * level is the only one there is - \a levels_declared **and** \a total_levels
+ * both one. The two are counted from different places and are not required to
+ * agree: \a levels_declared is how many structures the table carries for the
+ * domain, \a total_levels is what one of those structures says the platform
+ * has, so a single structure declaring two levels is a platform with a level
+ * this description does not carry. Where either is above one this is the lowest
+ * level any of them states, and the rest are not carried - or, where not one of
+ * them states a level at all, whichever structure the table carried first, in
+ * which case \a level_valid is clear and the figures belong to no level a
+ * caller can name.
+ *
+ * Absent rather than zero where HMAT declares no cache for the domain - which
+ * includes a platform declaring in so many words that the domain has none - and
+ * absent too where HMAT could not be read at all. \a valid does not tell those
+ * apart: it is clear for both, and what distinguishes them is
+ * pqos_mem_regions::hmat_available, exactly as for pqos_mem_locality. A caller
+ * that reads a clear \a valid as "this platform has no memory side cache"
+ * without looking at that flag is reading an unread table as an answer.
+ */
+struct pqos_mem_side_cache {
+        /** HMAT declares a cache for this region's target domain, and the
+         *  figures below describe it
+         */
+        int valid;
+        /** HMAT carries a cache structure for this region's target domain,
+         *  whatever that structure says. A platform stating that the domain has
+         *  no memory side cache - ACPI's Total Cache Levels nibble at zero -
+         *  sets this with \a valid clear, because the table was asked about the
+         *  domain and answered: that is a different thing from a table that
+         *  carries nothing for the domain at all, which leaves both clear
+         */
+        int domain_declared;
+        /** the domain the cache was declared for, which is the region's target
+         *  domain - meaningful where \a valid is set
+         */
+        unsigned memory_domain;
+        /** how many cache structures HMAT declares for that domain - one per
+         *  level. The figures here describe the lowest level any of them
+         * states, or the first of them where none states a level at all, so a
+         * count above one says there are levels this description does not carry
+         */
+        unsigned levels_declared;
+        /** how many levels of memory side cache the platform declares in total.
+         *  Meaningful wherever \a valid is set, because ACPI's zero there says
+         *  the domain has no memory side cache at all - a domain like that is
+         *  reported as having none, not as having one nothing is known about
+         */
+        unsigned total_levels;
+        /** which of those levels this is, and whether the platform said so:
+         *  zero in ACPI's nibble is a platform saying nothing about the level
+         * of a cache it has already said is there. So is a level above
+         * \a total_levels, which is a table contradicting itself and not an
+         * answer - where \a level_valid is set, \a level is between 1 and
+         * \a total_levels
+         */
+        int level_valid;
+        unsigned level;
+        /** 0 where ACPI's associativity nibble says nothing, else
+         *  PQOS_MEM_CACHE_ASSOC_*
+         */
+        enum pqos_mem_cache_associativity associativity;
+        /** 0 where ACPI's write policy nibble says nothing, else
+         *  PQOS_MEM_CACHE_WRITE_*
+         */
+        enum pqos_mem_cache_write_policy write_policy;
+        /** the cache line size in bytes, and whether the table stated one */
+        int line_size_valid;
+        unsigned line_size;
+        /** its size in bytes as the table states it, and whether a size was
+         *  stated: a cache of zero bytes is not a description, so a size field
+         *  left at zero is read as a platform that stated none.
+         *
+         *  Last, because it is the only member wider than an int: between the
+         *  flags it would take four bytes of padding before it and four after
+         *  the structure, which is eight bytes of nothing in every region of
+         *  every description. The flag stays immediately before the field it
+         *  governs, as the other three do
+         */
+        int size_valid;
+        uint64_t size;
+};
+
+/**
  * Latency and bandwidth HMAT reports for one initiator-target pair
  *
  * Absent rather than zero where HMAT does not describe the pair: valid is what
@@ -1064,7 +1174,10 @@ struct pqos_mem_region {
 
         /** SRAT places these ranges in a proximity domain */
         int srat_match;
-        /** HMAT describes the target domain */
+        /** HMAT describes the target domain: a locality pair for it, a memory
+         *  side cache declared for it, or both. The pair alone is
+         *  \a proximity_valid below, which is the narrower question
+         */
         int hmat_match;
         /** CEDT has a window overlapping these ranges, which is what places the
          *  region in CXL space. Overlap and not coverage: a window reaching any
@@ -1126,6 +1239,29 @@ struct pqos_mem_region {
         unsigned unclassified_mres;
 
         struct pqos_mem_locality locality;
+        /** the memory side cache HMAT declares for this region's target
+         *  domain. A cleared \a valid is not by itself the platform saying
+         *  there is none, and three flags tell the answers apart:
+         *
+         *  \a valid set is the cache described by the members below.
+         *
+         *  \a valid clear with pqos_mem_side_cache::domain_declared set is the
+         *  platform stating that the domain has no memory side cache - a
+         *  structure for the domain whose Total Cache Levels nibble is zero.
+         *
+         *  Both clear is a question nobody answered, and which question that
+         *  is depends on the flags above this one: \a srat_match clear means
+         *  the region has no single target domain to ask about,
+         *  pqos_mem_regions::hmat_available clear means the table was never
+         *  read, and with both set it means the table was read and carried
+         *  nothing for the domain.
+         *
+         *  A caller that reads a cleared \a valid as "no memory side cache"
+         *  publishes an unanswered question as an answer, and where the figure
+         *  is used to reconcile a region with the device behind it that is the
+         *  difference between a device of the region's size and one of half it
+         */
+        struct pqos_mem_side_cache mem_side_cache;
 
         /** how many mapped CXL devices this region's ranges meet */
         unsigned num_cxl_devices;
@@ -1166,8 +1302,10 @@ struct pqos_mem_region {
  * region size is not the comparison it looks like: where the platform puts an
  * extended linear cache in front of the device, the region covers both and is
  * twice the size of the device that backs it. The third figure that explains
- * that is a memory side cache, which HMAT declares and this description does
- * not carry yet.
+ * that is a memory side cache, which HMAT declares and
+ * pqos_mem_region::mem_side_cache carries - so the comparison is available to a
+ * caller that wants it, and printing a capacity beside a region size is a
+ * decision about the report rather than a missing figure.
  */
 struct pqos_cxl_device {
         /** the PCI function the device sits on, e.g. "0000:11:00.0" */

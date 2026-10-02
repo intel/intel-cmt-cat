@@ -115,6 +115,7 @@ extern "C" {
 /* HMAT structure types */
 #define ACPI_HMAT_TYPE_PROXIMITY_DOMAIN 0
 #define ACPI_HMAT_TYPE_LOCALITY         1
+#define ACPI_HMAT_TYPE_CACHE            2
 /* HMAT locality data types */
 #define ACPI_HMAT_ACCESS_LATENCY   0
 #define ACPI_HMAT_READ_LATENCY     1
@@ -249,6 +250,38 @@ struct __attribute__((__packed__)) acpi_hmat_locality {
         uint32_t reserved2;
         uint64_t entry_base_unit;
 };
+
+/**
+ * HMAT Memory Side Cache Information structure
+ *
+ * The SMBIOS handles that describe the cache's hardware follow the fixed
+ * fields and are counted by num_smbios_handles, so they cannot be members.
+ * Nothing here reads them: what the report states is the cache's size and what
+ * kind of cache the attributes say it is.
+ */
+struct __attribute__((__packed__)) acpi_hmat_cache {
+        struct acpi_hmat_entry entry;
+        uint32_t memory_domain;
+        uint32_t reserved;
+        uint64_t cache_size;
+        uint32_t attributes;
+        uint16_t reserved2;
+        uint16_t num_smbios_handles;
+};
+
+/* Every field this reads is inside the fixed part, so a structure holding that
+ * much is usable whatever it says about SMBIOS handles
+ */
+#define ACPI_HMAT_CACHE_MIN_LENGTH sizeof(struct acpi_hmat_cache)
+
+/* The cache attributes word, as ACPI lays it out: four nibbles and then the
+ * line size in bytes
+ */
+#define ACPI_HMAT_CACHE_TOTAL_LEVELS(a)  ((a) & 0xfU)
+#define ACPI_HMAT_CACHE_LEVEL(a)         (((a) >> 4) & 0xfU)
+#define ACPI_HMAT_CACHE_ASSOCIATIVITY(a) (((a) >> 8) & 0xfU)
+#define ACPI_HMAT_CACHE_WRITE_POLICY(a)  (((a) >> 12) & 0xfU)
+#define ACPI_HMAT_CACHE_LINE_SIZE(a)     (((a) >> 16) & 0xffffU)
 
 /**
  * CEDT structure header, common to every type
