@@ -68,10 +68,12 @@
  * and overrides this - test_log.c does, and so do the cases that capture
  * messages through a callback.
  *
- * A file that *mocks* log_init cannot have this: the call would reach its
- * __wrap_log_init before cmocka has started, and function_called() there
- * crashes. Such a file defines TEST_MOCKS_LOG_INIT before including this
- * header, and arms the log itself if it needs one.
+ * A file whose mocks are reached by log_init() cannot have this: the call would
+ * arrive before cmocka has started, and function_called() there crashes. That
+ * is a file mocking log_init itself, and equally one mocking something log_init
+ * uses - the pthread mutex calls, say. Such a file defines
+ * TEST_NO_LOG_CONSTRUCTOR before including this header, and arms the log itself
+ * if it needs one.
  */
 static inline void
 test_log_init_silent(void)
@@ -79,7 +81,7 @@ test_log_init_silent(void)
         (void)log_init(-1, NULL, NULL, LOG_VER_SILENT);
 }
 
-#ifndef TEST_MOCKS_LOG_INIT
+#ifndef TEST_NO_LOG_CONSTRUCTOR
 static void __attribute__((constructor))
 test_log_init_at_start(void)
 {

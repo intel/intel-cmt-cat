@@ -34,9 +34,9 @@
 #include "mock_cap.h"
 #include "pqos.h"
 /* log_init is wrapped below, so the harness must not call it before cmocka has
- * started - see TEST_MOCKS_LOG_INIT in test.h
+ * started - see TEST_NO_LOG_CONSTRUCTOR in test.h
  */
-#define TEST_MOCKS_LOG_INIT
+#define TEST_NO_LOG_CONSTRUCTOR
 #include "test.h"
 #include "test_cap.h"
 #ifdef __linux__
