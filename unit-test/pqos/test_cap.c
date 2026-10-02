@@ -387,9 +387,382 @@ __wrap_pqos_io_devs_get(struct pqos_pci_info *pci_info,
         return ret;
 }
 
+/* ------------------------------------------------------------------------
+ * The memory side cache block of the memory region report
+ *
+ * cap_print_region_cache() is static, and reachable through the public
+ * cap_print_mem_regions(): MMIO interface, an mrrm pointer so the report is
+ * attempted, and a description built here. What is asserted is the text,
+ * because the text is the product - a selection or a wording that drifts is
+ * invisible to the parser tests in unit-test/lib.
+ * ------------------------------------------------------------------------
+ */
+
+/** one region and one range, enough for the report to print a region */
+static unsigned cache_range_index[1] = {0};
+static struct pqos_mem_range cache_range = {.base_address = 0,
+                                            .length = 0x1000,
+                                            .local_region_id_valid = 1,
+                                            .local_region_id = 0};
+static struct pqos_mem_region cache_region;
+static struct pqos_mem_regions cache_regions;
+static struct pqos_mrrm_info cache_mrrm;
+
+/**
+ * @brief A description carrying one region, for the cache block to be read from
+ *
+ * @param [in] hmat_available whether HMAT was read at all
+ * @param [in] srat_match whether the region has a target domain
+ *
+ * @return the sysconfig to hand cap_print_mem_regions()
+ */
+static struct pqos_sysconfig
+cache_report(int hmat_available, int srat_match)
+{
+        struct pqos_sysconfig sys;
+
+        memset(&cache_region, 0, sizeof(cache_region));
+        memset(&cache_regions, 0, sizeof(cache_regions));
+        memset(&cache_mrrm, 0, sizeof(cache_mrrm));
+        memset(&sys, 0, sizeof(sys));
+
+        cache_region.num_ranges = 1;
+        cache_region.range_index = cache_range_index;
+        cache_region.type = PQOS_MEM_REGION_LOCAL;
+        cache_region.srat_match = srat_match;
+        cache_region.proximity_valid = srat_match;
+        cache_region.target_domain = 3;
+
+        cache_regions.num_range_entries = 1;
+        cache_regions.range = &cache_range;
+        cache_regions.num_regions = 1;
+        cache_regions.region = &cache_region;
+        cache_regions.srat_available = 1;
+        cache_regions.hmat_available = hmat_available;
+
+        sys.mrrm = &cache_mrrm;
+        sys.mem_regions = &cache_regions;
+
+        return sys;
+}
+
+/**
+ * @brief Whether a line appears inside the Memory Side Cache block
+ *
+ * The report prints several blocks per region and some of their lines read
+ * alike - the Proximity block prints "Target Domain     : 3" for the same
+ * fixture as the cache block does - so a search of the whole output can be
+ * satisfied by a line this case is not about. This looks only between the cache
+ * block's own header and the blank line that ends it.
+ *
+ * @param [in] line the text to look for
+ *
+ * @retval 1 it is in that block
+ * @retval 0 it is not
+ */
+static int
+cache_block_has(const char *line)
+{
+        const char *out = output_get();
+        const char *start;
+        const char *end;
+        const char *found;
+
+        if (out == NULL)
+                return 0;
+
+        start = strstr(out, "Memory Side Cache:");
+        if (start == NULL)
+                return 0;
+
+        /* searched in place rather than copied into a buffer: a buffer is a
+         * length to get wrong, and a section that grew past it would make this
+         * answer no for a line that is there
+         */
+        end = strstr(start, "\n\n");
+        if (end == NULL)
+                end = start + strlen(start);
+
+        found = strstr(start, line);
+
+        return found != NULL && found < end ? 1 : 0;
+}
+
+/** the cache a board really declares: one level of one, direct mapped, write
+ *  back, 64 byte line
+ */
+static void
+cache_one_level(struct pqos_mem_side_cache *cache)
+{
+        memset(cache, 0, sizeof(*cache));
+        cache->valid = 1;
+        cache->memory_domain = 3;
+        cache->levels_declared = 1;
+        cache->total_levels = 1;
+        cache->size_valid = 1;
+        cache->size = 0x2000000000ULL;
+        cache->level_valid = 1;
+        cache->level = 1;
+        cache->associativity = PQOS_MEM_CACHE_ASSOC_DIRECT_MAPPED;
+        cache->write_policy = PQOS_MEM_CACHE_WRITE_BACK;
+        cache->line_size_valid = 1;
+        cache->line_size = 64;
+}
+
+static void
+test_cap_print_region_cache_all_figures(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        cache_one_level(&cache_region.mem_side_cache);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        assert_int_equal(output_has_text("Memory Side Cache:"), 1);
+        assert_int_equal(cache_block_has("Size              : "
+                                         "0x0000002000000000"),
+                         1);
+        /* through cache_block_has(), because the Proximity block prints the
+         * same "Target Domain     : 3" for this fixture and a search of the
+         * whole report would be satisfied by that one
+         */
+        assert_int_equal(cache_block_has("Target Domain     : 3"), 1);
+        assert_int_equal(cache_block_has("Level             : 1 of 1"), 1);
+        assert_int_equal(cache_block_has("Associativity     : Direct Mapped"),
+                         1);
+        assert_int_equal(cache_block_has("Write Policy      : Write Back"), 1);
+        assert_int_equal(cache_block_has("Line Size         : 64"), 1);
+        /* one level declared, so no note about levels this does not carry */
+        assert_int_equal(output_has_text("HMAT declares"), 0);
+}
+
+static void
+test_cap_print_region_cache_without_a_size(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        cache_one_level(&cache_region.mem_side_cache);
+        cache_region.mem_side_cache.size_valid = 0;
+        cache_region.mem_side_cache.size = 0;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* a stated zero would be a cache of no bytes, which is not a
+         * description - so the line says the platform stated none
+         */
+        assert_int_equal(cache_block_has("Size              : Not Available"),
+                         1);
+        /* the Size line and no hexadecimal one beside it. Not the bare value: a
+         * zero address prints as 0x0000000000000000 in the range list above, so
+         * the assertion has to name the line rather than the number
+         */
+        assert_int_equal(cache_block_has("Size              : 0x"), 0);
+        assert_int_equal(cache_block_has("Level             : 1 of 1"), 1);
+}
+
+static void
+test_cap_print_region_cache_without_a_level(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        cache_one_level(&cache_region.mem_side_cache);
+        cache_region.mem_side_cache.level_valid = 0;
+        cache_region.mem_side_cache.level = 0;
+        cache_region.mem_side_cache.total_levels = 2;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* the total is a figure the platform did state, so it reaches the
+         * report even where the level within it did not
+         */
+        assert_int_equal(
+            cache_block_has("Level             : Not Available of 2"), 1);
+}
+
+static void
+test_cap_print_region_cache_names_the_level_it_describes(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        /* two structures declared and the lowest level described, which is the
+         * selection cache_fill() makes - the note must name the level and not a
+         * position in a table whose order ACPI does not fix
+         */
+        cache_one_level(&cache_region.mem_side_cache);
+        cache_region.mem_side_cache.levels_declared = 2;
+        cache_region.mem_side_cache.total_levels = 2;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        assert_int_equal(output_has_text("HMAT declares 2 cache structures for "
+                                         "this domain; level 1, the lowest "
+                                         "stated, is described above"),
+                         1);
+        assert_int_equal(output_has_text("the first is described"), 0);
+}
+
+static void
+test_cap_print_region_cache_note_without_any_level(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        /* several structures and not one of them states its level: there is no
+         * level to name, and the note says so rather than naming a position
+         */
+        cache_one_level(&cache_region.mem_side_cache);
+        cache_region.mem_side_cache.levels_declared = 3;
+        cache_region.mem_side_cache.total_levels = 3;
+        cache_region.mem_side_cache.level_valid = 0;
+        cache_region.mem_side_cache.level = 0;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        assert_int_equal(output_has_text("HMAT declares 3 cache structures for "
+                                         "this domain, none of which states "
+                                         "its level"),
+                         1);
+        assert_int_equal(output_has_text("the lowest stated"), 0);
+}
+
+static void
+test_cap_print_region_cache_one_of_several_levels(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        /* one structure, and a platform that says it has two levels: the counts
+         * come from different places and this is the shape where they disagree,
+         * so the report says that the rest are not described rather than
+         * leaving "1 of 2" to be worked out
+         */
+        cache_one_level(&cache_region.mem_side_cache);
+        cache_region.mem_side_cache.total_levels = 2;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        assert_int_equal(cache_block_has("Level             : 1 of 2"), 1);
+        assert_int_equal(
+            cache_block_has("the platform declares 2 cache levels "
+                            "and HMAT carries a structure for one "
+                            "of them, so the rest are not described "
+                            "above"),
+            1);
+}
+
+static void
+test_cap_print_region_cache_none_declared(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* HMAT read, a target domain to look up, and nothing in the table for
+         * it: one line, and none of the figures
+         */
+        assert_int_equal(cache_block_has("None declared for target domain 3"),
+                         1);
+        assert_int_equal(cache_block_has("Size              :"), 0);
+        assert_int_equal(cache_block_has("Level             :"), 0);
+}
+
+static void
+test_cap_print_region_cache_declared_absent(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        UNUSED_ARG(state);
+
+        /* the platform having said this domain has no memory side cache - a
+         * cache structure whose Total Cache Levels nibble is zero - which the
+         * library reports as domain_declared without valid
+         */
+        cache_region.mem_side_cache.domain_declared = 1;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* which is a different sentence from the one above: that one is the
+         * table carrying nothing for the domain, this one is the table saying
+         * there is no cache. Both are "none", and a report that said the same
+         * thing for each would lose the platform's statement
+         */
+        assert_int_equal(cache_block_has("None - HMAT declares no memory side "
+                                         "cache for target domain 3"),
+                         1);
+        assert_int_equal(cache_block_has("None declared for target domain 3"),
+                         0);
+        assert_int_equal(cache_block_has("Size              :"), 0);
+}
+
+static void
+test_cap_print_region_cache_hmat_not_read(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(0, 1);
+
+        UNUSED_ARG(state);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* unknown, and which kind of unknown: the table was not read at all */
+        assert_int_equal(cache_block_has("Unknown - HMAT was not read"), 1);
+        assert_int_equal(cache_block_has("None declared"), 0);
+}
+
+static void
+test_cap_print_region_cache_without_a_target_domain(void **state)
+{
+        struct pqos_sysconfig sys = cache_report(1, 0);
+
+        UNUSED_ARG(state);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* the other unknown: HMAT was read, but this region has no one domain
+         * to ask it about
+         */
+        assert_int_equal(cache_block_has("Unknown - this region has no target "
+                                         "domain to look up"),
+                         1);
+        assert_int_equal(cache_block_has("None declared"), 0);
+}
+
 int
 main(void)
 {
+        int result = 0;
+
         const struct CMUnitTest tests_print_io_dev[] = {
             cmocka_unit_test(test_cap_print_io_dev_without_a_device),
             cmocka_unit_test(test_cap_print_io_dev_without_dev_info),
@@ -401,6 +774,29 @@ main(void)
             cmocka_unit_test(test_cap_print_io_dev_without_iordt),
             cmocka_unit_test(test_cap_print_io_dev_with_channels)};
 
-        return cmocka_run_group_tests(tests_print_io_dev, test_cap_group_setup,
-                                      NULL);
+        /* a group of its own: these are about the memory region report rather
+         * than the I/O device list, and a group name that covers both tells a
+         * reader looking at a failure the wrong thing
+         */
+        const struct CMUnitTest tests_print_region_cache[] = {
+            cmocka_unit_test(test_cap_print_region_cache_all_figures),
+            cmocka_unit_test(test_cap_print_region_cache_without_a_size),
+            cmocka_unit_test(test_cap_print_region_cache_without_a_level),
+            cmocka_unit_test(
+                test_cap_print_region_cache_names_the_level_it_describes),
+            cmocka_unit_test(
+                test_cap_print_region_cache_note_without_any_level),
+            cmocka_unit_test(test_cap_print_region_cache_one_of_several_levels),
+            cmocka_unit_test(test_cap_print_region_cache_none_declared),
+            cmocka_unit_test(test_cap_print_region_cache_declared_absent),
+            cmocka_unit_test(test_cap_print_region_cache_hmat_not_read),
+            cmocka_unit_test(
+                test_cap_print_region_cache_without_a_target_domain)};
+
+        result += cmocka_run_group_tests(tests_print_io_dev,
+                                         test_cap_group_setup, NULL);
+        result += cmocka_run_group_tests(tests_print_region_cache,
+                                         test_cap_group_setup, NULL);
+
+        return result;
 }

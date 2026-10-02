@@ -937,6 +937,141 @@ cap_print_locality_value(const struct pqos_mem_locality *loc,
 }
 
 /**
+ * @brief Prints the memory side cache HMAT declares for one region
+ *
+ * The section is printed for every region, and an absence is stated rather than
+ * left out: a region with no cache declared says so, and one whose HMAT could
+ * not be read says that instead - the two are different answers and the report
+ * does not merge them. Those are one line and no more; the figures below them
+ * belong to a cache that is there.
+ *
+ * @param [in] regions the description the region came from, for what the
+ *             platform's tables were able to say at all
+ * @param [in] region the region
+ */
+static void
+cap_print_region_cache(const struct pqos_mem_regions *regions,
+                       const struct pqos_mem_region *region)
+{
+        const struct pqos_mem_side_cache *cache = &region->mem_side_cache;
+
+        printf("\n  Memory Side Cache:\n");
+
+        if (!cache->valid) {
+                /* which of the four absences this is. The last two are both
+                 * "none", and they are different statements: a structure whose
+                 * Total Cache Levels nibble is zero is the platform declaring
+                 * that this domain has no memory side cache, where a table
+                 * carrying no structure for the domain has not said so
+                 */
+                if (!regions->hmat_available)
+                        printf("    Unknown - HMAT was not read\n");
+                else if (!region->srat_match)
+                        printf("    Unknown - this region has no target domain "
+                               "to look up\n");
+                else if (cache->domain_declared)
+                        printf("    None - HMAT declares no memory side cache "
+                               "for target domain %u\n",
+                               region->target_domain);
+                else
+                        printf("    None declared for target domain %u\n",
+                               region->target_domain);
+
+                return;
+        }
+
+        if (cache->size_valid)
+                printf("    Size              : 0x%016" PRIx64 "\n",
+                       cache->size);
+        else
+                printf("    Size              : Not Available\n");
+
+        printf("    Target Domain     : %u\n", cache->memory_domain);
+
+        /* the total is printed whether or not the level within it was stated:
+         * the platform declaring two levels and not saying which this one is
+         * still said there are two, and a report that answered Not Available to
+         * the whole line would drop the only level figure the table carried
+         */
+        if (cache->level_valid)
+                printf("    Level             : %u of %u\n", cache->level,
+                       cache->total_levels);
+        else
+                printf("    Level             : Not Available of %u\n",
+                       cache->total_levels);
+
+        printf("    Associativity     : ");
+        switch (cache->associativity) {
+        case PQOS_MEM_CACHE_ASSOC_DIRECT_MAPPED:
+                printf("Direct Mapped\n");
+                break;
+        case PQOS_MEM_CACHE_ASSOC_COMPLEX:
+                printf("Complex\n");
+                break;
+        case PQOS_MEM_CACHE_ASSOC_OTHER:
+                printf("Other\n");
+                break;
+        default:
+                printf("Not Available\n");
+                break;
+        }
+
+        printf("    Write Policy      : ");
+        switch (cache->write_policy) {
+        case PQOS_MEM_CACHE_WRITE_BACK:
+                printf("Write Back\n");
+                break;
+        case PQOS_MEM_CACHE_WRITE_THROUGH:
+                printf("Write Through\n");
+                break;
+        case PQOS_MEM_CACHE_WRITE_OTHER:
+                printf("Other\n");
+                break;
+        default:
+                printf("Not Available\n");
+                break;
+        }
+
+        if (cache->line_size_valid)
+                printf("    Line Size         : %u\n", cache->line_size);
+        else
+                printf("    Line Size         : Not Available\n");
+
+        /* a domain with more than one level has one of them described above,
+         * and saying which is better than letting the level line stand for the
+         * whole story. Which one is the lowest level any of the structures
+         * states, because the table's order is not required to follow the
+         * levels - so naming the position would name something that can differ
+         * between two boards of one design. Where none of them states a level
+         * there is no level to name, and the line says that.
+         */
+        if (cache->levels_declared > 1) {
+                if (cache->level_valid)
+                        printf("    Note              : HMAT declares %u cache "
+                               "structures for this domain; level %u, the "
+                               "lowest stated, is described above\n",
+                               cache->levels_declared, cache->level);
+                else
+                        printf("    Note              : HMAT declares %u cache "
+                               "structures for this domain, none of which "
+                               "states its level; one is described above\n",
+                               cache->levels_declared);
+        } else if (cache->total_levels > 1) {
+                /* one structure and a platform that says it has more levels
+                 * than that: the Level line says "1 of 2" and a reader has to
+                 * work out what the missing one means, so the note says it. The
+                 * two counts come from different places - how many structures
+                 * the table carries, and what one of them says the platform has
+                 * - and this is the shape where they disagree
+                 */
+                printf("    Note              : the platform declares %u cache "
+                       "levels and HMAT carries a structure for one of them, "
+                       "so the rest are not described above\n",
+                       cache->total_levels);
+        }
+}
+
+/**
  * @brief Prints the HMAT numbers of one region
  *
  * @param [in] regions the description the region came from, for what the
@@ -1053,7 +1188,11 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
  * extended linear cache in front of the device, a region covers the device and
  * the cache both and is twice the size of what backs it, so a capacity printed
  * beside a region size reads as a contradiction without the third figure - the
- * memory side cache HMAT declares, which this report does not carry yet.
+ * memory side cache HMAT declares, which the Memory Side Cache block above
+ * prints. So the figure that was missing is here; what is not is the capacity
+ * itself, which this library does not read from the devices, and adding both
+ * the reading and the column is a change of its own rather than part of
+ * describing the cache.
  *
  * @param [in] regions the memory regions
  * @param [in] region the region to print the devices of
@@ -1183,6 +1322,7 @@ cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
         printf("\n");
         cap_print_region_acpi(regions, region);
         cap_print_region_locality(regions, region);
+        cap_print_region_cache(regions, region);
         cap_print_region_devices(regions, region);
         printf("\n");
 }
