@@ -34,6 +34,7 @@
 #include "test.h"
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -73,6 +74,97 @@ message_of(const size_t length)
         text[length] = '\0';
 
         return text;
+}
+
+/** whether the streaming thread below should stop */
+static int stream_stop;
+
+/** how many messages the streaming case's callback has been handed */
+static int stream_calls;
+
+/**
+ * @brief The streaming case's callback: it counts, and nothing more
+ *
+ * Deliberately no cmocka assertion and no shared buffer. A cmocka assertion
+ * leaves by longjmp() to the jmp_buf of the thread cmocka is running the case
+ * on, so one that fired here - on the streaming thread - would jump into
+ * another thread's stack. The only thing the case needs from this side is that
+ * messages arrived, which one atomic counter says.
+ */
+static void
+stream_callback(void *context __attribute__((unused)),
+                const size_t size __attribute__((unused)),
+                const char *message __attribute__((unused)))
+{
+        __atomic_add_fetch(&stream_calls, 1, __ATOMIC_ACQ_REL);
+}
+
+/**
+ * @brief Logs without pause until it is told to stop
+ */
+static void *
+stream_thread(void *arg __attribute__((unused)))
+{
+        while (!__atomic_load_n(&stream_stop, __ATOMIC_ACQUIRE))
+                log_printf(LOG_OPT_INFO, "one of many messages\n");
+
+        return NULL;
+}
+
+static void
+test_an_install_and_a_teardown_beside_a_stream_of_messages(
+    void **state __attribute__((unused)))
+{
+        pthread_t emitter;
+        unsigned i;
+
+        __atomic_store_n(&stream_calls, 0, __ATOMIC_RELEASE);
+        stream_stop = 0;
+        assert_int_equal(log_init(-1, stream_callback, NULL, LOG_VER_VERBOSE),
+                         LOG_RETVAL_OK);
+
+        /* pqos_open() and pqos_fopen() log through LOG_ERROR_IF_INIT() without
+         * the API lock, so they can be emitting while pqos_fini() runs - which
+         * is the reachable half of this race. Here the message is the same
+         * shape with nothing else in the way: one thread emits, this one
+         * installs and retires underneath it.
+         */
+        assert_int_equal(pthread_create(&emitter, NULL, stream_thread, NULL),
+                         0);
+
+        /* Installed over, rather than taken down and put back: a log_fini()
+         * here would leave the destination empty for as long as it takes to
+         * reach the log_init() after it, and log_printf() asserts that it has
+         * one - a DEBUG build aborts on that, which is the library behaving as
+         * documented rather than the race this case is about. An install over a
+         * live destination retires it exactly as a teardown does, so the
+         * lifetime being tested is the same one, and the destination is never
+         * absent while the other thread emits.
+         */
+        for (i = 0; i < 200; i++)
+                assert_int_equal(
+                    log_init(-1, stream_callback, NULL, LOG_VER_VERBOSE),
+                    LOG_RETVAL_OK);
+
+        __atomic_store_n(&stream_stop, 1, __ATOMIC_RELEASE);
+        assert_int_equal(pthread_join(emitter, NULL), 0);
+
+        /* and the teardown once the stream has stopped, which is the other half
+         * of what the loop exercised
+         */
+        log_fini();
+        assert_int_equal(log_is_initialized(), 0);
+        assert_int_equal(log_init(-1, stream_callback, NULL, LOG_VER_VERBOSE),
+                         LOG_RETVAL_OK);
+
+        /* what this asserts is that nothing crashed and the log is usable
+         * afterwards; that no message wrote to a destination already freed is
+         * what AddressSanitizer is for, and this case is the one it is run
+         * against
+         */
+        log_printf(LOG_OPT_INFO, "after the storm\n");
+        assert_true(__atomic_load_n(&stream_calls, __ATOMIC_ACQUIRE) > 0);
+        log_fini();
 }
 
 static int
@@ -177,7 +269,12 @@ main(void)
                 test_log_printf_clamps_a_long_message, log_setup, log_teardown),
             cmocka_unit_test_setup_teardown(
                 test_log_printf_writes_the_same_length_to_a_file, log_setup,
-                log_teardown)};
+                log_teardown),
+            /* the lifetime cases install and retire the log themselves, so they
+             * take neither the setup nor the teardown
+             */
+            cmocka_unit_test(
+                test_an_install_and_a_teardown_beside_a_stream_of_messages)};
 
         result += cmocka_run_group_tests(tests_log, NULL, NULL);
 

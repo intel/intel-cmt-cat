@@ -37,6 +37,13 @@
 #endif
 
 #include "lock.h"
+/* The log's own mutex calls reach the mocks below, and log_init() would take it
+ * from test.h's constructor - before cmocka is running, where function_called()
+ * crashes. lock.c logs nothing, so this file needs no log at all: see
+ * TEST_NO_LOG_CONSTRUCTOR in test.h.
+ */
+#define TEST_NO_LOG_CONSTRUCTOR
+
 #include "test.h"
 
 #include <errno.h>

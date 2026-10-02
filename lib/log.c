@@ -40,6 +40,7 @@
 #include "types.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -50,23 +51,60 @@
  * ---------------------------------------
  */
 
-static int m_opt = 0;              /**< log options */
-static int m_fd = -1;              /**< log file descriptor */
-static void *m_context_log = NULL; /**< log callback context */
 /**
- *  log callback
+ * Where a message goes: the descriptor, the callback and the callback's
+ * context, in one object so that a message takes all of it or none of it. The
+ * object is never modified once published - an install makes a new one - so a
+ * message that has taken it has a consistent destination and needs nothing
+ * else.
+ *
+ * A message holds one for the length of its emission, counted in \a refs, and
+ * the last holder of a retired destination is what frees it. A destination
+ * nobody holds is freed by the teardown that retires it, which is every
+ * teardown with no message beside it.
+ *
+ * A process that exits with the log still installed leaves one allocated, the
+ * way it leaves every other module's state at exit.
  */
-static void (*m_callback_log)(void *, const size_t, const char *);
-static int log_init_successful = 0; /**< log init gatekeeper */
+struct log_destination {
+        int opt; /**< which message types reach it */
+        int fd;  /**< descriptor to write to, or -1 for none */
+        /** where a message is handed to, or NULL for none */
+        void (*callback)(void *cb_context,
+                         const size_t cb_size,
+                         const char *cb_message);
+        void *context;                /**< handed back to \a callback */
+        unsigned refs;                /**< messages using it right now */
+        int retired;                  /**< taken out of service */
+        struct log_destination *next; /**< the retired list */
+};
 
 /**
- * The state above is written by log_init() and log_fini() only, and the library
- * calls those from pqos_init() and pqos_fini() with the API lock held - so the
- * installs and teardowns are already serialized against each other, and no lock
- * of this module's own would add anything to that. What is *not* synchronized
- * is a message racing an install or a teardown, which this module has never
- * synchronized: see log_printf().
+ * The published destination, the destinations retired and not yet freed, and
+ * the mutex that guards both of them together with every reference count.
+ *
+ * A lock here and not an atomic pointer: what a message needs is not only a
+ * consistent pointer but a destination that stays alive while it uses it, and
+ * taking a reference is two operations - read the pointer, count the reference
+ * - which an atomic pointer cannot make one. The retired list is a second
+ * reason: an install or a teardown links to it under the API lock while a drain
+ * may be walking it with that lock released, so the list needs a lock of its
+ * own whatever the pointer does.
+ *
+ * What this lock must never do is what the module refused a lock for before: it
+ * is *not held across the write or the application's callback*, and *not held
+ * while anything waits*. So nothing a callback does can be stopped by this
+ * lock: it may log, and it may finalize, and a teardown waiting for a message
+ * to finish takes this only to look and sleeps without it.
+ *
+ * Which is this module's half of the question and not the whole of it. What a
+ * callback may call is decided by the lock the *library* holds while it logs -
+ * pqos.h is where that is written down, and it is narrower: a callback reached
+ * from inside a pqos API cannot call one, because that lock is not recursive.
  */
+static pthread_mutex_t m_dest_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct log_destination *m_dest;
+static struct log_destination *m_retired;
 
 /** how deeply logging is suspended on this thread, which is thread local
  *  because it describes a call and not the log
@@ -86,6 +124,86 @@ static __thread unsigned m_suspended = 0;
  */
 
 /**
+ * @brief Takes the destination a message is to use, and a reference to it
+ *
+ * The pointer and the reference are taken together, which is the whole reason
+ * this is not an atomic pointer: between reading a pointer and counting a
+ * reference to what it points at, a teardown could otherwise free it.
+ *
+ * @return the destination, with a reference held for the caller, or NULL where
+ *         there is none
+ */
+static struct log_destination *
+log_dest_acquire(void)
+{
+        struct log_destination *dest;
+
+        pthread_mutex_lock(&m_dest_mutex);
+        dest = m_dest;
+        if (dest != NULL)
+                dest->refs++;
+        pthread_mutex_unlock(&m_dest_mutex);
+
+        return dest;
+}
+
+/**
+ * @brief Gives back a reference, freeing a retired destination nobody holds
+ *
+ * The last holder of a retired destination is what frees it, whether that is a
+ * message finishing or the teardown that retired it.
+ *
+ * @param [in] dest what log_dest_acquire() returned, or NULL
+ */
+static void
+log_dest_release(struct log_destination *dest)
+{
+        struct log_destination **link;
+
+        if (dest == NULL)
+                return;
+
+        pthread_mutex_lock(&m_dest_mutex);
+
+        dest->refs--;
+        if (dest->retired && dest->refs == 0) {
+                for (link = &m_retired; *link != NULL; link = &(*link)->next)
+                        if (*link == dest) {
+                                *link = dest->next;
+                                free(dest);
+                                break;
+                        }
+        }
+
+        pthread_mutex_unlock(&m_dest_mutex);
+}
+
+/**
+ * @brief Takes a destination out of service
+ *
+ * Freed here where no message is using it, which is every teardown with none
+ * beside it; otherwise it goes on the retired list and the last message to let
+ * it go frees it. Called with m_dest_mutex held.
+ *
+ * @param [in] dest the destination, or NULL
+ */
+static void
+log_dest_retire(struct log_destination *dest)
+{
+        if (dest == NULL)
+                return;
+
+        if (dest->refs == 0) {
+                free(dest);
+                return;
+        }
+
+        dest->retired = 1;
+        dest->next = m_retired;
+        m_retired = dest;
+}
+
+/**
  * @brief Installs the log
  *
  * @param [in] fd_log file descriptor to write to, or -1 for none
@@ -102,37 +220,59 @@ log_install(int fd_log,
             void *context_log,
             int verbosity)
 {
+        struct log_destination *dest;
+        struct log_destination *replaced;
+        int opt;
+
         /**
          * Set log message verbosity
          */
         switch (verbosity) {
         case LOG_VER_SILENT:
-                m_opt = LOG_OPT_SILENT;
-                log_init_successful = 1;
-                return LOG_RETVAL_OK;
+                opt = LOG_OPT_SILENT;
+                break;
         case LOG_VER_DEFAULT:
-                m_opt = LOG_OPT_DEFAULT;
+                opt = LOG_OPT_DEFAULT;
                 break;
         case LOG_VER_VERBOSE:
-                m_opt = LOG_OPT_VERBOSE;
+                opt = LOG_OPT_VERBOSE;
                 break;
         case LOG_VER_SUPER_VERBOSE:
-                m_opt = LOG_OPT_SUPER_VERBOSE;
+                opt = LOG_OPT_SUPER_VERBOSE;
                 break;
         default:
-                m_opt = LOG_OPT_SUPER_VERBOSE;
+                opt = LOG_OPT_SUPER_VERBOSE;
                 break;
         }
 
-        if (fd_log < 0 && callback_log == NULL) {
+        /* a silent log writes nowhere, so it needs no destination to write to;
+         * every other level does
+         */
+        if (opt != LOG_OPT_SILENT && fd_log < 0 && callback_log == NULL) {
                 fprintf(stderr, "%s: no LOG destination selected\n", __func__);
                 return LOG_RETVAL_ERROR;
         }
 
-        m_fd = fd_log;
-        m_callback_log = callback_log;
-        m_context_log = context_log;
-        log_init_successful = 1;
+        dest = calloc(1, sizeof(*dest));
+        if (dest == NULL) {
+                fprintf(stderr, "%s: out of memory\n", __func__);
+                return LOG_RETVAL_ERROR;
+        }
+        dest->opt = opt;
+        dest->fd = opt == LOG_OPT_SILENT ? -1 : fd_log;
+        dest->callback = opt == LOG_OPT_SILENT ? NULL : callback_log;
+        dest->context = opt == LOG_OPT_SILENT ? NULL : context_log;
+
+        /* Published under the lock, which is also what retires the destination
+         * this replaces: an install over one that is still there has to retire
+         * it as a teardown would, since a message may be using it and nothing
+         * else would ever free it.
+         */
+        pthread_mutex_lock(&m_dest_mutex);
+        replaced = m_dest;
+        m_dest = dest;
+        log_dest_retire(replaced);
+        pthread_mutex_unlock(&m_dest_mutex);
 
         return LOG_RETVAL_OK;
 }
@@ -140,22 +280,24 @@ log_install(int fd_log,
 /**
  * @brief Takes the log down
  *
+ * The destination is retired rather than freed: a message that loaded it before
+ * this runs is still using it, and this is called with the API lock held, where
+ * waiting for that message could deadlock a callback that finalizes. What frees
+ * it is the last message to let it go.
+ *
  * @return Operation status
  * @retval LOG_RETVAL_OK success
  */
 static int
 log_remove(void)
 {
-        if (m_opt == LOG_OPT_SILENT) {
-                log_init_successful = 0;
-                return LOG_RETVAL_OK;
-        }
+        struct log_destination *dest;
 
-        m_opt = 0;
-        m_fd = -1;
-        m_callback_log = NULL;
-        m_context_log = NULL;
-        log_init_successful = 0;
+        pthread_mutex_lock(&m_dest_mutex);
+        dest = m_dest;
+        m_dest = NULL;
+        log_dest_retire(dest);
+        pthread_mutex_unlock(&m_dest_mutex);
 
         return LOG_RETVAL_OK;
 }
@@ -191,68 +333,45 @@ log_resume(void)
 int
 log_is_initialized(void)
 {
-        return log_init_successful == 1;
+        int installed;
+
+        pthread_mutex_lock(&m_dest_mutex);
+        installed = m_dest != NULL;
+        pthread_mutex_unlock(&m_dest_mutex);
+
+        return installed;
 }
 
-void
-log_printf(int type, const char *str, ...)
+/**
+ * @brief Writes one message to a destination already acquired
+ *
+ * Separated from the entry point so that the acquire and the release around it
+ * are written once, and so that this part may return wherever it likes.
+ *
+ * @param [in] dest the destination, or NULL where there is none
+ * @param [in] type log type to be made
+ * @param [in] str format string compatible with printf()
+ * @param [in] ap the arguments \a str describes
+ */
+static void
+log_emit(const struct log_destination *dest,
+         int type,
+         const char *str,
+         va_list ap)
 {
-        va_list ap;
         char ap_buffer[AP_BUFFER_SIZE];
         int size;
-        int initialized;
-        int opt;
-        int fd;
-        void *context;
-        void (*callback)(void *cb_context, const size_t cb_size,
-                         const char *cb_message);
 
-        /* a caller that has suspended logging on this thread wants no message
-         * written and no assertion about a log it is not using - see
-         * log_suspend()
-         */
-        if (m_suspended > 0)
-                return;
-
-        /* Each field of the destination is read once, so that the test of a
-         * descriptor and the write to it cannot be about different descriptors,
-         * and the assertion below is about the state this message actually
-         * used.
-         *
-         * That is all it is: reading them once is not reading them together. An
-         * install or a teardown in another thread can still land between these
-         * reads, and the write and the callback below happen after them in any
-         * case - so a message may still reach a destination the application has
-         * since reclaimed. The log has always been open to that; closing it
-         * needs the destination to be one object a message can hold a reference
-         * to, which is more than a lock here can do.
-         */
-        initialized = log_init_successful;
-        opt = m_opt;
-        fd = m_fd;
-        callback = m_callback_log;
-        context = m_context_log;
-
-        /* If log_init has not been successful then
-         * log_printf should not work. */
-        ASSERT(initialized == 1);
-        if (initialized == 0)
-                return;
-
-        if (opt == LOG_OPT_SILENT)
-                return;
-
-        if ((opt & type) == 0)
+        if (dest == NULL || dest->opt == LOG_OPT_SILENT ||
+            (dest->opt & type) == 0)
                 return;
 
         ASSERT(str != NULL);
         if (str == NULL)
                 return;
 
-        va_start(ap, str);
         ap_buffer[AP_BUFFER_SIZE - 1] = '\0';
         size = vsnprintf(ap_buffer, AP_BUFFER_SIZE - 1, str, ap);
-        va_end(ap);
         ASSERT(size >= 0);
         if (size < 0)
                 return;
@@ -267,21 +386,70 @@ log_printf(int type, const char *str, ...)
         if (size > AP_BUFFER_SIZE - 2)
                 size = AP_BUFFER_SIZE - 2;
 
-        /* the descriptor first: the callback belongs to the application, and an
-         * application that closes its log descriptor from inside it - having
-         * just finalized the library, say - would leave this write addressed to
-         * a descriptor that is closed, or worse, reused
+        /* the descriptor first, and the callback after it: the callback belongs
+         * to the application, and one that closes the log descriptor - having
+         * just finalized the library, say - would leave a write after it
+         * addressed to a descriptor that is closed, or worse, reused
          */
-        if (fd >= 0) {
-                if (write(fd, ap_buffer, size) < 0)
+        if (dest->fd >= 0) {
+                if (write(dest->fd, ap_buffer, size) < 0)
                         fprintf(stderr, "%s: printing to file failed\n",
                                 __func__);
         }
 
-        /* and the callback outside the lock, so that what it does with the
-         * message - including calling back into this library - is not for the
-         * log to serialize
+        /* and the callback with nothing held, so that what it does with the
+         * message - including calling back into this library, or finalizing it
+         * - is not for the log to serialize
          */
-        if (callback != NULL)
-                callback(context, size, ap_buffer);
+        if (dest->callback != NULL)
+                dest->callback(dest->context, size, ap_buffer);
 }
+
+/**
+ * @brief One message, from the acquire to the release
+ *
+ * @param [in] type log type to be made
+ * @param [in] str format string compatible with printf()
+ * @param [in] ap the arguments \a str describes
+ */
+static void
+log_message(int type, const char *str, va_list ap)
+{
+        struct log_destination *dest;
+
+        /* a caller that has suspended logging on this thread wants no message
+         * written and no assertion about a log it is not using - see
+         * log_suspend()
+         */
+        if (m_suspended > 0)
+                return;
+
+        /* The destination and a reference to it are taken together, so it
+         * cannot be freed while this message is using it - and the whole
+         * destination comes with one pointer, so the descriptor this message
+         * tests is the descriptor it writes to and the context is the one that
+         * belongs to the callback beside it.
+         *
+         */
+        dest = log_dest_acquire();
+
+        /* If log_init has not been successful then log_printf should not
+         * work
+         */
+        ASSERT(dest != NULL);
+
+        log_emit(dest, type, str, ap);
+
+        log_dest_release(dest);
+}
+
+void
+log_printf(int type, const char *str, ...)
+{
+        va_list ap;
+
+        va_start(ap, str);
+        log_message(type, str, ap);
+        va_end(ap);
+}
+
