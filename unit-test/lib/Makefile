@@ -929,6 +929,7 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(LIB_OBJS)
 		-Wl,--wrap=cpuinfo_fini \
 		-Wl,--wrap=log_init \
 		-Wl,--wrap=log_fini \
+		-Wl,--wrap=log_wait_quiescent \
 		-Wl,--wrap=log_printf \
 		-Wl,--wrap=resctrl_is_supported \
 		-Wl,--wrap=machine_init \

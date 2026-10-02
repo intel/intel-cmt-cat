@@ -226,6 +226,36 @@ typedef uint32_t pqos_rmid_t;
  * @param context_log application specific data that is provided
  *                    to the callback function. It can be NULL if application
  *                    doesn't require it.
+ *
+ * Two things the library asks of \a callback_log, which it cannot check:
+ *
+ * It must not leave by a non-local jump - a longjmp(), or a C++ exception
+ * thrown through it. Such a callback never returns the reference its message
+ * holds, so the descriptor and the context that message was using are held for
+ * the life of the process.
+ *
+ * And a message may still be on its way when the library is finalized, in one
+ * case: one that has not finished within about a second of the teardown.
+ * pqos_fini() waits for the messages already on their way to \a fd_log and
+ * \a context_log, so that an application may reclaim both when it returns - but
+ * the wait is bounded, or an application could hang its own finalization with a
+ * log of its own.
+ *
+ * Which end of the message that is does not matter. A callback that does not
+ * return is one way; a write to \a fd_log that blocks is another, and a pipe
+ * nobody is reading will do it. Either leaves the message holding the
+ * descriptor and the context, and the callback of such a message may not even
+ * have started - so an application whose log may block for longer than the
+ * bound should not reclaim either of them on the strength of pqos_fini() alone.
+ *
+ * The same bounded wait is in the path where pqos_init() itself fails: that
+ * path takes the log down too, and a message already on its way is waited for
+ * in the same way and for the same reason. So an error return from pqos_init()
+ * carries the same caution as a return from pqos_fini() - a message that
+ * exceeded the bound may still be using \a fd_log and \a context_log, and an
+ * application that reclaims them on the strength of the error return alone can
+ * have them used after they are gone.
+ *
  * @param verbose logging options
  *         LOG_VER_SILENT         - no messages
  *         LOG_VER_DEFAULT        - warning and error messages
@@ -264,6 +294,14 @@ int pqos_init(const struct pqos_config *config);
 
 /**
  * @brief Shuts down PQoS module
+ *
+ * Before it returns it waits for the log messages already on their way to the
+ * descriptor and the callback given to pqos_init(), so that an application may
+ * close the one and free what the other uses as soon as this returns. The wait
+ * is bounded at about a second: a message that takes longer than that to finish
+ * may still be using them afterwards - a callback that does not return, or a
+ * write to the descriptor that blocks - which is the case where those two are
+ * not yet free. See pqos_config::callback_log.
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success

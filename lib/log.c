@@ -41,8 +41,10 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <stdint.h> /* int64_t */
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /**
@@ -110,6 +112,27 @@ static struct log_destination *m_retired;
  *  because it describes a call and not the log
  */
 static __thread unsigned m_suspended = 0;
+
+/** How long log_wait_quiescent() waits for the messages using a retired
+ *  destination to finish: a second, as a deadline rather than as a count of
+ *  sleeps. A count of sleeps is not a duration - a hundred microseconds is
+ * below what the kernel can be relied on to give back, so ten thousand of them
+ * take well over a second on a loaded machine - and what this promises is a
+ *  duration. Bounded deliberately: a finalization that waited for ever would
+ *  hand the application a hang in place of a race, and what the wait is for is
+ *  the last few instructions of a message, not an unbounded callback.
+ *
+ *  A millisecond between looks, which is a thousand wakeups in the worst case
+ *  rather than ten thousand. The interval decides only how long after the last
+ *  message this returns, and a millisecond of that is nothing beside the second
+ *  it is bounded by - while ten thousand syscalls in every finalization is not
+ *  nothing. A condition variable signalled by the last release would cost none
+ *  at all, and is deliberately not here: it is a second synchronisation object
+ *  in a module whose one rule is that nothing is held across the application's
+ *  callback, for a saving of a few milliseconds per teardown.
+ */
+#define LOG_DRAIN_NS       1000000000L
+#define LOG_DRAIN_SLEEP_NS 1000000
 
 /**
  * ---------------------------------------
@@ -283,7 +306,8 @@ log_install(int fd_log,
  * The destination is retired rather than freed: a message that loaded it before
  * this runs is still using it, and this is called with the API lock held, where
  * waiting for that message could deadlock a callback that finalizes. What frees
- * it is the last message to let it go.
+ * it is the last message to let it go, and log_wait_quiescent() is what waits
+ * for that - from pqos_fini(), after it has let the API lock go.
  *
  * @return Operation status
  * @retval LOG_RETVAL_OK success
@@ -340,6 +364,82 @@ log_is_initialized(void)
         pthread_mutex_unlock(&m_dest_mutex);
 
         return installed;
+}
+
+/**
+ * @brief Whether a retired destination is still being used by a message
+ *
+ * @return Whether a message is still holding one
+ * @retval 1 one is held
+ * @retval 0 the retired destinations have no references left
+ */
+static int
+log_retired_in_use(void)
+{
+        const struct log_destination *dest;
+        int in_use = 0;
+
+        pthread_mutex_lock(&m_dest_mutex);
+
+        for (dest = m_retired; dest != NULL; dest = dest->next)
+                if (dest->refs > 0) {
+                        in_use = 1;
+                        break;
+                }
+
+        pthread_mutex_unlock(&m_dest_mutex);
+
+        return in_use;
+}
+
+/**
+ * @brief Nanoseconds from one moment to another
+ *
+ * @param [in] from the earlier reading
+ * @param [in] to the later reading
+ *
+ * @return how long separates them, in nanoseconds
+ */
+static int64_t
+log_elapsed_ns(const struct timespec *from, const struct timespec *to)
+{
+        /* int64_t and not long: long is 32 bits on an ILP32 build, where two
+         * and a bit seconds of nanoseconds overflow it - and a waiter
+         * descheduled for that long would then compare a wrapped value against
+         * the deadline and keep waiting, which is the one thing this bound
+         * promises not to do
+         */
+        return (int64_t)(to->tv_sec - from->tv_sec) * 1000000000LL +
+               (int64_t)(to->tv_nsec - from->tv_nsec);
+}
+
+void
+log_wait_quiescent(void)
+{
+        struct timespec start;
+        struct timespec now;
+
+        /* What is waited for is a message using a destination this library has
+         * retired, and nothing else: a message using the destination installed
+         * now - an application logging from a thread of its own, which never
+         * stops - is not what a teardown is about, and waiting for that would
+         * make every pqos_fini() pay the whole bound.
+         */
+        if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+                return;
+
+        while (log_retired_in_use()) {
+                struct timespec ts;
+
+                if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+                        return;
+                if (log_elapsed_ns(&start, &now) >= LOG_DRAIN_NS)
+                        return;
+
+                ts.tv_sec = 0;
+                ts.tv_nsec = LOG_DRAIN_SLEEP_NS;
+                (void)nanosleep(&ts, NULL);
+        }
 }
 
 /**

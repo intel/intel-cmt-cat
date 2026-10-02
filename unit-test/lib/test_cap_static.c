@@ -155,6 +155,19 @@ __wrap_log_init(int fd_log __attribute__((unused)),
         return log_init_result;
 }
 
+/* The drain, which is what says the messages still on their way to the
+ * descriptor and the callback are finished with before the lock that a callback
+ * calling back into the library would take is destroyed. Wrapped so that the
+ * cases can require it between those two: the order is the whole of what this
+ * call does for the caller, and without it here a wait removed, or moved after
+ * lock_fini(), would pass every case in this file.
+ */
+void
+__wrap_log_wait_quiescent(void)
+{
+        function_called();
+}
+
 static int log_fini_result = LOG_RETVAL_OK;
 int
 __wrap_log_fini(void)
@@ -1128,6 +1141,7 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         expect_function_call(__wrap_log_init);
         // cleanup
         expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_log_wait_quiescent);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_init(&cfg), LOG_RETVAL_OK);
@@ -1147,6 +1161,7 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         // cleanup
         expect_function_call(__wrap_log_fini);
         expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_log_wait_quiescent);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
@@ -1166,6 +1181,7 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         // cleanup
         expect_function_call(__wrap_log_fini);
         expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_log_wait_quiescent);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
@@ -1194,6 +1210,7 @@ test_pqos_fini_negative(void **state __attribute__((unused)))
         will_return(__wrap_machine_fini, PQOS_RETVAL_ERROR);
         expect_function_call(__wrap_log_fini);
         expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_log_wait_quiescent);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);

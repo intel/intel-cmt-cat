@@ -37,6 +37,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /* What a message longer than the payload buffer has to arrive as: all of what
@@ -76,6 +77,49 @@ message_of(const size_t length)
         return text;
 }
 
+/* The lifetime cases below hold a message inside the application's callback and
+ * ask what a teardown does about it. Everything the two threads tell each other
+ * goes through these, because an assertion belongs on the thread cmocka is on.
+ */
+static pthread_mutex_t hold_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t hold_cond = PTHREAD_COND_INITIALIZER;
+static int callback_entered;   /**< a message has reached the callback */
+static int callback_may_leave; /**< and may return from it */
+static int wait_returned;      /**< log_wait_quiescent() has come back */
+static int nested_teardown;    /**< the callback took the log down itself */
+
+/**
+ * @brief A callback that stops until it is let go
+ */
+static void
+holding_callback(void *context __attribute__((unused)),
+                 const size_t size __attribute__((unused)),
+                 const char *message __attribute__((unused)))
+{
+        pthread_mutex_lock(&hold_mutex);
+        callback_entered = 1;
+        pthread_cond_broadcast(&hold_cond);
+        while (!callback_may_leave)
+                pthread_cond_wait(&hold_cond, &hold_mutex);
+        pthread_mutex_unlock(&hold_mutex);
+}
+
+/**
+ * @brief A callback that takes the log down the way pqos_fini() does
+ *
+ * Retire, then wait - from inside an emission, which is the case that must not
+ * wait for itself.
+ */
+static void
+finalizing_callback(void *context __attribute__((unused)),
+                    const size_t size __attribute__((unused)),
+                    const char *message __attribute__((unused)))
+{
+        log_fini();
+        log_wait_quiescent();
+        nested_teardown = 1;
+}
+
 /** whether the streaming thread below should stop */
 static int stream_stop;
 
@@ -109,6 +153,134 @@ stream_thread(void *arg __attribute__((unused)))
                 log_printf(LOG_OPT_INFO, "one of many messages\n");
 
         return NULL;
+}
+
+static void *
+emit_thread(void *arg __attribute__((unused)))
+{
+        log_printf(LOG_OPT_INFO, "a message that stops in the callback\n");
+
+        return NULL;
+}
+
+static void *
+wait_thread(void *arg __attribute__((unused)))
+{
+        log_wait_quiescent();
+        __atomic_store_n(&wait_returned, 1, __ATOMIC_RELEASE);
+
+        return NULL;
+}
+
+/**
+ * @brief Starts a message and waits until it is inside the callback
+ *
+ * @param [out] thread the thread the message is on
+ */
+static void
+start_a_held_message(pthread_t *thread)
+{
+        callback_entered = 0;
+        callback_may_leave = 0;
+        wait_returned = 0;
+
+        assert_int_equal(log_init(-1, holding_callback, NULL, LOG_VER_VERBOSE),
+                         LOG_RETVAL_OK);
+        assert_int_equal(pthread_create(thread, NULL, emit_thread, NULL), 0);
+
+        pthread_mutex_lock(&hold_mutex);
+        while (!callback_entered)
+                pthread_cond_wait(&hold_cond, &hold_mutex);
+        pthread_mutex_unlock(&hold_mutex);
+}
+
+/**
+ * @brief Lets the held message finish, and waits for its thread
+ */
+static void
+release_the_held_message(pthread_t thread)
+{
+        pthread_mutex_lock(&hold_mutex);
+        callback_may_leave = 1;
+        pthread_cond_broadcast(&hold_cond);
+        pthread_mutex_unlock(&hold_mutex);
+
+        assert_int_equal(pthread_join(thread, NULL), 0);
+}
+
+/** a tenth of a second, which every case here uses to let the other thread run
+ */
+static void
+sleep_a_moment(void)
+{
+        struct timespec ts;
+
+        ts.tv_sec = 0;
+        ts.tv_nsec = 100 * 1000 * 1000;
+        (void)nanosleep(&ts, NULL);
+}
+
+static void
+test_a_teardown_waits_for_a_message_already_on_its_way(void **state
+                                                       __attribute__((unused)))
+{
+        pthread_t emitter, waiter;
+
+        start_a_held_message(&emitter);
+
+        /* the log is taken down while that message is inside the callback -
+         * which is exactly the message pqos_fini() must not leave behind,
+         * because the descriptor and the context it is using are the
+         * application's to reclaim as soon as pqos_fini() returns
+         */
+        log_fini();
+        assert_int_equal(log_is_initialized(), 0);
+
+        assert_int_equal(pthread_create(&waiter, NULL, wait_thread, NULL), 0);
+        sleep_a_moment();
+
+        /* still inside the callback, so the wait has not finished */
+        assert_int_equal(__atomic_load_n(&wait_returned, __ATOMIC_ACQUIRE), 0);
+
+        release_the_held_message(emitter);
+        assert_int_equal(pthread_join(waiter, NULL), 0);
+        assert_int_equal(__atomic_load_n(&wait_returned, __ATOMIC_ACQUIRE), 1);
+}
+
+static void
+test_the_wait_ends_even_for_a_callback_that_does_not(void **state
+                                                     __attribute__((unused)))
+{
+        pthread_t emitter, waiter;
+        struct timespec start, end;
+        double seconds;
+
+        start_a_held_message(&emitter);
+        log_fini();
+
+        /* the callback never returns on its own, and the wait still does: an
+         * application must not be able to hang its own pqos_fini() with a
+         * callback of its own
+         */
+        assert_int_equal(clock_gettime(CLOCK_MONOTONIC, &start), 0);
+        assert_int_equal(pthread_create(&waiter, NULL, wait_thread, NULL), 0);
+        assert_int_equal(pthread_join(waiter, NULL), 0);
+        assert_int_equal(clock_gettime(CLOCK_MONOTONIC, &end), 0);
+
+        seconds = (double)(end.tv_sec - start.tv_sec) +
+                  (double)(end.tv_nsec - start.tv_nsec) / 1e9;
+
+        /* it waited rather than passing straight through, and it came back
+         * rather than waiting for ever
+         */
+        assert_true(seconds > 0.5);
+        /* the bound is a second, and this is what the wait may overrun it by
+         * before the case calls it unbounded: a sleep that the kernel returns
+         * late, on a machine running every other case beside this one
+         */
+        assert_true(seconds < 3.0);
+
+        release_the_held_message(emitter);
 }
 
 static void
@@ -273,6 +445,10 @@ main(void)
             /* the lifetime cases install and retire the log themselves, so they
              * take neither the setup nor the teardown
              */
+            cmocka_unit_test(
+                test_a_teardown_waits_for_a_message_already_on_its_way),
+            cmocka_unit_test(
+                test_the_wait_ends_even_for_a_callback_that_does_not),
             cmocka_unit_test(
                 test_an_install_and_a_teardown_beside_a_stream_of_messages)};
 

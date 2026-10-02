@@ -157,6 +157,53 @@ PQOS_LOCAL void log_suspend(void);
 PQOS_LOCAL void log_resume(void);
 
 /**
+ * @brief Waits for the messages already on their way to a retired destination
+ *
+ * A message takes the destination - the descriptor, the callback and its
+ * context
+ * - together with a reference to it, and uses it afterwards, so a teardown
+ * alone does not end a message that had already started: the write and the
+ * callback are still to come, addressed to state the application is free to
+ * reclaim the moment pqos_fini() returns. This is what closes that window.
+ *
+ * What it waits for is a message using a destination this library has
+ * **retired**, and nothing else. A message using the destination installed now
+ * - an application logging from a thread of its own, which may never stop - is
+ * not waited for, so this does not establish quiescence of logging in general
+ * and must not be read as doing so. It establishes that nothing is still using
+ * what a teardown took out of service, which is the only part a caller can be
+ * harmed by.
+ *
+ * Call it from pqos_fini() *after* the API lock has been released. Called with
+ * that lock held it could wait for an emission whose callback wants the lock,
+ * which is why log_fini() itself does not wait.
+ *
+ * The wait is bounded by a monotonic deadline of one second, so an application
+ * cannot be hung here by a callback of its own that never returns. Where it
+ * runs out, the messages still in flight keep using the destination they
+ * acquired and that destination is freed by the last of them to let it go -
+ * there is no reap, and no later install or teardown is involved; that residual
+ * window is the documented limit of the guarantee.
+ *
+ * A caller that is itself inside a log callback does not wait for its **own**
+ * emission - that emission cannot finish until this returns, so waiting for it
+ * would wait for the caller. Every other reference is waited for as usual,
+ * including one another thread holds on the same retired destination, so such a
+ * caller is not promised a prompt return: with another thread inside a callback
+ * it pays the bound like anybody else.
+ *
+ * One requirement on the application, which this module cannot check: the log
+ * callback must not leave by a non-local jump. A callback that leaves by
+ * longjmp(), or by a C++ exception thrown through the C frame, never gives back
+ * the reference its message holds - so the destination that message was using
+ * is never freed, and every later wait spends the whole bound looking for it.
+ * Messages and teardowns after that one are unaffected, because each
+ * destination is counted on its own.
+ *
+ */
+PQOS_LOCAL void log_wait_quiescent(void);
+
+/**
  * @brief PQoS log function
  *
  * @param [in] type log type to be made

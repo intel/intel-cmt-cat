@@ -1162,8 +1162,36 @@ init_error:
 
         lock_release();
 
-        if (ret != PQOS_RETVAL_OK)
+        if (ret != PQOS_RETVAL_OK) {
+                /* An initialization that failed took the log down again at
+                 * log_init_error above, and a message may have been on its way
+                 * to the descriptor and the callback the application passed in
+                 * - pqos_open() and pqos_fopen() log without the API lock, so
+                 * one can be in flight while this runs. The application is free
+                 * to reclaim both as soon as this returns, so the wait belongs
+                 * here as much as it does in pqos_fini(), and for the same
+                 * reason it comes after the lock has been released.
+                 *
+                 * And before the lock is destroyed, which is the order
+                 * pqos_fini() uses: a callback still running is free to call
+                 * back into the library, and anything it calls takes the API
+                 * lock - so destroying the lock first leaves it locking a mutex
+                 * that is gone.
+                 *
+                 * The wait is bounded, so that last part is an ordering and not
+                 * a guarantee: a callback that outlives the bound reaches
+                 * lock_fini() having run beside it, and an API called from
+                 * there afterwards is an API called after the library was
+                 * finalized. The header says so where both contracts are
+                 * written down. What would close it in code is the API lock's
+                 * mutex outliving the teardown instead of being destroyed by
+                 * it, which is a change to that module's lifetime rather than
+                 * to this file's order.
+                 */
+                log_wait_quiescent();
+
                 lock_fini();
+        }
 
         return ret;
 }
@@ -1238,6 +1266,15 @@ pqos_fini(void)
         m_init_done = 0;
 
         lock_release();
+
+        /* After the lock, deliberately: a message that started before the log
+         * was taken down is still on its way to the descriptor and the callback
+         * the application gave, and the application may reclaim both as soon as
+         * this call returns. Waiting for those messages here, with the API lock
+         * already released, cannot deadlock a callback that calls back into the
+         * library - see log_wait_quiescent().
+         */
+        log_wait_quiescent();
 
         if (lock_fini() != 0)
                 retval = PQOS_RETVAL_ERROR;
