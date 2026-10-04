@@ -226,6 +226,106 @@ test_profile_list_before_a_class_returns_failure(void **state)
         assert_false(output_has_text("Config ID"));
 }
 
+/* ======== a value that begins with a dash ======== */
+
+/* -R, -r and -p take a value, and a value that begins with a dash is read as
+ * the next switch handed to them by mistake, so optind is rewound to it. That
+ * is only right when the value was its own word. Attached to the option, the
+ * value is part of the word just consumed, and the rewind used to make getopt
+ * return the same option with the same value without end. The handlers end in
+ * exit(), which the harness turns into a longjmp, so the status is read from
+ * the output module rather than from the return value.
+ */
+static void
+test_reset_alloc_attached_dash_returns_failure(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 2, "-R-");
+
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_true(
+            output_has_text("Unrecognized '-' allocation reset option"));
+}
+
+static void
+test_reset_alloc_long_option_dash_returns_failure(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 2, "--alloc-reset=-");
+
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_true(
+            output_has_text("Unrecognized '-' allocation reset option"));
+}
+
+static void
+test_reset_mon_attached_dash_returns_failure(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 2, "-r-");
+
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_true(output_has_text("Unrecognized '-' monitoring"));
+}
+
+/* Only the status here: which message rejects "-" depends on the interface an
+ * earlier case left selected. Under mmio, narrow_iface() refuses -p itself, on
+ * stderr, before the value is parsed; otherwise parse_monitor_pids() rejects
+ * the value. Either way the utility exits with a failure instead of looping.
+ */
+static void
+test_monitor_pids_attached_dash_returns_failure(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 2, "-p-");
+
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+}
+
+/* The control: the next switch as its own word is still given back to getopt,
+ * so -R followed by -s is a reset and a show, not a reset of "-s". What the
+ * platform then makes of the command is left alone, as in the print-mode tests
+ */
+static void
+test_reset_alloc_next_switch_is_not_its_value(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 3, "-R", "-s");
+
+        assert_false(output_has_text("Unrecognized"));
+}
+
+static void
+test_reset_mon_next_switch_is_not_its_value(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 3, "-r", "-s");
+
+        assert_false(output_has_text("Unrecognized"));
+}
+
 int
 main(void)
 {
@@ -235,7 +335,13 @@ main(void)
             cmocka_unit_test(test_print_mode_with_an_assoc_returns_failure),
             cmocka_unit_test(test_print_mode_with_a_class_returns_failure),
             cmocka_unit_test(test_profile_list_after_a_class_returns_failure),
-            cmocka_unit_test(test_profile_list_before_a_class_returns_failure)};
+            cmocka_unit_test(test_profile_list_before_a_class_returns_failure),
+            cmocka_unit_test(test_reset_alloc_attached_dash_returns_failure),
+            cmocka_unit_test(test_reset_alloc_long_option_dash_returns_failure),
+            cmocka_unit_test(test_reset_mon_attached_dash_returns_failure),
+            cmocka_unit_test(test_monitor_pids_attached_dash_returns_failure),
+            cmocka_unit_test(test_reset_alloc_next_switch_is_not_its_value),
+            cmocka_unit_test(test_reset_mon_next_switch_is_not_its_value)};
 
         return cmocka_run_group_tests(tests_cmdline, NULL, NULL);
 }

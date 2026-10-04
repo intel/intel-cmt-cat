@@ -1863,6 +1863,27 @@ check_print_and_exit_options(void)
         return -1;
 }
 
+/**
+ * @brief Tells whether the value getopt gave an option was the word after it
+ *
+ * An option that takes a value, given one that begins with a dash, has most
+ * likely been handed the next switch: "-R -s" reads as -R with the value
+ * "-s". The caller then rewinds optind so that getopt sees the switch. That
+ * is right only when the value was its own word. Attached to the option, as
+ * in "-R-" or "--alloc-reset=-", the value is part of the word getopt has
+ * just consumed, and rewinding to that word makes getopt return the same
+ * option with the same value without end.
+ *
+ * @param [in] argv the argument vector getopt is walking
+ *
+ * @return 1 when optarg is the whole of the word before optind, 0 otherwise
+ */
+static int
+optarg_is_next_word(char **argv)
+{
+        return optarg != NULL && optarg == argv[optind - 1];
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1911,7 +1932,8 @@ main(int argc, char **argv)
                         selfn_monitor_interval(optarg);
                         break;
                 case 'p':
-                        if (optarg != NULL && *optarg == '-') {
+                        if (optarg != NULL && *optarg == '-' &&
+                            optarg_is_next_word(argv)) {
                                 /**
                                  * Next switch option wrongly assumed to be
                                  * argument to '-p'.
@@ -1961,7 +1983,8 @@ main(int argc, char **argv)
                          * Next switch option wrongly assumed
                          * to be argument to '-r'.
                          */
-                        if (optarg != NULL && *optarg == '-') {
+                        if (optarg != NULL && *optarg == '-' &&
+                            optarg_is_next_word(argv)) {
                                 selfn_reset_mon(NULL);
                                 optind--;
                                 break;
@@ -1970,7 +1993,8 @@ main(int argc, char **argv)
                         break;
                 case 'R':
                         if (optarg != NULL) {
-                                if (*optarg == '-') {
+                                if (*optarg == '-' &&
+                                    optarg_is_next_word(argv)) {
                                         /**
                                          * Next switch option wrongly assumed
                                          * to be argument to '-R'.
