@@ -298,9 +298,15 @@ test_monitor_pids_attached_dash_returns_failure(void **state)
         assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
 }
 
-/* The control: the next switch as its own word is still given back to getopt,
- * so -R followed by -s is a reset and a show, not a reset of "-s". What the
- * platform then makes of the command is left alone, as in the print-mode tests
+/* The control: the next switch as its own word is still given back to getopt.
+ * The switch is one the utility does not know, so that what happens to it is
+ * observable either way. Handed back, main() reports it as an unknown option
+ * and returns EXIT_FAILURE - the report goes to stderr, which the harness does
+ * not capture, so the return is what is asserted, together with exit() not
+ * having been called. Kept as the value, the handler prints "Unrecognized" and
+ * calls exit(). A show could not tell the two apart: the first case of this
+ * binary leaves the show selection set, and -s consumed silently would look
+ * the same.
  */
 static void
 test_reset_alloc_next_switch_is_not_its_value(void **state)
@@ -309,8 +315,10 @@ test_reset_alloc_next_switch_is_not_its_value(void **state)
 
         UNUSED_ARG(state);
 
-        run_pqos(&ret, 3, "-R", "-s");
+        run_pqos(&ret, 3, "-R", "--no-such-option");
 
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_false(output_exit_was_called());
         assert_false(output_has_text("Unrecognized"));
 }
 
@@ -321,8 +329,10 @@ test_reset_mon_next_switch_is_not_its_value(void **state)
 
         UNUSED_ARG(state);
 
-        run_pqos(&ret, 3, "-r", "-s");
+        run_pqos(&ret, 3, "-r", "--no-such-option");
 
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_false(output_exit_was_called());
         assert_false(output_has_text("Unrecognized"));
 }
 
