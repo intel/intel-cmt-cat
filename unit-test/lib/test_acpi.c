@@ -134,12 +134,6 @@ size_t __irdt_tab_rmud_1_offset = 205;
  * DEBUG:  0 DEV(s):
  */
 
-struct acpi_table_internal {
-        struct acpi_table table;
-        acpi_address address;
-        acpi_size size;
-};
-
 void
 __wrap_free(void *ptr)
 {
@@ -178,6 +172,7 @@ test_acpi_free(void **state __attribute__((unused)))
 
         data->table.generic = (uint8_t *)0xDEAD0000;
         data->size = 2021;
+        data->mtype = ACPI_TBL_MMAP;
 
         expect_function_call(__wrap_munmap);
         expect_value(__wrap_munmap, addr, 0xDEAD0000);
@@ -413,6 +408,33 @@ test_acpi_get_irdt_chms(void **state __attribute__((unused)))
         assert_int_equal(chms[1]->rcs_enum_id, 2);
 }
 
+static void
+test_acpi_addresses_are_as_wide_as_the_tables(void **state
+                                              __attribute__((unused)))
+{
+        /* The tables carry 64-bit physical addresses - the RSDP's xsdt_address,
+         * every XSDT entry, the ERDT's MMIO locations - and pqos_mmap_read()
+         * takes uint64_t. A narrower acpi_address would read a table above
+         * 4 GiB from the wrong place rather than fail, which is why the width
+         * is asserted here instead of being left to the architecture.
+         */
+        assert_int_equal(sizeof(acpi_address), sizeof(uint64_t));
+        assert_int_equal(sizeof(acpi_size), sizeof(uint64_t));
+        assert_int_equal(
+            sizeof(acpi_address),
+            sizeof(((struct acpi_table_rsdp *)NULL)->xsdt_address));
+
+        /* and the object acpi_free() reads is the one a caller here builds:
+         * struct acpi_table_internal comes from lib/acpi.h, so the size this
+         * asserts is the library's. This file used to keep a copy of it that
+         * was one member short, and test_acpi_free() then allocated less than
+         * acpi_free() reads - a copy reintroduced now would not compile.
+         */
+        assert_true(sizeof(struct acpi_table_internal) >=
+                    sizeof(struct acpi_table) + sizeof(acpi_address) +
+                        sizeof(acpi_size) + sizeof(enum acpi_tbl_mtype));
+}
+
 int
 main(void)
 {
@@ -426,7 +448,10 @@ main(void)
             cmocka_unit_test(test_acpi_get_irdt_rmud_invalid_len),
             cmocka_unit_test(test_acpi_get_irdt_dev),
             cmocka_unit_test(test_acpi_get_irdt_dev_invalid_len),
-            cmocka_unit_test(test_acpi_get_irdt_chms)};
+            cmocka_unit_test(test_acpi_get_irdt_chms),
+            cmocka_unit_test(
+
+                test_acpi_addresses_are_as_wide_as_the_tables)};
 
         result += cmocka_run_group_tests(tests, NULL, NULL);
 

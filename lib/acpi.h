@@ -46,18 +46,39 @@ extern "C" {
 #include "pqos.h"
 #include "types.h"
 
-#if defined(__x86_64__)
-typedef uint64_t acpi_address;
-typedef uint64_t acpi_size;
-#elif defined(__i386__)
-typedef uint32_t acpi_address;
-typedef uint32_t acpi_size;
-#else
+#if !defined(__x86_64__) && !defined(__i386__)
 #error "Unsupported architecture"
 #endif
 
+/* An ACPI address is 64 bits wide whatever this is built for, because that is
+ * what the tables carry and what the mapping call takes: the RSDP's
+ * xsdt_address, every entry of the XSDT and the ERDT's MMIO locations are
+ * 64-bit physical addresses, and pqos_mmap_read() takes uint64_t.
+ *
+ * A 32-bit typedef here, which this had for i386, did not make the library
+ * 32-bit - nothing else in the build, the packaging or the CI targets i386 -
+ * it narrowed those addresses before they reached the mapping, so a table
+ * above 4 GiB would have been read from the wrong place. Keeping one width
+ * is both simpler and safer for a 32-bit build than pretending to support it.
+ *
+ * What one width does not do is make such a table readable on a 32-bit build.
+ * mmap() takes an off_t and a size_t, and without _FILE_OFFSET_BITS=64 neither
+ * is 64 bits there, so the address would be narrowed one call further down
+ * instead. pqos_mmap_read() refuses a mapping it cannot ask for rather than
+ * asking for a different one, which is the difference that matters: the
+ * failure is reported instead of being read as a table.
+ */
+typedef uint64_t acpi_address;
+typedef uint64_t acpi_size;
+
 /* ACPI tables root directory in sysfs */
 #define ACPI_TABLE_FS_PATH "/sys/firmware/acpi/tables"
+
+/** how a table's memory was obtained, which is how acpi_free() gives it back */
+enum acpi_tbl_mtype {
+        ACPI_TBL_MMAP,
+        ACPI_TBL_ALLOC,
+};
 
 /**
  * ACPI Table
@@ -74,6 +95,22 @@ struct acpi_table {
                 char *signature;
                 uint8_t *generic;
         };
+};
+
+/**
+ * A table and what acpi.c needs to give its memory back
+ *
+ * Declared here rather than kept private to acpi.c because acpi_free() reads
+ * every member of it and the unit test builds one to hand to it: a copy of this
+ * in the test was one member short of the library's, so the call read past the
+ * end of what the test had allocated and the branch it took depended on what
+ * happened to be there.
+ */
+struct acpi_table_internal {
+        struct acpi_table table;
+        acpi_address address;
+        acpi_size size;
+        enum acpi_tbl_mtype mtype;
 };
 
 /**

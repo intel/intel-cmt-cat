@@ -128,6 +128,12 @@ static const char *race_link;
 static const char *race_open_link;
 static void race_plant(void);
 
+/** how many times /dev/mem has been opened since a case reset this, so a case
+ *  can require that a mapping this build cannot make is refused without the
+ *  device being opened at all
+ */
+static unsigned dev_mem_opens;
+
 /* Variadic, as open() is
  *
  * A wrapper with a fixed mode parameter reads a third argument that a two
@@ -163,6 +169,19 @@ __wrap_open(const char *path, int oflags, ...)
          * rather than what the open resolved.
          */
         armed = race_open_link != NULL && strcmp(path, race_open_link) == 0;
+
+        /* /dev/mem is recorded and refused, never opened. A unit test has no
+         * business mapping the host's physical memory - and run as root it
+         * would succeed, leaving a mapping of it behind that nothing unmaps.
+         * What the cases need from this is whether the attempt was made, which
+         * the count answers.
+         */
+        if (strcmp(path, "/dev/mem") == 0) {
+                dev_mem_opens++;
+                errno = EACCES;
+
+                return -1;
+        }
 
         fd = __real_open(path, oflags, mode);
 
@@ -1798,6 +1817,103 @@ test_common_pqos_fopen_refuses_a_null_mode_and_keeps_the_pool(
         assert_int_equal(rmdir(dir), 0);
 }
 
+/* ------------------------------------------------------------------------
+ * What pqos_mmap_read() will and will not ask of mmap()
+ *
+ * The addresses are physical addresses out of the ACPI tables, 64 bits wide
+ * whatever the library is built for, while mmap() takes an off_t and a size_t.
+ * A request that does not fit those is refused rather than narrowed - reading a
+ * different page and calling it the table is the failure being prevented - and
+ * refused before /dev/mem is opened, which is what these cases can see.
+ * ------------------------------------------------------------------------
+ */
+
+static void
+test_common_refuses_a_mapping_this_build_cannot_address(void **state
+                                                        __attribute__((unused)))
+{
+        /* an address off_t cannot hold. On a 64-bit build that is one above the
+         * signed range; on a 32-bit build without _FILE_OFFSET_BITS=64 off_t is
+         * a signed 32-bit type, so it is anything from 2 GiB up - the cast goes
+         * negative between 2 and 4 GiB and loses bits above - and the same
+         * refusal answers both
+         */
+        dev_mem_opens = 0;
+
+        assert_null(pqos_mmap_read(0x8000000000000000ULL, 8));
+        assert_int_equal(dev_mem_opens, 0);
+
+        assert_null(pqos_mmap_write(0x8000000000000000ULL, 8));
+        assert_int_equal(dev_mem_opens, 0);
+}
+
+static void
+test_common_refuses_a_length_that_cannot_be_formed(void **state
+                                                   __attribute__((unused)))
+{
+        /* Rounding the address down to a page lengthens the mapping, and that
+         * addition is 64-bit unsigned: a size near the top of the width wrapped
+         * to a small representable length and reached mmap() as a request for
+         * the wrong amount. A sum that cannot be formed is not a request.
+         */
+        dev_mem_opens = 0;
+
+        assert_null(pqos_mmap_read(0x1008, UINT64_MAX - 4));
+        assert_int_equal(dev_mem_opens, 0);
+
+        assert_null(pqos_mmap_write(0x1008, UINT64_MAX - 4));
+        assert_int_equal(dev_mem_opens, 0);
+}
+
+static void
+test_common_refuses_a_length_wider_than_size_t(void **state
+                                               __attribute__((unused)))
+{
+        /* A length that is finite, forms a sum without wrapping and sits at an
+         * address off_t can hold - and is still wider than size_t where size_t
+         * is 32 bits. 4 GiB is the smallest such length, and (size_t)length is
+         * then zero: a cast would reach mmap() as a request for nothing and
+         * report success for a table it never mapped.
+         *
+         * The two cases above cannot see this check. One fails on the offset's
+         * sign and one on the sum wrapping, both before the length is cast, so
+         * a build where size_t is narrower could lose the cast's round trip
+         * and pass them. This is the case that line is for, and the only one
+         * whose answer depends on the width of the build: on 64-bit the request
+         * fits and reaches the device, which is what the mocked open sees.
+         */
+        const unsigned opens = sizeof(size_t) < sizeof(uint64_t) ? 0 : 1;
+
+        dev_mem_opens = 0;
+        assert_null(pqos_mmap_read(0x1000, 0x100000000ULL));
+        assert_int_equal(dev_mem_opens, opens);
+
+        dev_mem_opens = 0;
+        assert_null(pqos_mmap_write(0x1000, 0x100000000ULL));
+        assert_int_equal(dev_mem_opens, opens);
+}
+
+static void
+test_common_attempts_a_mapping_it_can_address(void **state
+                                              __attribute__((unused)))
+{
+        /* and a request that does fit is not refused here: it reaches the
+         * device, which is what tells these cases apart. The mock refuses the
+         * open rather than performing it - a unit test must not map the host's
+         * physical memory, least of all run as root - so what is asserted is
+         * that the attempt was made, and that the call reports the failure
+         * rather than inventing a mapping.
+         */
+        dev_mem_opens = 0;
+
+        assert_null(pqos_mmap_read(0x1000, 8));
+        assert_int_equal(dev_mem_opens, 1);
+
+        dev_mem_opens = 0;
+        assert_null(pqos_mmap_write(0x1000, 8));
+        assert_int_equal(dev_mem_opens, 1);
+}
+
 int
 main(void)
 {
@@ -1840,6 +1956,12 @@ main(void)
                 test_common_pqos_open_refuses_a_link_behind_a_slash),
             cmocka_unit_test(
                 test_common_pqos_fopen_refuses_a_null_mode_and_keeps_the_pool),
+            cmocka_unit_test(
+                test_common_refuses_a_mapping_this_build_cannot_address),
+            cmocka_unit_test(
+                test_common_refuses_a_length_that_cannot_be_formed),
+            cmocka_unit_test(test_common_refuses_a_length_wider_than_size_t),
+            cmocka_unit_test(test_common_attempts_a_mapping_it_can_address),
         };
 
         result +=

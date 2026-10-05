@@ -56,18 +56,6 @@
 #define BIOS_RO_MEM_SIZE 0x00020000LLU
 #define PAGE_SIZE        4096
 
-enum acpi_tbl_mtype {
-        ACPI_TBL_MMAP,
-        ACPI_TBL_ALLOC,
-};
-
-struct acpi_table_internal {
-        struct acpi_table table;
-        acpi_address address;
-        acpi_size size;
-        enum acpi_tbl_mtype mtype;
-};
-
 int
 acpi_init(void)
 {

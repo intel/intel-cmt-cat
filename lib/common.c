@@ -829,6 +829,54 @@ pqos_file_contains(const char *fname, const char *str, int *found)
 
 #define DEV_MEM "/dev/mem"
 
+/**
+ * @brief Whether this build can ask mmap() for a mapping it was given in 64
+ * bits
+ *
+ * The addresses these mappings are made from are physical addresses out of the
+ * ACPI tables, and those are 64 bits wide whatever the library is built for.
+ * mmap() takes an off_t for the offset and a size_t for the length, and neither
+ * is 64 bits on a 32-bit build without _FILE_OFFSET_BITS=64 - so a cast would
+ * map a different physical page, or a shorter run of them, and report success.
+ * Reading the wrong page and calling it the table is the failure this refuses:
+ * a caller gets NULL and a message instead.
+ *
+ * @param [in] address the physical address to map from, page aligned or not
+ * @param [in] size how much of it to map
+ * @param [in] page_size what a mapping has to be aligned to
+ *
+ * @retval 1 the request can be made as asked
+ * @retval 0 it cannot, and the mapping must not be attempted
+ */
+static int
+mmap_fits(const uint64_t address, const uint64_t size, const uint64_t page_size)
+{
+        const uint64_t offset = address % page_size;
+        const uint64_t start = address - offset;
+        uint64_t length;
+        off_t as_off;
+        size_t as_size;
+
+        /* the length first, and in the width the caller gave it: rounding the
+         * address down lengthens the mapping, and that addition is 64-bit
+         * unsigned, so a size near the top of the width would wrap to a small
+         * representable length and reach mmap() as a request for the wrong
+         * amount. A sum that cannot be formed is not a request that can be
+         * made.
+         */
+        length = size + offset;
+        if (length < size)
+                return 0;
+
+        as_off = (off_t)start;
+        as_size = (size_t)length;
+
+        if (as_off < 0 || (uint64_t)as_off != start)
+                return 0;
+
+        return (uint64_t)as_size == length;
+}
+
 uint8_t *
 pqos_mmap_read(uint64_t address, const uint64_t size)
 {
@@ -837,16 +885,28 @@ pqos_mmap_read(uint64_t address, const uint64_t size)
         uint8_t *mem;
         int fd;
 
+        page_size = sysconf(_SC_PAGESIZE);
+        offset = address % page_size;
+
+        /* asked before the device is opened: a request this build cannot make
+         * is refused without touching /dev/mem at all
+         */
+        if (!mmap_fits(address, size, page_size)) {
+                LOG_ERROR("Memory map refused, address=%llx size=%llu: this "
+                          "build cannot address it\n",
+                          (unsigned long long)address,
+                          (unsigned long long)size);
+                return NULL;
+        }
+
         fd = pqos_open(DEV_MEM, O_RDONLY, 0);
         if (fd < 0) {
                 LOG_ERROR("Could not open %s\n", DEV_MEM);
                 return NULL;
         }
 
-        page_size = sysconf(_SC_PAGESIZE);
-        offset = address % page_size;
-        mem = mmap(NULL, size + offset, PROT_READ, MAP_PRIVATE, fd,
-                   address - offset);
+        mem = mmap(NULL, (size_t)(size + offset), PROT_READ, MAP_PRIVATE, fd,
+                   (off_t)(address - offset));
 
         if (mem == MAP_FAILED) {
                 LOG_ERROR("Memory map failed, address=%llx size=%llu\n",
@@ -868,16 +928,26 @@ pqos_mmap_write(uint64_t address, const uint64_t size)
         uint8_t *mem;
         int fd;
 
+        page_size = sysconf(_SC_PAGESIZE);
+        offset = address % page_size;
+
+        /* asked before the device is opened, as in pqos_mmap_read() */
+        if (!mmap_fits(address, size, page_size)) {
+                LOG_ERROR("Memory map refused, address=%llx size=%llu: this "
+                          "build cannot address it\n",
+                          (unsigned long long)address,
+                          (unsigned long long)size);
+                return NULL;
+        }
+
         fd = pqos_open(DEV_MEM, O_RDWR, 0);
         if (fd < 0) {
                 LOG_ERROR("Could not open %s\n", DEV_MEM);
                 return NULL;
         }
 
-        page_size = sysconf(_SC_PAGESIZE);
-        offset = address % page_size;
-        mem = mmap(NULL, size + offset, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-                   address - offset);
+        mem = mmap(NULL, (size_t)(size + offset), PROT_READ | PROT_WRITE,
+                   MAP_SHARED, fd, (off_t)(address - offset));
 
         if (mem == MAP_FAILED) {
                 LOG_ERROR("Memory map failed, address=%llx size=%llu\n",
