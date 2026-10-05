@@ -103,6 +103,17 @@ endif
 
 DEPFILES = $(SRCS:.c=.d)
 
+# The objects here are described by this Makefile - libgraboutput's own flags are
+# written nowhere else - and every pqos test binary links the library they make,
+# test_output_capture linking nothing else. So a flag change has to rebuild them,
+# or the capture the other cases assert through is the one the previous flags
+# built.
+#
+# The objects and not the library: the link recipe passes $^ to the compiler, so a
+# Makefile named as a prerequisite of the library would be handed to the linker as
+# an object file. Rebuilding an object relinks the library.
+$(OBJS) $(DEPFILES): Makefile $(wildcard *.h)
+
 %.o: %.c %.d
 
 %.d: %.c

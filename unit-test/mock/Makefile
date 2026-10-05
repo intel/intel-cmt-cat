@@ -104,7 +104,16 @@ else
 	$(AR) crvsD $@ $^
 endif
 
+# The objects here are described by this Makefile - the mock's own flags are
+# written nowhere else - so a flag change has to rebuild them, or the tests link
+# against the library the previous flags built.
+#
+# The objects and not the library: the link recipe above passes $^ to the
+# compiler, so a Makefile named as a prerequisite of the library would be handed
+# to the linker as an object file. Rebuilding an object relinks the library.
 DEPFILES = $(SRCS:.c=.d)
+
+$(OBJS) $(DEPFILES): Makefile $(wildcard *.h)
 
 %.o: %.c %.d
 

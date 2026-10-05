@@ -77,6 +77,23 @@ CFLAGS += -g -ggdb -O0
 
 all: $(TESTS)
 
+# What a binary or an object here is made of, and nothing else, decides whether
+# it is out of date. Two things do, and neither was tracked. The reasoning
+# is unit-test/lib/Makefile's, and applies here word for word.
+#
+# This Makefile, for the wraps and the -D flags. The headers in this directory
+# and in the mock beside it - the test .c files go straight to the link recipes
+# and never become objects, so they have no .d file: caps_gen.h holds the
+# capability fixtures every case is built on, and an edit to it left every binary
+# up to date and every run asserting against the previous fixtures.
+#
+# $(APP_MOCK_OBJS) among the targets, not only $(PQOS_OBJS): those objects are
+# compiled with the $(CFLAGS) defined here and nowhere else, and test_profiles
+# links them, so a flag change left it linked against a mock the previous flags
+# built.
+$(TESTS) $(PQOS_OBJS) $(APP_MOCK_OBJS): Makefile $(wildcard *.h) \
+    $(wildcard $(APP_MOCK_DIR)/*.h)
+
 $(OBJ_DIR)/main.o: $(PQOS_DIR)/main.c
 	mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@

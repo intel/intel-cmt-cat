@@ -65,6 +65,35 @@ endif
 
 all: $(TESTS)
 
+# What a binary or an object here is made of, and nothing else, decides whether
+# it is out of date. Two things do, and neither was tracked.
+#
+# This Makefile: the -Wl,--wrap= list a test links with, and the -D flags an
+# object is compiled with, are written nowhere else. Without this prerequisite
+# make finds them up to date after such a change and the run exercises the
+# previous build - a wrap that is no longer linked, or a path that no longer
+# points where the recipe says. What that looks like is cmocka's "No entries for
+# symbol", or a real function running where a mock was expected, or ten fixture
+# cases failing against a tree the reader no longer reads: a failure that looks
+# like the code under test rather than like the build.
+#
+# The headers in this directory: the test .c files are handed straight to the
+# link recipes and never become objects, so they have no .d file and nothing
+# tracked what they include. test.h is included by every case; test_acpi.h,
+# test_cap.h, test_iordt.h and test_lock.h carry the fixtures their own cases are
+# built on. A wildcard rather than a list, so a header added later is covered by
+# the next invocation without anybody remembering this line.
+#
+# The cost is that editing either rebuilds everything here, which takes
+# seconds and is the answer to a question nobody should have to ask.
+$(TESTS) $(LIB_OBJS): Makefile $(wildcard *.h)
+
+# the recorded dependencies follow the flags that produced them: a .d file lists
+# the headers the -I set in force at the time reached, so a change to that set
+# has to regenerate them - or the objects rebuild once and the next edit to a
+# header only the new search path finds rebuilds nothing.
+$(LIB_DEPS): Makefile
+
 $(OBJ_DIR)/%.o: $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
 	$(CC) $(CFLAGS) -c $< -o $@
 
