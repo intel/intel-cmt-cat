@@ -97,11 +97,19 @@ OBJS = $(SRCS:.c=.o)
 CLEAN_OBJS = $(SRCS:.c=.o)
 DEPFILE = $(LIB).dep
 
+# The form that was not built goes once this one is made, which the flags stamp
+# alone cannot do for the reader: the consumers link with -l, and the linker
+# prefers a .so where both are there. So "make SHARED=n" rebuilt the archive and
+# the tests went on loading the shared library the previous build had left - the
+# stamp noticing the change bought nothing. After the build and not before it, so
+# that a build which fails leaves what was working where it was.
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(LIB).so -o $(LIBNAME) $^ -lc
+	rm -f $(LIB).a
 else
 	$(AR) crvsD $@ $^
+	rm -f $(LIB).so*
 endif
 
 # The objects here are described by this Makefile - the mock's own flags are
@@ -120,10 +128,21 @@ DEPFILES = $(SRCS:.c=.d)
 
 $(OBJS) $(DEPFILES): Makefile $(wildcard *.h) $(FLAGS_STAMP)
 
+# and the recorded dependencies are read, which is what makes writing them worth
+# anything: the wildcard above covers the headers beside this Makefile, and these
+# cover the ones the sources reach through -I - ../../lib/pqos.h among them, so a
+# change to it rebuilt nothing here at all.
+DEPFILES_TO_READ = $(DEPFILES)
+include ../depfiles.mk
+
 %.o: %.c %.d
 
+# CPPFLAGS as well as CFLAGS, because the objects here are compiled by make's
+# built-in recipe and that is "$(CC) $(CPPFLAGS) $(CFLAGS) -c": a header reached
+# only through a macro defined there would be compiled in and not recorded, and the
+# next edit to it would rebuild nothing.
 %.d: %.c
-	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
+	$(CC) -MM -MP -MF $@ $(CPPFLAGS) $(CFLAGS) $<
 	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
 CHECKPATCH?=checkpatch.pl

@@ -11,6 +11,7 @@ MOCK_DIR = ../mock
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
 TESTS = $(TESTS_SRCS:%.c=$(BIN_DIR)/%)
+TESTS_DEPS = $(TESTS_SRCS:%.c=$(OBJ_DIR)/%.d)
 
 
 LDFLAGS = -L$(MOCK_DIR) -lpthread -lcmocka -lpqosmock -z noexecstack -z relro -z now
@@ -77,12 +78,13 @@ all: $(TESTS)
 # cases failing against a tree the reader no longer reads: a failure that looks
 # like the code under test rather than like the build.
 #
-# The headers in this directory: the test .c files are handed straight to the
-# link recipes and never become objects, so they have no .d file and nothing
-# tracked what they include. test.h is included by every case; test_acpi.h,
-# test_cap.h, test_iordt.h and test_lock.h carry the fixtures their own cases are
-# built on. A wildcard rather than a list, so a header added later is covered by
-# the next invocation without anybody remembering this line.
+# The headers in this directory. The test .c files are handed straight to the link
+# recipes and never become objects, so what they include is recorded against the
+# binary rather than against an object - see $(TESTS_DEPS) below, which is what
+# does that now. This wildcard is the belt beside it: test.h is included by every
+# case, and test_acpi.h, test_cap.h, test_iordt.h and test_lock.h carry the
+# fixtures their own cases are built on, so a header added later is covered by the
+# next invocation without anybody remembering either line.
 #
 # And the flags that do not come from this file at all - DEBUG arrives on the
 # command line - which is what flags-stamp.mk records.
@@ -99,19 +101,38 @@ include ../flags-stamp.mk
 # by wildcard because which of the two exists is the mock build's choice, made
 # on its own command line - and as a prerequisite only: the link lines below name
 # the library with -lpqosmock and must not be handed a second copy of it.
+# and the headers the test .c files reach through -I. Those files have recorded
+# dependencies of their own now - $(TESTS_DEPS) - so this is a second belt: by
+# directory rather than by name, for the reason the wildcard above is one, and it
+# covers a test source whose .d file has not been written yet.
 $(TESTS) $(LIB_OBJS): Makefile $(wildcard *.h) $(FLAGS_STAMP) \
+    $(wildcard $(LIB_DIR)/*.h) $(wildcard $(MOCK_DIR)/*.h) \
     $(wildcard $(MOCK_DIR)/libpqosmock.*)
 
 # the recorded dependencies follow the flags that produced them: a .d file lists
 # the headers the -I set in force at the time reached, so a change to that set
 # has to regenerate them - or the objects rebuild once and the next edit to a
 # header only the new search path finds rebuilds nothing.
-$(LIB_DEPS): Makefile $(FLAGS_STAMP)
+$(LIB_DEPS) $(TESTS_DEPS): Makefile $(FLAGS_STAMP)
 
+# and they are read - see depfiles.mk, which is where the conditions on that are
+# written down. Included here rather than at the top so that the default goal is
+# still "all".
+DEPFILES_TO_READ = $(LIB_DEPS) $(TESTS_DEPS) $(OBJ_DIR)/cxl_fixture.d
+include ../depfiles.mk
+
+
+# mkdir in every one of these, as the dependency rule below has one: make reads
+# the directory listing once and a directory that clean removed in the same
+# invocation still looks present to it, so an order-only prerequisite on the
+# directory is not made and "make clean all" reached the first object recipe with
+# nowhere to put it - "Fatal error: can't create obj/acpi.o".
 $(OBJ_DIR)/%.o: $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=hw_alloc_assoc_write --weaken-symbol=hw_alloc_assoc_write \
@@ -134,6 +155,7 @@ $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
 		$@
 
 $(OBJ_DIR)/common.o: $(LIB_DIR)/common.c $(OBJ_DIR)/common.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=pqos_fopen --weaken-symbol=pqos_fopen \
@@ -141,6 +163,7 @@ $(OBJ_DIR)/common.o: $(LIB_DIR)/common.c $(OBJ_DIR)/common.d
 		$@
 
 $(OBJ_DIR)/cap.o: $(LIB_DIR)/cap.c $(OBJ_DIR)/cap.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=_pqos_check_init --weaken-symbol=_pqos_check_init \
@@ -149,6 +172,7 @@ $(OBJ_DIR)/cap.o: $(LIB_DIR)/cap.c $(OBJ_DIR)/cap.d
 		$@
 
 $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=hw_mon_assoc_write --weaken-symbol=hw_mon_assoc_write \
@@ -163,12 +187,14 @@ $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.
 		$@
 
 $(OBJ_DIR)/common_monitoring.o: $(LIB_DIR)/common_monitoring.c $(OBJ_DIR)/common_monitoring.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=mon_reset_iordt --weaken-symbol=mon_reset_iordt \
 		$@
 
 $(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=hw_cap_l3ca_cdp --weaken-symbol=hw_cap_l3ca_cdp \
@@ -178,6 +204,7 @@ $(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
 		$@
 
 $(OBJ_DIR)/resctrl_alloc.o: $(LIB_DIR)/resctrl_alloc.c $(OBJ_DIR)/resctrl_alloc.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=resctrl_alloc_fopen --weaken-symbol=resctrl_alloc_fopen \
@@ -185,6 +212,7 @@ $(OBJ_DIR)/resctrl_alloc.o: $(LIB_DIR)/resctrl_alloc.c $(OBJ_DIR)/resctrl_alloc.
 		$@
 
 $(OBJ_DIR)/os_allocation.o: $(LIB_DIR)/os_allocation.c $(OBJ_DIR)/os_allocation.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=os_alloc_assoc_set --weaken-symbol=os_alloc_assoc_set \
@@ -198,6 +226,7 @@ $(OBJ_DIR)/os_allocation.o: $(LIB_DIR)/os_allocation.c $(OBJ_DIR)/os_allocation.
 		$@
 
 $(OBJ_DIR)/os_cap.o: $(LIB_DIR)/os_cap.c $(OBJ_DIR)/os_cap.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=os_cap_mon_resctrl_support --weaken-symbol=os_cap_mon_resctrl_support \
@@ -205,6 +234,7 @@ $(OBJ_DIR)/os_cap.o: $(LIB_DIR)/os_cap.c $(OBJ_DIR)/os_cap.d
 		$@
 
 $(OBJ_DIR)/resctrl_monitoring.o: $(LIB_DIR)/resctrl_monitoring.c $(OBJ_DIR)/resctrl_monitoring.d
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=resctrl_mon_is_supported --weaken-symbol=resctrl_mon_is_supported \
@@ -218,9 +248,45 @@ $(OBJ_DIR)/resctrl_monitoring.o: $(LIB_DIR)/resctrl_monitoring.c $(OBJ_DIR)/resc
 		--globalize-symbol=resctrl_mon_rmdir --weaken-symbol=resctrl_mon_rmdir \
 		$@
 
+# -MT, because -MM writes the target as a bare "log.o" with no directory in it,
+# and the objects here are $(OBJ_DIR)/log.o: the rules in a .d file written
+# without it name a target this Makefile never builds, so the prerequisites in
+# them attach to nothing.
+#
+# And the .d file is a target too, of the same headers: otherwise a header that
+# stops including another rebuilds the object but not this file, which goes on
+# naming the other - and once that is deleted, -MP's empty rule for it is
+# always out of date, so everything listing it rebuilds on every invocation.
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
-	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
+	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) $<
+
+# and the same for the test sources, whose target is the binary: these are
+# compiled inside the link recipes and never become objects, so what the
+# recorded dependencies belong to is bin/test_lock and not an obj/test_lock.o
+# that does not exist.
+#
+# The wildcard above covers the headers beside them while those headers are
+# there - and a header that is *removed* leaves it, so nothing said the binaries
+# that include it were out of date and they kept running. With -MP the .d file
+# names the removed header as a phony target, which make remakes and so rebuilds
+# what depends on it - a compile that then reports the missing include, which is
+# the answer the reader wants.
+$(TESTS_DEPS): $(OBJ_DIR)/%.d : %.c
+	mkdir -p $(OBJ_DIR)
+	$(CC) -MM -MP -MT $(BIN_DIR)/$* -MT $@ -MF $@ $(CFLAGS) $<
+
+# the fixture object's, with the flags it is compiled with: the same source
+# reaches a different path through -DCXL_BUS_PATH, so what it includes is its own
+# question
+$(OBJ_DIR)/cxl_fixture.d: $(LIB_DIR)/cxl.c Makefile $(FLAGS_STAMP)
+	mkdir -p $(OBJ_DIR)
+	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) \
+		-UCXL_BUS_PATH -DCXL_BUS_PATH=\"bus/cxl\" $<
+
+# each binary waits for its own, which the pattern above cannot say: these rules
+# carry no recipe and only add a prerequisite.
+$(TESTS): $(BIN_DIR)/% : $(OBJ_DIR)/%.d
 
 %.o: %.c %.d
 
@@ -811,7 +877,12 @@ $(BIN_DIR)/test_mrrm: test_mrrm.c $(LIB_OBJS)
 # path names. That is not hypothetical - it is what happened when the path
 # became relative, and the ten fixture cases failed until the object was
 # deleted by hand.
-$(OBJ_DIR)/cxl_fixture.o: $(LIB_DIR)/cxl.c $(OBJ_DIR)/cxl.d Makefile
+# Its own .d file and not cxl.o's: a .d file names the object its prerequisites
+# belong to, so depending on cxl.d makes this object wait for that file to be
+# written and inherits nothing from inside it - an edit to cxl.h rebuilt cxl.o and
+# left this one, which test_cxl then linked.
+$(OBJ_DIR)/cxl_fixture.o: $(LIB_DIR)/cxl.c $(OBJ_DIR)/cxl_fixture.d Makefile
+	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -UCXL_BUS_PATH -DCXL_BUS_PATH=\"bus/cxl\" \
 		-c $< -o $@
 

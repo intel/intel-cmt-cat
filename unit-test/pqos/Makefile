@@ -47,9 +47,12 @@ PQOS_SRCS = $(sort $(wildcard $(PQOS_DIR)/*.c))
 PQOS_OBJS = $(PQOS_SRCS:$(PQOS_DIR)/%.c=$(OBJ_DIR)/%.o)
 APP_MOCK_SRCS = $(sort $(wildcard $(APP_MOCK_DIR)/*.c))
 APP_MOCK_OBJS = $(APP_MOCK_SRCS:$(APP_MOCK_DIR)/%.c=$(OBJ_APP_MOCK_DIR)/%.o)
+PQOS_DEPS = $(PQOS_SRCS:$(PQOS_DIR)/%.c=$(OBJ_DIR)/%.d)
+APP_MOCK_DEPS = $(APP_MOCK_SRCS:$(APP_MOCK_DIR)/%.c=$(OBJ_APP_MOCK_DIR)/%.d)
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
 TESTS = $(TESTS_SRCS:%.c=$(BIN_DIR)/%)
+TESTS_DEPS = $(TESTS_SRCS:%.c=$(OBJ_DIR)/%.d)
 
 LDFLAGS = -L$(LIB_DIR) -L$(MOCK_DIR) -L$(GRAB_OUTPUT_DIR) -lpqos -lcmocka -lpqosmock -lgraboutput\
 	-z noexecstack -z relro -z now
@@ -81,12 +84,14 @@ all: $(TESTS)
 # it is out of date. Three things do, and none of them was tracked. The reasoning
 # is unit-test/lib/Makefile's, and applies here word for word.
 #
-# This Makefile, for the wraps and the -D flags. The headers in this directory
-# and in the mock beside it - the test .c files go straight to the link recipes
-# and never become objects, so they have no .d file: caps_gen.h holds the
-# capability fixtures every case is built on, and an edit to it left every binary
-# up to date and every run asserting against the previous fixtures. And the flags
-# that do not come from this file, which flags-stamp.mk records.
+# This Makefile, for the wraps and the -D flags. The headers in this directory and
+# in the mock beside it: the test .c files go straight to the link recipes and
+# never become objects, so what they include is recorded against the binary rather
+# than against an object - $(TESTS_DEPS) below does that - and these wildcards are
+# the belt beside it. caps_gen.h holds the capability fixtures every case is built
+# on, and an edit to it left every binary up to date and every run asserting
+# against the previous fixtures. And the flags that do not come from this file,
+# which flags-stamp.mk records.
 #
 # $(APP_MOCK_OBJS) among the targets, not only $(PQOS_OBJS): those objects are
 # compiled with the $(CFLAGS) defined here and nowhere else, and test_profiles
@@ -95,32 +100,81 @@ all: $(TESTS)
 FLAGS_STAMP_DIR = $(OBJ_DIR)
 include ../flags-stamp.mk
 
-# and on the two libraries these binaries link - the mock and the output capture.
+# and on the three libraries these binaries link - the product library, the mock
+# and the output capture.
 # With SHARED=y each is loaded at run time and a rebuilt one is picked up by
 # itself; with SHARED=n they are archives whose contents are copied in, so a
 # library rebuilt after a flag change left every binary running the code the
 # previous flags produced - test_output_capture asserts through the capture
-# library and nothing else. Named by wildcard because which of the two forms
+# library and nothing else, and every one of them is linked against libpqos
+# itself. Named by wildcard because which of the two forms
 # exists is those builds' choice, made on their own command lines, and as
 # prerequisites only: the link lines below name both with -l and must not be
 # handed a second copy.
+# and on the headers these compilations reach through -I, which are in four
+# directories and not two: $(PQOS_DIR) holds main.h and the utility's own, and
+# ../../pqos/main.c includes both that and the library's pqos.h, so an edit to
+# either left obj/main.o up to date. The objects have recorded dependencies as
+# well, generated below and read through depfiles.mk; these cover the test .c
+# files, which are handed straight to the link recipes and never become objects.
 $(TESTS) $(PQOS_OBJS) $(APP_MOCK_OBJS): Makefile $(wildcard *.h) \
     $(wildcard $(APP_MOCK_DIR)/*.h) $(FLAGS_STAMP) \
+    $(wildcard $(PQOS_DIR)/*.h) $(wildcard $(LIB_DIR)/*.h) \
+    $(wildcard $(MOCK_DIR)/*.h) $(wildcard $(GRAB_OUTPUT_DIR)/*.h) \
     $(wildcard $(MOCK_DIR)/libpqosmock.*) \
-    $(wildcard $(GRAB_OUTPUT_DIR)/libgraboutput.*)
+    $(wildcard $(GRAB_OUTPUT_DIR)/libgraboutput.*) \
+    $(wildcard $(LIB_DIR)/libpqos.*)
 
-$(OBJ_DIR)/main.o: $(PQOS_DIR)/main.c
+# the recorded dependencies follow the flags that produced them, as in
+# unit-test/lib: a .d file lists what the -I set in force at the time reached.
+$(PQOS_DEPS) $(APP_MOCK_DEPS) $(TESTS_DEPS): Makefile $(FLAGS_STAMP)
+
+# and they are read - see depfiles.mk. After "all:" above, so that it is still
+# the default goal.
+DEPFILES_TO_READ = $(PQOS_DEPS) $(APP_MOCK_DEPS) $(TESTS_DEPS)
+include ../depfiles.mk
+
+
+$(OBJ_DIR)/main.o: $(PQOS_DIR)/main.c $(OBJ_DIR)/main.d
 	mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ --redefine-sym main=appmain $@
 
-$(OBJ_DIR)/%.o: $(PQOS_DIR)/%.c
+$(OBJ_DIR)/%.o: $(PQOS_DIR)/%.c $(OBJ_DIR)/%.d
 	mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_APP_MOCK_DIR)/%.o: $(APP_MOCK_DIR)/%.c
+$(OBJ_APP_MOCK_DIR)/%.o: $(APP_MOCK_DIR)/%.c $(OBJ_APP_MOCK_DIR)/%.d
 	mkdir -p $(OBJ_APP_MOCK_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# -MT, because -MM writes the target as a bare "main.o" with no directory in it
+# and the objects here are $(OBJ_DIR)/main.o: a .d file written without it names
+# a target this Makefile never builds, so its prerequisites attach to nothing.
+# The .d file is a target as well, so that a header which stops including
+# another regenerates it - see unit-test/lib/Makefile.
+$(PQOS_DEPS): $(OBJ_DIR)/%.d : $(PQOS_DIR)/%.c
+	mkdir -p $(OBJ_DIR)
+	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) $<
+
+$(APP_MOCK_DEPS): $(OBJ_APP_MOCK_DIR)/%.d : $(APP_MOCK_DIR)/%.c
+	mkdir -p $(OBJ_APP_MOCK_DIR)
+	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) $<
+
+# and the test sources, whose target is the binary: they are compiled inside the
+# link recipes and never become objects. Two of them - test_monitor_utils.c and
+# test_monitor_xml.c - #include a utility source rather than linking the object,
+# and nothing said so: editing ../../pqos/monitor_utils.c left the binary that
+# carries a copy of it up to date. These files list whatever a test source
+# includes, source or header, and a header that is removed is named as a phony
+# target by -MP, so what includes it rebuilds and the compile reports it.
+$(TESTS_DEPS): $(OBJ_DIR)/%.d : %.c
+	mkdir -p $(OBJ_DIR)
+	$(CC) -MM -MP -MT $(BIN_DIR)/$* -MT $@ -MF $@ $(CFLAGS) $<
+
+# each binary waits for its own, which the pattern above cannot say: these rules
+# carry no recipe and only add a prerequisite.
+$(TESTS): $(BIN_DIR)/% : $(OBJ_DIR)/%.d
 
 $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)

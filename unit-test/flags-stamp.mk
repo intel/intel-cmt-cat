@@ -51,6 +51,12 @@
 # -DLOCKFILE=\"/tmp/...\" - and there is no way to pass that through a shell
 # unharmed. $(file ...) needs no shell.
 #
+# The rule below cannot use it: a recipe's $(file ...) is evaluated when make
+# expands the recipe, which is before the mkdir in it has run, so the write finds
+# no directory. It hands the text to the shell through the environment instead -
+# a target-specific export, so the recipe reads one variable and the quotes in it
+# are never a shell's business either.
+#
 # A Makefile including this sets FLAGS_STAMP_DIR to the directory the stamp
 # belongs in, and includes it *after* the last line that adds to the flags.
 
@@ -60,12 +66,73 @@ endif
 
 FLAGS_STAMP = $(FLAGS_STAMP_DIR)/.build-flags
 
-# every variable that decides what is produced here, in one line. AR as well as
-# CC: with SHARED=n the mock and the capture library are archives, and which ar
-# builds them is as much a part of what came out as which compiler did.
-FLAGS_STAMP_TEXT = $(strip $(CC) $(AR) $(CFLAGS) $(LDFLAGS) $(WRAP))
+# every variable that decides what is produced here, in one line.
+#
+# AR as well as CC: with SHARED=n the mock and the capture library are archives,
+# and which ar builds them is as much a part of what came out as which compiler
+# did. CPPFLAGS because unit-test/mock and unit-test/output have no compilation
+# recipe of their own and fall through to make's built-in one, which is
+# "$(CC) $(CPPFLAGS) $(CFLAGS) -c" - so a macro defined there decides what is
+# produced and nothing else here would notice it.
+#
+# One field per variable, named and bracketed, because a plain concatenation does
+# not say where one ends and the next begins: CFLAGS="-DX=1 -pthread" with
+# LDFLAGS="-lm" and CFLAGS="-DX=1" with LDFLAGS="-pthread -lm" are different
+# builds and the same string. Moving a token from one variable to another now
+# changes the text, which is what a stamp is for.
+#
+# The text is also compared as it stands and not through $(strip). strip collapses
+# runs of whitespace wherever they are, including inside a quoted macro value, so
+# -DX="a b" and -DX="a  b" recorded equal and the objects compiled with the first
+# were kept for the second. The brackets make that safe at the ends too: whatever
+# a variable leaves at either of its own ends is inside them.
+FLAGS_STAMP_TEXT = CC=[$(CC)] AR=[$(AR)] CPPFLAGS=[$(CPPFLAGS)] \
+CFLAGS=[$(CFLAGS)] LDFLAGS=[$(LDFLAGS)] WRAP=[$(WRAP)]
 
-ifneq ($(FLAGS_STAMP_TEXT),$(strip $(shell cat $(FLAGS_STAMP) 2>/dev/null)))
+ifneq ($(FLAGS_STAMP_TEXT),$(shell cat $(FLAGS_STAMP) 2>/dev/null))
 $(shell mkdir -p $(FLAGS_STAMP_DIR))
 $(file >$(FLAGS_STAMP),$(FLAGS_STAMP_TEXT))
 endif
+
+# and a rule as well as the write above, for the invocation that removes it after
+# it has been written: "make clean all" writes the stamp while the makefile is
+# read, clean deletes it with the directory it is in, and all then wants a
+# prerequisite that no longer exists - "No rule to make target
+# 'obj/.build-flags'". The write above handles a change of flags; this handles the
+# file not being there.
+$(FLAGS_STAMP): export FLAGS_STAMP_TEXT := $(FLAGS_STAMP_TEXT)
+$(FLAGS_STAMP):
+	@mkdir -p $(@D)
+	@printf '%s' "$$FLAGS_STAMP_TEXT" > $@
+
+# "make clean all" asks for both in one invocation, and make does not serialize
+# goals: under -j the clean deletes what the build is writing - obj/ while a link
+# is reading it, or this stamp after it has been written - and which wins is
+# timing, so an invocation has passed and failed on one tree without anything
+# changing in it. Naming clean as a prerequisite of the other goal is not enough
+# on its own: that orders it before that goal's recipe and not before its other
+# prerequisites, which under -j start while the clean is still running. So the
+# invocation is run serially as well, through a .NOTPARALLEL that only this
+# condition reads. A plain build is parallel as before.
+#
+# Here rather than in each Makefile, because every one of them that records flags
+# has both goals and the same race.
+#
+# Order-only - the "|" - and not an ordinary prerequisite: the library recipes in
+# unit-test/mock and unit-test/output hand $^ to the compiler, so "clean" named
+# the ordinary way arrives on the link line and ld goes looking for a file called
+# clean. Order-only prerequisites are not in $^.
+ifneq ($(filter clean,$(MAKECMDGOALS)),)
+ifneq ($(filter-out clean,$(MAKECMDGOALS)),)
+.NOTPARALLEL:
+# and the edge only where clean was asked for first, which is the order the
+# invocation wants: "make <library> clean" asks to build and then tidy up, and an
+# edge there would delete the objects between them and hand the recipe a $^ whose
+# files are gone. With .NOTPARALLEL above, make takes the goals in the order they
+# were given, which is what the other order needs.
+ifeq ($(firstword $(MAKECMDGOALS)),clean)
+$(filter-out clean,$(MAKECMDGOALS)): | clean
+endif
+endif
+endif
+
