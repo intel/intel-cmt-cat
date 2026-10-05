@@ -34,6 +34,7 @@
 #include "os_allocation.h"
 
 #include "allocation.h"
+#include "allocation_common.h"
 #include "cap.h"
 #include "common.h"
 #include "cpuinfo.h"
@@ -1219,23 +1220,13 @@ os_l3ca_set(const unsigned l3cat_id,
         ASSERT(ca != NULL);
         ASSERT(num_clos != 0);
 
-        /**
-         * Check if class bitmasks are zero.
+        /* one place decides what a zero mask means, so the MMIO
+         * interface can keep the per-domain exception it needs and
+         * these paths cannot drift from each other
          */
-        for (i = 0; i < num_clos; i++) {
-                int is_non_zero = 0;
-
-                if (ca[i].cdp)
-                        is_non_zero =
-                            ca[i].u.s.data_mask && ca[i].u.s.code_mask;
-                else
-                        is_non_zero = ca[i].u.ways_mask;
-
-                if (!is_non_zero) {
-                        LOG_ERROR("L3 CLOS%u bit mask is 0!\n", ca[i].class_id);
-                        return PQOS_RETVAL_PARAM;
-                }
-        }
+        ret = alloc_l3ca_check_bitmasks(ca, num_clos);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         /* Check L3 CBM is non-contiguous */
         if (!cap_get_l3ca_non_contignous()) {

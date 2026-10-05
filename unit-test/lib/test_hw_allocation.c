@@ -314,6 +314,58 @@ test_hw_l3ca_set_param(void **state __attribute__((unused)))
 }
 
 /**
+ * @brief Tests hw_l3ca_set with a class that selects no cache ways
+ *
+ * The check itself lives in allocation_common.c and is tested there; what this
+ * case holds in place is that this path still performs it. A zero mask is a
+ * parameter error on every interface that cannot say otherwise, and nothing
+ * else in hw_l3ca_set refuses one - so with the call gone the library would
+ * program a class with no cache and no case would notice.
+ *
+ * @param [in] state pointer to struct test_data
+ */
+static void
+test_hw_l3ca_set_zero_mask(void **state __attribute__((unused)))
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_l3ca ca[MAX_CA_1] = {};
+        int ret;
+
+        /* non-contiguous masks are allowed here, so the contiguity check is
+         * not what refuses these: a zero mask is not contiguous either, and
+         * with that check in the way this case would pass whether or not the
+         * zero mask check is performed at all
+         */
+        data->cap_l3ca.non_contiguous_cbm = NON_CONTIGUOUS_CBM_SUPPORTED;
+        data->cap_l3ca.cdp = CDP_ENABLED;
+        data->cap_l3ca.cdp_on = CDP_ON;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* the single mask selecting nothing */
+        ca[CA_IDX_ZERO].cdp = CDP_DISABLED;
+        ca[CA_IDX_ZERO].u.ways_mask = 0;
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_CLOS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* and with code and data separated, either of the two */
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = 0;
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_CLOS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ca[CA_IDX_ZERO].u.s.data_mask = 0;
+        ca[CA_IDX_ZERO].u.s.code_mask = CONTIGUOUS_CBM;
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_CLOS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/**
  * @brief This function mocks Non-Contiguous CBM. And it tests hw_l3ca_set
  * function with Non-Contiguous mask(Code, Data and Ways). Since Non-Contiguous
  * CBM is supported, hw_l3ca_set should return PQOS_RETVAL_OK.
@@ -1708,6 +1760,7 @@ main(void)
             cmocka_unit_test(test_hw_l3ca_set_cdp_on),
             cmocka_unit_test(test_hw_l3ca_set_cdp_off),
             cmocka_unit_test(test_hw_l3ca_set_param),
+            cmocka_unit_test(test_hw_l3ca_set_zero_mask),
             cmocka_unit_test(test_hw_l3ca_set_non_contiguous_cbm),
             cmocka_unit_test(test_hw_l3ca_get),
             cmocka_unit_test(test_hw_l3ca_get_cdp),

@@ -64,6 +64,44 @@ extern "C" {
  */
 PQOS_LOCAL int alloc_reset(const struct pqos_alloc_config *cfg);
 
+/**
+ * @brief Refuses a class whose capacity bitmask selects nothing
+ *
+ * A class with a zero mask has no cache to allocate, and every interface that
+ * cannot say otherwise refuses it. The MMIO interface is the one that can: a
+ * domain's CARD structure says whether it supports a zero-length bitmask, so
+ * mmio_allocation.c asks the domain before refusing and keeps a check of its
+ * own rather than calling this.
+ *
+ * With CDP enabled a class carries two masks and needs both, because code and
+ * data are allocated separately: a class whose code mask selects no way, or
+ * whose data mask selects none, is as unusable as one where neither does.
+ *
+ * @param [in] ca the classes to check
+ * @param [in] num_ca how many there are
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK every class selects something
+ * @retval PQOS_RETVAL_PARAM one of them does not, and it was reported
+ */
+PQOS_LOCAL int alloc_l3ca_check_bitmasks(const struct pqos_l3ca *ca,
+                                         const unsigned num_ca);
+
+/**
+ * @brief Refuses an L2 class whose capacity bitmask selects nothing
+ *
+ * The L2 counterpart of alloc_l3ca_check_bitmasks(), on the same terms.
+ *
+ * @param [in] ca the classes to check
+ * @param [in] num_ca how many there are
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK every class selects something
+ * @retval PQOS_RETVAL_PARAM one of them does not, and it was reported
+ */
+PQOS_LOCAL int alloc_l2ca_check_bitmasks(const struct pqos_l2ca *ca,
+                                         const unsigned num_ca);
+
 #ifdef __cplusplus
 }
 #endif

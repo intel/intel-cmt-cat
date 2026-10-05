@@ -262,6 +262,56 @@ test_os_l3ca_set_param(void **state)
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+/**
+ * @brief Tests os_l3ca_set with a class that selects no cache ways
+ *
+ * The check itself lives in allocation_common.c and is tested there; what this
+ * case holds in place is that the resctrl path still performs it. Nothing else
+ * in os_l3ca_set refuses a zero mask, so with the call gone the library would
+ * write a schemata with no ways in it and no case would notice.
+ *
+ * @param [in] state pointer to struct test_data
+ */
+static void
+test_os_l3ca_set_zero_mask(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_l3ca ca[1];
+
+        /* non-contiguous masks are allowed here, so the contiguity check is not
+         * what refuses these: a zero mask is not contiguous either, and with
+         * that check in the way this case would pass whether or not the zero
+         * mask check is performed at all
+         */
+        data->cap_l3ca.non_contiguous_cbm = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* the single mask selecting nothing */
+        ca[0].class_id = 0;
+        ca[0].cdp = 0;
+        ca[0].u.ways_mask = 0;
+
+        ret = os_l3ca_set(0, 1, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* and with code and data separated, either of the two */
+        ca[0].cdp = 1;
+        ca[0].u.s.data_mask = 0xf;
+        ca[0].u.s.code_mask = 0;
+
+        ret = os_l3ca_set(0, 1, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ca[0].u.s.data_mask = 0;
+        ca[0].u.s.code_mask = 0xf;
+
+        ret = os_l3ca_set(0, 1, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
 static void
 test_os_l3ca_set_cdp_off(void **state)
 {
@@ -1597,6 +1647,7 @@ main(void)
 
         const struct CMUnitTest tests_l3ca[] = {
             cmocka_unit_test(test_os_l3ca_set_param),
+            cmocka_unit_test(test_os_l3ca_set_zero_mask),
             cmocka_unit_test(test_os_l3ca_set),
             cmocka_unit_test(test_os_l3ca_set_cdp_on),
             cmocka_unit_test(test_os_l3ca_set_cdp_off),

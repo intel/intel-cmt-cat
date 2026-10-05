@@ -66,6 +66,26 @@
  */
 
 /**
+ * Whether a class of service selects no cache ways, read according to its own
+ * cdp flag: with code and data separated the class carries two masks and needs
+ * both - one whose code mask selects no way, or whose data mask selects none,
+ * is as unusable as one where neither does - and without CDP there is the
+ * single mask.
+ *
+ * Only the masks the class says it carries are named. The code mask is the
+ * other eight bytes of the union that ways_mask starts, so a caller that filled
+ * in ways_mask alone left them as they were, and a check that read them would
+ * be reading a value the caller never set.
+ *
+ * A macro and not a function because the two class structures carry this flag
+ * and this union at different offsets and the union has no type name, so there
+ * is nothing for a function to take that is not the structure itself - and a
+ * function per structure is what this file is removing.
+ */
+#define ALLOC_SELECTS_NOTHING(c)                                               \
+        ((c).cdp ? !((c).u.s.data_mask && (c).u.s.code_mask) : !(c).u.ways_mask)
+
+/**
  * ---------------------------------------
  * Local data structures
  * ---------------------------------------
@@ -82,6 +102,40 @@
  * Internal functions
  * ---------------------------------------
  */
+int
+alloc_l3ca_check_bitmasks(const struct pqos_l3ca *ca, const unsigned num_ca)
+{
+        unsigned i;
+
+        if (ca == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < num_ca; i++)
+                if (ALLOC_SELECTS_NOTHING(ca[i])) {
+                        LOG_ERROR("L3 CLOS%u bit mask is 0!\n", ca[i].class_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+alloc_l2ca_check_bitmasks(const struct pqos_l2ca *ca, const unsigned num_ca)
+{
+        unsigned i;
+
+        if (ca == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < num_ca; i++)
+                if (ALLOC_SELECTS_NOTHING(ca[i])) {
+                        LOG_ERROR("L2 CLOS%u bit mask is 0!\n", ca[i].class_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 alloc_reset(const struct pqos_alloc_config *cfg)
 {

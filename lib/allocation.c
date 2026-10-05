@@ -315,23 +315,13 @@ hw_l3ca_set(const unsigned l3cat_id,
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
 
-        /**
-         * Check if class bitmasks are zero.
+        /* one place decides what a zero mask means, so the MMIO
+         * interface can keep the per-domain exception it needs and
+         * these paths cannot drift from each other
          */
-        for (i = 0; i < num_ca; i++) {
-                int is_non_zero = 0;
-
-                if (ca[i].cdp)
-                        is_non_zero =
-                            ca[i].u.s.data_mask && ca[i].u.s.code_mask;
-                else
-                        is_non_zero = ca[i].u.ways_mask;
-
-                if (!is_non_zero) {
-                        LOG_ERROR("L3 CLOS%u bit mask is 0!\n", ca[i].class_id);
-                        return PQOS_RETVAL_PARAM;
-                }
-        }
+        ret = alloc_l3ca_check_bitmasks(ca, num_ca);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         l3_ways_mask = (1ULL << cpu->l3.num_ways) - 1ULL;
         for (i = 0; i < num_ca; i++) {
