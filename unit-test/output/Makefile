@@ -107,12 +107,16 @@ DEPFILES = $(SRCS:.c=.d)
 # written nowhere else - and every pqos test binary links the library they make,
 # test_output_capture linking nothing else. So a flag change has to rebuild them,
 # or the capture the other cases assert through is the one the previous flags
-# built.
+# built. SHARED and EXTRA_CFLAGS arrive on the command line rather than from the
+# file, and flags-stamp.mk is what records those.
 #
 # The objects and not the library: the link recipe passes $^ to the compiler, so a
 # Makefile named as a prerequisite of the library would be handed to the linker as
 # an object file. Rebuilding an object relinks the library.
-$(OBJS) $(DEPFILES): Makefile $(wildcard *.h)
+FLAGS_STAMP_DIR = .
+include ../flags-stamp.mk
+
+$(OBJS) $(DEPFILES): Makefile $(wildcard *.h) $(FLAGS_STAMP)
 
 %.o: %.c %.d
 
@@ -150,4 +154,4 @@ style:
 
 .PHONY: clean
 clean:
-	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
+	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES) $(FLAGS_STAMP)

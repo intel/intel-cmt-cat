@@ -106,14 +106,19 @@ endif
 
 # The objects here are described by this Makefile - the mock's own flags are
 # written nowhere else - so a flag change has to rebuild them, or the tests link
-# against the library the previous flags built.
+# against the library the previous flags built. SHARED and EXTRA_CFLAGS arrive on
+# the command line rather than from the file, and flags-stamp.mk is what records
+# those.
 #
 # The objects and not the library: the link recipe above passes $^ to the
 # compiler, so a Makefile named as a prerequisite of the library would be handed
 # to the linker as an object file. Rebuilding an object relinks the library.
+FLAGS_STAMP_DIR = .
+include ../flags-stamp.mk
+
 DEPFILES = $(SRCS:.c=.d)
 
-$(OBJS) $(DEPFILES): Makefile $(wildcard *.h)
+$(OBJS) $(DEPFILES): Makefile $(wildcard *.h) $(FLAGS_STAMP)
 
 %.o: %.c %.d
 
@@ -151,4 +156,4 @@ style:
 
 .PHONY: clean
 clean:
-	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
+	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES) $(FLAGS_STAMP)

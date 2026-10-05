@@ -66,7 +66,7 @@ endif
 all: $(TESTS)
 
 # What a binary or an object here is made of, and nothing else, decides whether
-# it is out of date. Two things do, and neither was tracked.
+# it is out of date. Three things do, and none of them was tracked.
 #
 # This Makefile: the -Wl,--wrap= list a test links with, and the -D flags an
 # object is compiled with, are written nowhere else. Without this prerequisite
@@ -84,15 +84,21 @@ all: $(TESTS)
 # built on. A wildcard rather than a list, so a header added later is covered by
 # the next invocation without anybody remembering this line.
 #
-# The cost is that editing either rebuilds everything here, which takes
+# And the flags that do not come from this file at all - DEBUG arrives on the
+# command line - which is what flags-stamp.mk records.
+#
+# The cost is that editing any of the three rebuilds everything here, which takes
 # seconds and is the answer to a question nobody should have to ask.
-$(TESTS) $(LIB_OBJS): Makefile $(wildcard *.h)
+FLAGS_STAMP_DIR = $(OBJ_DIR)
+include ../flags-stamp.mk
+
+$(TESTS) $(LIB_OBJS): Makefile $(wildcard *.h) $(FLAGS_STAMP)
 
 # the recorded dependencies follow the flags that produced them: a .d file lists
 # the headers the -I set in force at the time reached, so a change to that set
 # has to regenerate them - or the objects rebuild once and the next edit to a
 # header only the new search path finds rebuilds nothing.
-$(LIB_DEPS): Makefile
+$(LIB_DEPS): Makefile $(FLAGS_STAMP)
 
 $(OBJ_DIR)/%.o: $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
 	$(CC) $(CFLAGS) -c $< -o $@

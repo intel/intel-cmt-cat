@@ -5,6 +5,7 @@
 *.xml
 *.log
 *.d
+.build-flags
 *.pyc
 *.out
 *.swp
