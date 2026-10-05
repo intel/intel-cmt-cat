@@ -60,8 +60,10 @@ endif
 
 FLAGS_STAMP = $(FLAGS_STAMP_DIR)/.build-flags
 
-# every variable that decides what is produced here, in one line
-FLAGS_STAMP_TEXT = $(strip $(CC) $(CFLAGS) $(LDFLAGS) $(WRAP))
+# every variable that decides what is produced here, in one line. AR as well as
+# CC: with SHARED=n the mock and the capture library are archives, and which ar
+# builds them is as much a part of what came out as which compiler did.
+FLAGS_STAMP_TEXT = $(strip $(CC) $(AR) $(CFLAGS) $(LDFLAGS) $(WRAP))
 
 ifneq ($(FLAGS_STAMP_TEXT),$(strip $(shell cat $(FLAGS_STAMP) 2>/dev/null)))
 $(shell mkdir -p $(FLAGS_STAMP_DIR))

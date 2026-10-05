@@ -92,7 +92,15 @@ all: $(TESTS)
 FLAGS_STAMP_DIR = $(OBJ_DIR)
 include ../flags-stamp.mk
 
-$(TESTS) $(LIB_OBJS): Makefile $(wildcard *.h) $(FLAGS_STAMP)
+# and on the mock library they link. With SHARED=y that library is loaded at run
+# time and a rebuilt one is picked up by itself; with SHARED=n it is an archive
+# whose contents are copied into each binary, so a mock rebuilt after a flag
+# change left every binary running the code the previous flags produced. Named
+# by wildcard because which of the two exists is the mock build's choice, made
+# on its own command line - and as a prerequisite only: the link lines below name
+# the library with -lpqosmock and must not be handed a second copy of it.
+$(TESTS) $(LIB_OBJS): Makefile $(wildcard *.h) $(FLAGS_STAMP) \
+    $(wildcard $(MOCK_DIR)/libpqosmock.*)
 
 # the recorded dependencies follow the flags that produced them: a .d file lists
 # the headers the -I set in force at the time reached, so a change to that set

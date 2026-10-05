@@ -95,8 +95,19 @@ all: $(TESTS)
 FLAGS_STAMP_DIR = $(OBJ_DIR)
 include ../flags-stamp.mk
 
+# and on the two libraries these binaries link - the mock and the output capture.
+# With SHARED=y each is loaded at run time and a rebuilt one is picked up by
+# itself; with SHARED=n they are archives whose contents are copied in, so a
+# library rebuilt after a flag change left every binary running the code the
+# previous flags produced - test_output_capture asserts through the capture
+# library and nothing else. Named by wildcard because which of the two forms
+# exists is those builds' choice, made on their own command lines, and as
+# prerequisites only: the link lines below name both with -l and must not be
+# handed a second copy.
 $(TESTS) $(PQOS_OBJS) $(APP_MOCK_OBJS): Makefile $(wildcard *.h) \
-    $(wildcard $(APP_MOCK_DIR)/*.h) $(FLAGS_STAMP)
+    $(wildcard $(APP_MOCK_DIR)/*.h) $(FLAGS_STAMP) \
+    $(wildcard $(MOCK_DIR)/libpqosmock.*) \
+    $(wildcard $(GRAB_OUTPUT_DIR)/libgraboutput.*)
 
 $(OBJ_DIR)/main.o: $(PQOS_DIR)/main.c
 	mkdir -p $(OBJ_DIR)
