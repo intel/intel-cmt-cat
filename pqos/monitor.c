@@ -2266,13 +2266,13 @@ error_exit:
 /**
  * @brief Reads the virtual channels a --mon-dev device selection names
  *
- * The list itself is list_parse()'s, as every other list option's is. What is
- * this option's own is what it refuses on top of that, and the words it uses: a
- * channel named twice is an error rather than collapsed into one, because two
- * selections of one channel are two monitoring groups the platform cannot
- * tell apart; a descending range is kept in the order written, which is the
- * order the groups are set up and reported in; and a channel outside
- * [0, PQOS_DEV_MAX_CHANNELS) does not exist.
+ * The list itself is list_parse()'s, as it is for every option strlisttotab()
+ * reads. What is this option's own is what it refuses on top of that, and the
+ * words it uses: a channel named twice is an error rather than collapsed into
+ * one, because two selections of one channel are two monitoring groups the
+ * platform cannot tell apart; a descending range is kept in the order written,
+ * which is the order the groups are set up and reported in; and a channel
+ * outside [0, PQOS_DEV_MAX_CHANNELS) does not exist.
  *
  * @param str All virtual channels string passed to
  *            --mon-dev command line option
