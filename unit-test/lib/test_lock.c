@@ -2448,6 +2448,9 @@ test_holder_that_exited_unreaped_is_cleared(void **state
         assert_true(child >= 0);
         if (child == 0)
                 _exit(0);
+        /* tracked first, so an assertion below leaves the teardown to reap it
+         */
+        case_child = child;
         assert_true(became_a_zombie(child));
 
         snprintf(line, sizeof(line), TEST_RECORD, (int)child,
@@ -2455,6 +2458,7 @@ test_holder_that_exited_unreaped_is_cleared(void **state
         a_lock_that_is_cleared(line);
 
         assert_true(waitpid(child, NULL, 0) == child);
+        case_child = -1;
 }
 
 static void
