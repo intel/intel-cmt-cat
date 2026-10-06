@@ -204,8 +204,9 @@ static int m_probe_waiting;
  *
  * The probe is joined where it got the lock. One that did not is left waiting
  * and joinable: the_waiting_probe_drained() joins it once the case gives the
- * lock up, so no probe is still inside lock_release() when the teardown
- * destroys the mutex.
+ * lock up, so no probe is left to take the lock in a later case. The mutex
+ * outlives lock_teardown(), which closes the lock file and leaves the mutex as
+ * it is.
  */
 static int
 another_thread_takes_the_lock(const unsigned ms)
@@ -396,8 +397,9 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
          * No assertion fires while stderr is redirected or while the holder
          * holds the lock: cmocka's assertions leave the case by a longjmp,
          * which would leave stderr pointing at the file for every later case
-         * and the holder spinning with the mutex, for lock_teardown() to
-         * destroy locked. Everything is observed first and asserted last.
+         * and the holder spinning with the mutex - which lock_teardown() does
+         * not touch, so every later case would block on it. Everything is
+         * observed first and asserted last.
          */
         (void)state;
         __atomic_store_n(&m_holder_has, 0, __ATOMIC_RELEASE);
@@ -490,14 +492,15 @@ test_a_release_clears_the_record_in_memory(void **state)
         /* the holder is let go and joined, the probe's refusal observed, the
          * lock released and the probe drained, all before anything is
          * asserted: a failure then leaves no thread spinning and no mutex
-         * held for lock_teardown() to destroy.
+         * held into the later cases.
          *
          * Only a holder that got through its two locks is waiting to be let
          * go. One that did not may be stuck in its second lock_get(), on a
          * lock a release failed to give back: this thread does not lock
          * then, which would block it as well, and the case fails on got_has
-         * once the bounded join has given up - the stuck thread holds the
-         * mutex, and lock_teardown() fails to destroy it rather than block.
+         * once the bounded join has given up. The stuck thread keeps the
+         * mutex, which lock_teardown() leaves alone, so got_has is what
+         * reports it.
          */
         if (got_has)
                 lock_get();

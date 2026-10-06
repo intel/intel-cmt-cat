@@ -63,7 +63,11 @@ extern "C" {
 PQOS_LOCAL int lock_init(void);
 
 /**
- * @brief Uninitializes API locks
+ * @brief Ends the session's hold on the API lock
+ *
+ * Closes and removes the lock file lock_init() took. The API mutex is not
+ * taken down: it lives as long as the process, so a call that arrives after
+ * this still takes it and is refused as a call to a finalized library.
  *
  * @return Operation status
  * @retval 0 success

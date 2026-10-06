@@ -891,9 +891,9 @@ pqos_init(const struct pqos_config *config)
         lock_get();
 
         /* released and not finalised: the lock is taken here only to
-         * serialise with the running session, which is what owns its mutex
-         * and its lock file. lock_fini() would destroy the one and unlink the
-         * other - after which another process initialises beside it
+         * serialise with the running session, which owns the lock file.
+         * lock_fini() would close and unlink it - after which another process
+         * initialises beside it
          */
         ret = _pqos_check_init(0);
         if (ret != PQOS_RETVAL_OK) {
@@ -1188,21 +1188,12 @@ init_error:
                  * here as much as it does in pqos_fini(), and for the same
                  * reason it comes after the lock has been released.
                  *
-                 * And before the lock is destroyed, which is the order
-                 * pqos_fini() uses: a callback still running is free to call
-                 * back into the library, and anything it calls takes the API
-                 * lock - so destroying the lock first leaves it locking a mutex
-                 * that is gone.
-                 *
-                 * The wait is bounded, so that last part is an ordering and not
-                 * a guarantee: a callback that outlives the bound reaches
-                 * lock_fini() having run beside it, and an API called from
-                 * there afterwards is an API called after the library was
-                 * finalized. The header says so where both contracts are
-                 * written down. What would close it in code is the API lock's
-                 * mutex outliving the teardown instead of being destroyed by
-                 * it, which is a change to that module's lifetime rather than
-                 * to this file's order.
+                 * And before lock_fini(), the order pqos_fini() uses. A
+                 * callback that outlives the bounded wait may still call back
+                 * in after that: the API lock lives as long as the process, so
+                 * such a call takes it as usual and is refused as any call
+                 * after a failed pqos_init() is - pqos_fini() too, which
+                 * resets the MMIO mode only once its init check has passed.
                  */
                 log_wait_quiescent();
 
@@ -1222,9 +1213,6 @@ pqos_fini(void)
 
         lock_get();
 
-        if (interface == PQOS_INTER_MMIO)
-                mmio_set_mbm_mba_mode(PQOS_TOTAL_MBM_MBA_MODE, m_sysconf.erdt);
-
         /* and not finalised here either: a pqos_fini() on a library that was
          * never initialised holds no lock file, and the one lock_fini() would
          * unlink is LOCKFILE, the system-wide name - another process's live
@@ -1235,6 +1223,14 @@ pqos_fini(void)
                 lock_release();
                 return ret;
         }
+
+        /* after the check: the interface outlives the session, and its ERDT
+         * does not - freed by a pqos_fini() that has returned, and never there
+         * after a failed MMIO initialisation - so the reset belongs to an
+         * initialised library only
+         */
+        if (interface == PQOS_INTER_MMIO)
+                mmio_set_mbm_mba_mode(PQOS_TOTAL_MBM_MBA_MODE, m_sysconf.erdt);
 
         pqos_mon_fini();
         pqos_alloc_fini();
@@ -1282,6 +1278,10 @@ pqos_fini(void)
          * it: the published contract is that nothing here survives pqos_fini()
          */
         m_sysconf.mem_regions = NULL;
+        /* and these by erdt_fini(), mrrm_fini() and channels_domains_fini() */
+        m_sysconf.erdt = NULL;
+        m_sysconf.mrrm = NULL;
+        m_sysconf.channels_domains = NULL;
 
         m_init_done = 0;
 

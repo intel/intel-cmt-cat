@@ -91,6 +91,10 @@
 
 /* ======== mocks ======== */
 
+/* Kept wrapped although nothing expects a call: the API lock's mutex is
+ * initialised statically and never destroyed, so a call to either here is a
+ * regression, and cmocka fails it as unexpected
+ */
 int
 __wrap_pthread_mutex_init(pthread_mutex_t *restrict mutex,
                           const pthread_mutexattr_t *restrict attr
@@ -898,29 +902,6 @@ test_lock_init_error(void **state __attribute__((unused)))
         will_return(__wrap_pthread_mutex_unlock, 0);
 
         assert_int_equal(lock_init(), -1);
-
-        /* Case 2: open ok, mutex init fails (cleanup: close+unlink) */
-        expect_function_call(__wrap_pthread_mutex_lock);
-        will_return(__wrap_pthread_mutex_lock, 0);
-
-        expect_check_lockdir_access_ok();
-        expect_lockfile_open(0, TEST_LOCK_FD3);
-
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, -1);
-
-        expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, TEST_LOCK_FD3);
-        will_return(__wrap_close, 0);
-
-        expect_function_call(__wrap_unlink);
-        expect_string(__wrap_unlink, pathname, LOCKFILE);
-        will_return(__wrap_unlink, 0);
-
-        expect_function_call(__wrap_pthread_mutex_unlock);
-        will_return(__wrap_pthread_mutex_unlock, 0);
-
-        assert_int_equal(lock_init(), -1);
 }
 
 static void
@@ -933,9 +914,6 @@ test_lock_init_exit(void **state __attribute__((unused)))
         expect_check_lockdir_access_ok();
         expect_lockfile_open(0, TEST_LOCK_FD);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
-
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -945,9 +923,6 @@ test_lock_init_exit(void **state __attribute__((unused)))
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD);
         will_return(__wrap_close, 0);
-
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
 
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
@@ -962,21 +937,15 @@ test_lock_init_exit(void **state __attribute__((unused)))
         expect_check_lockdir_access_ok();
         expect_lockfile_open(0, TEST_LOCK_FD2);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
-
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
         assert_int_equal(lock_init(), 0);
 
-        /* fini: destroy fails */
+        /* fini: close fails, which lock_fini() still reports */
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
-        will_return(__wrap_close, 0);
-
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, -1);
+        will_return(__wrap_close, -1);
 
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
@@ -994,9 +963,6 @@ test_lock_get(void **state __attribute__((unused)))
 
         expect_check_lockdir_access_ok();
         expect_lockfile_open(0, TEST_LOCK_FD2);
-
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
 
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
@@ -1016,9 +982,6 @@ test_lock_get(void **state __attribute__((unused)))
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
         will_return(__wrap_close, 0);
-
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
 
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
@@ -1081,9 +1044,6 @@ test_lock_opens_close_on_exec(void **state __attribute__((unused)))
         expect_check_lockdir_access_ok();
         expect_lockfile_open(0, TEST_LOCK_FD3);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
-
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1106,9 +1066,6 @@ test_lock_opens_close_on_exec(void **state __attribute__((unused)))
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD3);
         will_return(__wrap_close, 0);
-
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
 
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
@@ -1265,8 +1222,6 @@ test_stale_lock_of_another_owner_is_cleared(void **state
 
         expect_lockfile_open(0, TEST_LOCK_FD2);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1275,8 +1230,6 @@ test_stale_lock_of_another_owner_is_cleared(void **state
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, 0);
@@ -1322,8 +1275,6 @@ test_lock_file_that_is_a_directory_is_cleared(void **state
 
         expect_lockfile_open(0, TEST_LOCK_FD3);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1332,8 +1283,6 @@ test_lock_file_that_is_a_directory_is_cleared(void **state
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD3);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         unlink_errno = 0;
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
@@ -1362,8 +1311,6 @@ test_lock_file_is_never_published_empty(void **state __attribute__((unused)))
         expect_check_lockdir_access_ok();
         expect_lockfile_open(0, TEST_LOCK_FD);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1375,8 +1322,6 @@ test_lock_file_is_never_published_empty(void **state __attribute__((unused)))
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, 0);
@@ -1403,8 +1348,6 @@ test_lock_file_is_published_read_only_to_other_users(void **state
         expect_check_lockdir_access_ok();
         expect_lockfile_open(0, TEST_LOCK_FD);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1418,8 +1361,6 @@ test_lock_file_is_published_read_only_to_other_users(void **state
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, 0);
@@ -1799,8 +1740,6 @@ test_a_forged_record_is_not_a_lock(void **state __attribute__((unused)))
 
                 expect_lockfile_open(0, TEST_LOCK_FD2);
 
-                expect_function_call(__wrap_pthread_mutex_init);
-                will_return(__wrap_pthread_mutex_init, 0);
                 expect_function_call(__wrap_pthread_mutex_unlock);
                 will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1809,8 +1748,6 @@ test_a_forged_record_is_not_a_lock(void **state __attribute__((unused)))
                 expect_function_call(__wrap_close);
                 expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
                 will_return(__wrap_close, 0);
-                expect_function_call(__wrap_pthread_mutex_destroy);
-                will_return(__wrap_pthread_mutex_destroy, 0);
                 expect_function_call(__wrap_unlink);
                 expect_string(__wrap_unlink, pathname, LOCKFILE);
                 will_return(__wrap_unlink, 0);
@@ -1970,8 +1907,6 @@ test_lock_file_that_went_away_is_not_an_error(void **state
          */
         expect_lockfile_open(0, TEST_LOCK_FD2);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -1980,8 +1915,6 @@ test_lock_file_that_went_away_is_not_an_error(void **state
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, 0);
@@ -2022,8 +1955,6 @@ a_symlink_at_the_name_is_cleared(int open_errno)
 
         expect_lockfile_open(0, TEST_LOCK_FD3);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -2032,8 +1963,6 @@ a_symlink_at_the_name_is_cleared(int open_errno)
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD3);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, 0);
@@ -2297,8 +2226,6 @@ a_lock_that_is_cleared(const char *line)
 
         expect_lockfile_open(0, TEST_LOCK_FD2);
 
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
 
@@ -2307,8 +2234,6 @@ a_lock_that_is_cleared(const char *line)
         expect_function_call(__wrap_close);
         expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
         will_return(__wrap_close, 0);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         expect_function_call(__wrap_unlink);
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, 0);

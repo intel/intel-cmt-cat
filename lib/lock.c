@@ -175,7 +175,15 @@ lock_release(void)
  * API thread/process safe access is secured through these locks.
  */
 static int m_apilock = -1;
-static pthread_mutex_t m_apilock_mutex;
+/* Initialised statically and never destroyed, so that it outlives lock_init()
+ * and lock_fini(). A log callback that outlives the bounded drain in
+ * pqos_fini() can still call an API after lock_fini(), and with a mutex
+ * destroyed there that call locks a mutex that no longer exists, which is
+ * undefined. A second lock_init() would likewise re-initialise a mutex a live
+ * session may hold. Never destroying it costs nothing: a default mutex holds
+ * no resource.
+ */
+static pthread_mutex_t m_apilock_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pid_t m_pid = 0;
 /**
  * @brief Opens a file as a stream whose descriptor closes on exec
@@ -1014,9 +1022,8 @@ remove_the_lockfile(void)
  * set and cleared through the key instead would be cleared by a call that can
  * fail, and a thread whose clear had failed would look like the holder after
  * giving the lock back - its destructor would then unlock a mutex another
- * thread holds by then, or one pqos_fini() has destroyed. The record is
- * written by its own thread alone, and read by that thread's destructor once
- * the thread is gone.
+ * thread holds by then. The record is written by its own thread alone, and
+ * read by that thread's destructor once the thread is gone.
  *
  * Neither lock_get() nor lock_release() contains a cancellation point between
  * the mutex and the record, so a deferred cancellation cannot land between
@@ -1036,10 +1043,13 @@ remove_the_lockfile(void)
  * pthread_key_create() says EAGAIN when it is spent - fails that
  * initialisation and says so, rather than leave a lock without the record
  * that gives it back; the next initialisation tries again, since a key freed
- * by another library meanwhile makes the next attempt succeed. lock_get()
- * reads the flag without a fence: the initialisation that set it did so under
- * init_mutex before it made the API mutex, and a thread that takes the API
- * mutex has synchronised with the initialisation that made it.
+ * by another library meanwhile makes the next attempt succeed.
+ *
+ * The flag is set with release and read with acquire. The API mutex is static,
+ * so lock_get() may run beside the first lock_init() - an API called while
+ * another thread initialises - and nothing else orders the key's creation,
+ * made under init_mutex, before lock_get() uses the key under the API mutex.
+ * A lock_get() that finds the flag set finds the key made.
  */
 static pthread_key_t m_apilock_held;
 static int m_apilock_held_valid = 0;
@@ -1078,9 +1088,9 @@ lock_held_destructor(void *value)
 __attribute__((destructor)) static void
 lock_held_key_unload(void)
 {
-        if (m_apilock_held_valid) {
+        if (__atomic_load_n(&m_apilock_held_valid, __ATOMIC_ACQUIRE)) {
                 (void)pthread_key_delete(m_apilock_held);
-                m_apilock_held_valid = 0;
+                __atomic_store_n(&m_apilock_held_valid, 0, __ATOMIC_RELEASE);
         }
 }
 
@@ -1097,7 +1107,7 @@ lock_held_key_create(void)
 {
         int err;
 
-        if (m_apilock_held_valid)
+        if (__atomic_load_n(&m_apilock_held_valid, __ATOMIC_ACQUIRE))
                 return 0;
         err = pthread_key_create(&m_apilock_held, lock_held_destructor);
         if (err != 0) {
@@ -1105,7 +1115,7 @@ lock_held_key_create(void)
                         strerror(err));
                 return -1;
         }
-        m_apilock_held_valid = 1;
+        __atomic_store_n(&m_apilock_held_valid, 1, __ATOMIC_RELEASE);
         return 0;
 }
 
@@ -1323,14 +1333,6 @@ lock_init(void)
                 }
         }
 
-        if (pthread_mutex_init(&m_apilock_mutex, NULL) != 0) {
-                close(m_apilock);
-                unlink(LOCKFILE);
-                m_apilock = -1;
-                pthread_mutex_unlock(&init_mutex);
-                return -1;
-        }
-
         pthread_mutex_unlock(&init_mutex);
         return 0;
 }
@@ -1341,9 +1343,6 @@ lock_fini(void)
         int ret = 0;
 
         if (close(m_apilock) != 0)
-                ret = -1;
-
-        if (pthread_mutex_destroy(&m_apilock_mutex) != 0)
                 ret = -1;
 
         /* Remove lock file on exit */
@@ -1375,7 +1374,7 @@ lock_get(void)
          * reported by lock_init(), which failed on it - and this thread has
          * set no value in it yet
          */
-        if (m_apilock_held_valid &&
+        if (__atomic_load_n(&m_apilock_held_valid, __ATOMIC_ACQUIRE) &&
             pthread_getspecific(m_apilock_held) == NULL) {
                 /* armed on the thread's first lock, and kept. A thread whose
                  * value could not be set holds the lock as usual and gives it

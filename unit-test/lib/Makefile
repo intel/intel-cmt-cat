@@ -1062,6 +1062,8 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(LIB_OBJS)
 		-Wl,--wrap=resctrl_is_supported \
 		-Wl,--wrap=machine_init \
 		-Wl,--wrap=machine_fini \
+		-Wl,--wrap=mmio_set_mbm_mba_mode \
+		-Wl,--wrap=cores_domains_fini \
 		-Wl,--wrap=lock_init \
 		-Wl,--wrap=lock_fini \
 		-Wl,--wrap=lock_get \

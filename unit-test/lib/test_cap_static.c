@@ -30,6 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cap.h"
 #include "log.h"
 #include "mock_cap.h"
 #include "pqos.h"
@@ -156,11 +157,13 @@ __wrap_log_init(int fd_log __attribute__((unused)),
 }
 
 /* The drain, which is what says the messages still on their way to the
- * descriptor and the callback are finished with before the lock that a callback
- * calling back into the library would take is destroyed. Wrapped so that the
- * cases can require it between those two: the order is the whole of what this
- * call does for the caller, and without it here a wait removed, or moved after
- * lock_fini(), would pass every case in this file.
+ * descriptor and the callback are finished with before the session's lock file
+ * goes: lock_fini() closes and removes it, and another process may then start a
+ * session, so this one is over only once nothing of it is still running. The
+ * API mutex is not part of that any more - it lives as long as the process.
+ * Wrapped so that the cases can require it between those two: the order is the
+ * whole of what this call does for the caller, and without it here a wait
+ * removed, or moved after lock_fini(), would pass every case in this file.
  */
 void
 __wrap_log_wait_quiescent(void)
@@ -347,6 +350,27 @@ __wrap_pqos_mon_fini(void)
         function_called();
 
         return 0;
+}
+
+/* The MBM/MBA mode reset, which reads the session's ERDT: wrapped so that a
+ * case can require it of an initialised library and of nothing else
+ */
+int
+__wrap_mmio_set_mbm_mba_mode(enum pqos_mbm_mba_modes mode,
+                             const struct pqos_erdt_info *erdt)
+{
+        function_called();
+        check_expected(mode);
+        check_expected_ptr(erdt);
+
+        return PQOS_RETVAL_OK;
+}
+
+/* asserts on a table that only an MMIO initialisation makes */
+void
+__wrap_cores_domains_fini(void)
+{
+        function_called();
 }
 
 int
@@ -1217,6 +1241,64 @@ test_pqos_fini_negative(void **state __attribute__((unused)))
         assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
 }
 
+static void
+test_pqos_fini_mmio(void **state __attribute__((unused)))
+{
+        /* the record is the library's own and handed out read-only; the case
+         * fills in what an MMIO pqos_init() would
+         */
+        union {
+                const struct pqos_sysconfig *ro;
+                struct pqos_sysconfig *rw;
+        } sysconf = {.ro = _pqos_get_sysconfig()};
+        struct pqos_erdt_info erdt;
+        struct pqos_mrrm_info mrrm;
+        struct pqos_channels_domains channels_domains;
+
+        /* pqos_init() records the interface before its MMIO checks can fail,
+         * and pqos_fini() leaves it recorded. A refused pqos_fini() - after a
+         * failed initialisation, or a second one - has no ERDT to reset the
+         * mode with, so it must not reach the reset
+         */
+        _pqos_set_inter(PQOS_INTER_MMIO);
+        expect_function_call(__wrap_lock_get);
+        expect_value(__wrap__pqos_check_init, expect, 1);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_INIT);
+        expect_function_call(__wrap_lock_release);
+        assert_int_equal(pqos_fini(), PQOS_RETVAL_INIT);
+
+        /* an initialised one resets it, and keeps nothing it has freed */
+        sysconf.rw->erdt = &erdt;
+        sysconf.rw->mrrm = &mrrm;
+        sysconf.rw->channels_domains = &channels_domains;
+        expect_function_call(__wrap_lock_get);
+        expect_value(__wrap__pqos_check_init, expect, 1);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_mmio_set_mbm_mba_mode);
+        expect_value(__wrap_mmio_set_mbm_mba_mode, mode,
+                     PQOS_TOTAL_MBM_MBA_MODE);
+        expect_value(__wrap_mmio_set_mbm_mba_mode, erdt, &erdt);
+        expect_function_call(__wrap_pqos_mon_fini);
+        expect_function_call(__wrap_pqos_alloc_fini);
+        expect_function_call(__wrap_cores_domains_fini);
+        expect_function_call(__wrap_cpuinfo_fini);
+        will_return(__wrap_cpuinfo_fini, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_machine_fini);
+        will_return(__wrap_machine_fini, PQOS_RETVAL_OK);
+        log_fini_result = LOG_RETVAL_OK;
+        expect_function_call(__wrap_log_fini);
+        expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_log_wait_quiescent);
+        expect_function_call(__wrap_lock_fini);
+        will_return(__wrap_lock_fini, 0);
+        assert_int_equal(pqos_fini(), PQOS_RETVAL_OK);
+        assert_null(sysconf.ro->erdt);
+        assert_null(sysconf.ro->mrrm);
+        assert_null(sysconf.ro->channels_domains);
+
+        _pqos_set_inter(PQOS_INTER_MSR);
+}
+
 /* ======== pqos_get_available_interfaces ======== */
 
 static void
@@ -1374,6 +1456,7 @@ main(void)
             cmocka_unit_test(test_discover_capabilities_malloc_fail),
             cmocka_unit_test(test_pqos_init_negative),
             cmocka_unit_test(test_pqos_fini_negative),
+            cmocka_unit_test(test_pqos_fini_mmio),
             cmocka_unit_test(test_get_available_interfaces_param),
 #ifdef __linux__
             cmocka_unit_test(test_get_available_interfaces_mmio_msr_os),

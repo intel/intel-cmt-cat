@@ -316,13 +316,14 @@ typedef uint32_t pqos_rmid_t;
  * the reference is still given back when the message ends, and what the call
  * promises about other threads' messages is unchanged.
  *
- * And once the library is finalized, no callback may call in at all. Up to that
- * point one reached outside the lock may: the wait is done with the API lock
- * released, so a call made while the library is still finalizing takes a lock
- * that is still there. Once the call returns, the library is finalized and
- * its synchronization has been taken down with it, so an API called from such a
- * callback is an API called after pqos_fini() - which no application may do at
- * all, and which from here cannot even be refused in an orderly way.
+ * And once the library is finalized, a callback that calls in is refused like
+ * any other call after pqos_fini(). Up to that point one reached outside the
+ * lock may call in: the wait is done with the API lock released, so a call made
+ * while the library is still finalizing takes the lock as usual. The lock
+ * itself lives as long as the process - pqos_fini() closes and removes the
+ * session's lock file, not the mutex - so a call that arrives after the return
+ * still takes it, finds the library finalized, and is refused: an API that
+ * returns a status returns PQOS_RETVAL_INIT, a second pqos_fini() included.
  * @param verbose logging options
  *         LOG_VER_SILENT         - no messages
  *         LOG_VER_DEFAULT        - warning and error messages
