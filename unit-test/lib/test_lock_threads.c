@@ -41,8 +41,13 @@
 
 #include "lock.h"
 #include "test.h"
+#include "test_lock.h"
 
+#include <errno.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -59,6 +64,32 @@ static int m_probe_got;
 static int m_holder_has;
 /** set by the case when the holder may leave */
 static int m_holder_go;
+
+/** the error the next pthread_key_create() / pthread_setspecific() call
+ *  returns, zero to pass it through. Positive, as pthread functions return
+ *  them
+ */
+static int m_key_create_error;
+static int m_setspecific_error;
+
+int
+__wrap_pthread_key_create(pthread_key_t *key, void (*destructor)(void *))
+{
+        if (m_key_create_error != 0)
+                return m_key_create_error;
+        return __real_pthread_key_create(key, destructor);
+}
+
+int
+__wrap_pthread_setspecific(pthread_key_t key, const void *value)
+{
+        const int err =
+            __atomic_exchange_n(&m_setspecific_error, 0, __ATOMIC_ACQ_REL);
+
+        if (err != 0)
+                return err;
+        return __real_pthread_setspecific(key, value);
+}
 
 static void
 sleep_ms(const unsigned ms)
@@ -208,14 +239,101 @@ test_a_released_lock_is_not_given_back_twice(void **state)
         assert_true(wait_for(&m_probe_got, FREE_WAIT_MS));
 }
 
+static void
+test_a_holder_that_is_not_recorded_is_reported(void **state)
+{
+        char buf[256] = "";
+        FILE *captured;
+        int saved;
+
+        /* The record could not be made: the call still holds the lock and
+         * gives it back on return, and what it cannot do - give it back on a
+         * thread exit - is said rather than left silent.
+         */
+        (void)state;
+        captured = tmpfile();
+        assert_non_null(captured);
+        fflush(stderr);
+        saved = dup(STDERR_FILENO);
+        assert_true(saved >= 0);
+        assert_true(dup2(fileno(captured), STDERR_FILENO) >= 0);
+
+        __atomic_store_n(&m_setspecific_error, ENOMEM, __ATOMIC_RELEASE);
+        lock_get();
+
+        fflush(stderr);
+        assert_true(dup2(saved, STDERR_FILENO) >= 0);
+        close(saved);
+        rewind(captured);
+        (void)fread(buf, 1, sizeof(buf) - 1, captured);
+        fclose(captured);
+        assert_non_null(strstr(buf, "API lock holder not recorded"));
+
+        assert_false(another_thread_takes_the_lock(300));
+        lock_release();
+        assert_true(wait_for(&m_probe_got, FREE_WAIT_MS));
+}
+
+static void
+test_a_key_that_cannot_be_created_fails_init(void **state)
+{
+        pid_t pid;
+        int status = -1;
+
+        /* In a child: the key is made once per process, so a failure here is
+         * permanent for whoever sees it, and the other cases need a key.
+         */
+        (void)state;
+        fflush(stdout);
+        fflush(stderr);
+        pid = fork();
+        assert_true(pid >= 0);
+        if (pid == 0) {
+                m_key_create_error = EAGAIN;
+                /* refused, and before the lock file was made - one an
+                 * earlier run left is this binary's own, and goes first
+                 */
+                (void)unlink(LOCKFILE);
+                _exit(lock_init() == -1 && access(LOCKFILE, F_OK) != 0 ? 0 : 1);
+        }
+
+        assert_int_equal(waitpid(pid, &status, 0), pid);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+}
+
+/** The lock as the library sets it up, with its own lock file */
+static int
+lock_setup(void **state)
+{
+        (void)state;
+        return lock_init();
+}
+
+static int
+lock_teardown(void **state)
+{
+        (void)state;
+        return lock_fini();
+}
+
 int
 main(void)
 {
+        int result = 0;
+
+        const struct CMUnitTest tests_init[] = {
+            cmocka_unit_test(test_a_key_that_cannot_be_created_fails_init)};
+
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_a_released_lock_is_not_given_back_twice),
             cmocka_unit_test(
                 test_a_thread_that_exits_holding_the_lock_gives_it_back),
-            cmocka_unit_test(test_a_cancelled_thread_gives_the_lock_back)};
+            cmocka_unit_test(test_a_cancelled_thread_gives_the_lock_back),
+            cmocka_unit_test(test_a_holder_that_is_not_recorded_is_reported)};
 
-        return cmocka_run_group_tests(tests, NULL, NULL);
+        result += cmocka_run_group_tests(tests_init, NULL, NULL);
+        result += cmocka_run_group_tests(tests, lock_setup, lock_teardown);
+
+        return result;
 }

@@ -34,12 +34,19 @@
 #define __TEST_LOCK_H
 
 #include <aio.h>
+#include <pthread.h>
 #include <stddef.h>
 
 #define LOCKFILENO 9999
 
 int __real_open(const char *path, int oflags, int mode);
 int __real_close(int fildes);
+
+/* test_lock_threads.c, linked with --wrap=pthread_key_create and
+ * --wrap=pthread_setspecific
+ */
+int __real_pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
+int __real_pthread_setspecific(pthread_key_t key, const void *value);
 int __real_lockf(int fd, int cmd, off_t len);
 
 #endif /* __TEST_LOCK_H */

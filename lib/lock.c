@@ -996,6 +996,62 @@ remove_the_lockfile(void)
         return -1;
 }
 
+/**
+ * Whether this thread holds the API lock, so that a thread which leaves while
+ * holding it gives it back.
+ *
+ * An API call takes the lock, does its work - which logs - and releases it. A
+ * log callback that leaves by pthread_exit() or a cancellation never returns
+ * to the release, and every later API call on any thread would wait on the
+ * lock for ever. A cleanup handler around each call would have to pair with it
+ * lexically in fifty-odd places, several with more than one return. A key's
+ * destructor needs neither: POSIX runs it when a thread exits or is cancelled
+ * with a non-NULL value, and the value is non-NULL exactly while this thread
+ * holds the lock, so the destructor unlocks a mutex the exiting thread owns.
+ *
+ * Neither lock_get() nor lock_release() contains a cancellation point between
+ * the mutex and the key, so a deferred cancellation cannot land between them.
+ *
+ * The key is created once per process, by the first lock_init(), which can
+ * fail and say so: a key that could not be created fails the initialisation,
+ * this one and every later one, rather than leaving a lock without the record
+ * that gives it back. lock_get() goes through the same pthread_once(), which is
+ * what orders its read of the flag after the creation.
+ */
+static pthread_key_t m_apilock_held;
+static pthread_once_t m_apilock_held_once = PTHREAD_ONCE_INIT;
+static int m_apilock_held_valid = 0;
+
+/**
+ * @brief Gives back the API lock of a thread leaving without releasing it
+ *
+ * @param [in] held this thread's value for the key, non-NULL while it holds
+ *             the lock
+ */
+static void
+lock_held_destructor(void *held)
+{
+        (void)held;
+        pthread_mutex_unlock(&m_apilock_mutex);
+}
+
+/**
+ * @brief Creates the key, once per process
+ */
+static void
+lock_held_key_create(void)
+{
+        const int err =
+            pthread_key_create(&m_apilock_held, lock_held_destructor);
+
+        if (err != 0) {
+                fprintf(stderr, "Couldn't create the API lock key: %s\n",
+                        strerror(err));
+                return;
+        }
+        m_apilock_held_valid = 1;
+}
+
 int
 lock_init(void)
 {
@@ -1005,6 +1061,13 @@ lock_init(void)
         static pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
 
         pthread_mutex_lock(&init_mutex);
+
+        /* the record that gives the lock back, before anything is created */
+        if (pthread_once(&m_apilock_held_once, lock_held_key_create) != 0 ||
+            !m_apilock_held_valid) {
+                pthread_mutex_unlock(&init_mutex);
+                return -1;
+        }
 
         /* Check directory access */
         if (check_lockdir_access() != 0) {
@@ -1235,49 +1298,6 @@ lock_fini(void)
         return ret;
 }
 
-/**
- * Whether this thread holds the API lock, so that a thread which leaves while
- * holding it gives it back.
- *
- * An API call takes the lock, does its work - which logs - and releases it. A
- * log callback that leaves by pthread_exit() or a cancellation never returns
- * to the release, and every later API call on any thread would wait on the
- * lock for ever. A cleanup handler around each call would have to pair with it
- * lexically in fifty-odd places, several with more than one return. A key's
- * destructor needs neither: POSIX runs it when a thread exits or is cancelled
- * with a non-NULL value, and the value is non-NULL exactly while this thread
- * holds the lock, so the destructor unlocks a mutex the exiting thread owns.
- *
- * Neither lock_get() nor lock_release() contains a cancellation point between
- * the mutex and the key, so a deferred cancellation cannot land between them.
- */
-static pthread_key_t m_apilock_held;
-static pthread_once_t m_apilock_held_once = PTHREAD_ONCE_INIT;
-static int m_apilock_held_valid = 0;
-
-/**
- * @brief Gives back the API lock of a thread leaving without releasing it
- *
- * @param [in] held this thread's value for the key, non-NULL while it holds
- *             the lock
- */
-static void
-lock_held_destructor(void *held)
-{
-        (void)held;
-        pthread_mutex_unlock(&m_apilock_mutex);
-}
-
-/**
- * @brief Creates the key, once per process
- */
-static void
-lock_held_key_create(void)
-{
-        m_apilock_held_valid =
-            pthread_key_create(&m_apilock_held, lock_held_destructor) == 0;
-}
-
 void
 lock_get(void)
 {
@@ -1286,16 +1306,32 @@ lock_get(void)
                 return;
         }
 
+        /* clear only where the key could not be created, which lock_init()
+         * has already reported and failed on
+         */
         (void)pthread_once(&m_apilock_held_once, lock_held_key_create);
-        if (m_apilock_held_valid)
-                (void)pthread_setspecific(m_apilock_held, &m_apilock_held);
+        if (m_apilock_held_valid) {
+                const int err =
+                    pthread_setspecific(m_apilock_held, &m_apilock_held);
+
+                if (err != 0)
+                        fprintf(stderr,
+                                "API lock holder not recorded, a thread that "
+                                "exits holding it will not give it back: %s\n",
+                                strerror(err));
+        }
 }
 
 void
 lock_release(void)
 {
-        if (m_apilock_held_valid)
-                (void)pthread_setspecific(m_apilock_held, NULL);
+        if (m_apilock_held_valid) {
+                const int err = pthread_setspecific(m_apilock_held, NULL);
+
+                if (err != 0)
+                        fprintf(stderr, "API lock holder not cleared: %s\n",
+                                strerror(err));
+        }
 
         if (pthread_mutex_unlock(&m_apilock_mutex) != 0)
                 fprintf(stderr, "API mutex unlock error: %s\n",
