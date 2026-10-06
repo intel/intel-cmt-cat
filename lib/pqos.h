@@ -1298,14 +1298,13 @@ struct pqos_mem_region {
  * the link out in a way this library could not follow - an empty name is
  * unknown, not absent, and a report says so rather than dropping the device.
  *
- * No capacity of the device itself appears here, because a capacity beside a
- * region size is not the comparison it looks like: where the platform puts an
- * extended linear cache in front of the device, the region covers both and is
- * twice the size of the device that backs it. The third figure that explains
- * that is a memory side cache, which HMAT declares and
- * pqos_mem_region::mem_side_cache carries - so the comparison is available to a
- * caller that wants it, and printing a capacity beside a region size is a
- * decision about the report rather than a missing figure.
+ * The device's own capacity is carried beside the region's range, and the two
+ * are not the same figure: where the platform puts an extended linear cache in
+ * front of the device, the region covers both and is twice the size of the
+ * device that backs it. The third figure that reconciles them is the memory
+ * side cache HMAT declares, which pqos_mem_region::mem_side_cache carries. An
+ * interleaved region is backed by its ways together, so there the region is
+ * compared against the sum of its devices.
  */
 struct pqos_cxl_device {
         /** the PCI function the device sits on, e.g. "0000:11:00.0" */
@@ -1323,6 +1322,17 @@ struct pqos_cxl_device {
         int address_valid;
         uint64_t base_address;
         uint64_t size;
+        /** whether the device reported its capacity, without which the two
+         *  fields below are zero. Clear where the device could not be named,
+         *  where it publishes neither partition, or where one it publishes
+         *  could not be read: half a capacity is not a capacity
+         */
+        int capacity_valid;
+        /** the device's volatile and persistent partitions, in bytes. A
+         *  partition the operating system does not publish is zero
+         */
+        uint64_t ram_capacity;
+        uint64_t pmem_capacity;
 };
 
 /**

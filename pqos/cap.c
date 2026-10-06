@@ -1189,15 +1189,11 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
  * committed, leaves the same question open. Printing an empty list for any of
  * them would say the platform has no devices.
  *
- * A device's own capacity is deliberately absent. Where the platform puts an
- * extended linear cache in front of the device, a region covers the device and
- * the cache both and is twice the size of what backs it, so a capacity printed
- * beside a region size reads as a contradiction without the third figure - the
- * memory side cache HMAT declares, which the Memory Side Cache block above
- * prints. So the figure that was missing is here; what is not is the capacity
- * itself, which this library does not read from the devices, and adding both
- * the reading and the column is a change of its own rather than part of
- * describing the cache.
+ * Each device is followed by its capacity, by partition. Where the platform
+ * puts an extended linear cache in front of the device, a region covers the
+ * device and the cache both and is twice the size of what backs it, so the
+ * capacity beside the region's range is not a contradiction: the Memory Side
+ * Cache block above prints the figure that makes up the difference.
  *
  * @param [in] regions the memory regions
  * @param [in] region the region to print the devices of
@@ -1250,6 +1246,15 @@ cap_print_region_devices(const struct pqos_mem_regions *regions,
                     dev->mem_name[0] != '\0' ? dev->mem_name : "unknown",
                     dev->region_name[0] != '\0' ? dev->region_name : "unknown",
                     dev->base_address, dev->size);
+
+                /* on a line of its own, so the device line reads as it did */
+                if (dev->capacity_valid)
+                        printf("      Capacity : RAM 0x%" PRIx64
+                               ", PMEM 0x%" PRIx64 "\n",
+                               dev->ram_capacity, dev->pmem_capacity);
+                else
+                        printf("      Capacity : Unknown - the device does not "
+                               "report it\n");
         }
 
         /* and a list of devices is not the claim that it is the whole list.

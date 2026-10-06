@@ -60,16 +60,14 @@ extern "C" {
  * address range of their region, which is what makes them comparable to the
  * ranges MRRM describes.
  *
- * Capacities the devices declare are deliberately not among the fields, and the
- * reason is not that they disagree with the region size but that they agree
- * with it in a way a region size alone cannot show. On the platform this was
- * measured on the region is twice the device: the region's size covers the
- * device's memory and the extended linear cache in front of it, which the
- * kernel reports as the region's extended_linear_cache_size and HMAT declares
- * as a memory side cache for the same proximity domain. A device capacity
- * printed beside a region size needs that third figure to make sense, and the
- * memory region description now carries it, so what is left is a decision about
- * which figures this report prints rather than one it could not obtain.
+ * Each device also carries its capacity, read from the partitions the kernel
+ * publishes for it. On the platform this was measured on the region is twice
+ * the device: the region's size covers the device's memory and the extended
+ * linear cache in front of it, which the kernel reports as the region's
+ * extended_linear_cache_size and HMAT declares as a memory side cache for the
+ * same proximity domain. So a capacity is not compared against a region size
+ * alone: the memory region description carries the cache that makes up the
+ * difference.
  *
  * A region is read only where the operating system says it is committed, which
  * is the point at which it decodes the address range it was configured with.

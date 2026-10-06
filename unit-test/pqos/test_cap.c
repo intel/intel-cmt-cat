@@ -758,6 +758,84 @@ test_cap_print_region_cache_without_a_target_domain(void **state)
         assert_int_equal(cache_block_has("None declared"), 0);
 }
 
+/* ------------------------------------------------------------------------
+ * The CXL Devices block of the memory region report
+ * ------------------------------------------------------------------------
+ */
+
+static unsigned device_index[1] = {0};
+static struct pqos_cxl_device device;
+
+/**
+ * @brief The cache report's region, with one device behind it
+ *
+ * @param [in] capacity_valid whether the device reported its capacity
+ *
+ * @return the sysconfig to hand cap_print_mem_regions()
+ */
+static struct pqos_sysconfig
+device_report(int capacity_valid)
+{
+        struct pqos_sysconfig sys = cache_report(1, 1);
+
+        memset(&device, 0, sizeof(device));
+        strcpy(device.pci_address, "0000:11:00.0");
+        strcpy(device.mem_name, "mem0");
+        strcpy(device.region_name, "region0");
+        device.address_valid = 1;
+        device.base_address = 0x6200000000ULL;
+        device.size = 0x4000000000ULL;
+        device.capacity_valid = capacity_valid;
+        if (capacity_valid)
+                device.ram_capacity = 0x2000000000ULL;
+
+        cache_regions.cxl_devices_available = 1;
+        cache_regions.cxl_devices_complete = 1;
+        cache_regions.num_cxl_devices = 1;
+        cache_regions.cxl_device = &device;
+        cache_region.num_cxl_devices = 1;
+        cache_region.cxl_device_index = device_index;
+
+        return sys;
+}
+
+static void
+test_cap_print_region_devices_with_a_capacity(void **state)
+{
+        struct pqos_sysconfig sys = device_report(1);
+
+        UNUSED_ARG(state);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* the device line reads as it did, and the capacity is under it */
+        assert_int_equal(output_has_text("    0000:11:00.0  mem0  region0  "
+                                         "0x6200000000 + 0x4000000000\n"
+                                         "      Capacity : RAM 0x2000000000, "
+                                         "PMEM 0x0\n"),
+                         1);
+}
+
+static void
+test_cap_print_region_devices_without_a_capacity(void **state)
+{
+        struct pqos_sysconfig sys = device_report(0);
+
+        UNUSED_ARG(state);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_mem_regions, &sys);
+
+        /* unknown, not a device of no bytes */
+        assert_int_equal(output_has_text("      Capacity : Unknown - the "
+                                         "device does not report it\n"),
+                         1);
+        assert_int_equal(output_has_text("RAM 0x"), 0);
+}
+
 int
 main(void)
 {
@@ -793,9 +871,15 @@ main(void)
             cmocka_unit_test(
                 test_cap_print_region_cache_without_a_target_domain)};
 
+        const struct CMUnitTest tests_print_region_devices[] = {
+            cmocka_unit_test(test_cap_print_region_devices_with_a_capacity),
+            cmocka_unit_test(test_cap_print_region_devices_without_a_capacity)};
+
         result += cmocka_run_group_tests(tests_print_io_dev,
                                          test_cap_group_setup, NULL);
         result += cmocka_run_group_tests(tests_print_region_cache,
+                                         test_cap_group_setup, NULL);
+        result += cmocka_run_group_tests(tests_print_region_devices,
                                          test_cap_group_setup, NULL);
 
         return result;

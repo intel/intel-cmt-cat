@@ -44,6 +44,7 @@
  *   .../endpoint4/uport -> .../0000:11:00.0/mem0
  *                                           and that endpoint names the device
  *                                           and the PCI function it sits on
+ *   .../mem0/ram/size, .../mem0/pmem/size   whose partitions are its capacity
  *
  * An interleaved region has a target per way, so a region can name several
  * devices, and each is reported with the region's address range: the range is
@@ -197,6 +198,57 @@ read_attribute(const char *path, char *buf, size_t size)
 }
 
 /**
+ * @brief Reads the capacity of one memory device
+ *
+ * The kernel publishes a device's capacity as its partitions, volatile and
+ * persistent, each a directory with a size in it. A partition it does not
+ * publish is one the device does not have; one it publishes and that cannot be
+ * read leaves the capacity unknown, because the sum without it would be a
+ * smaller device than the one there is.
+ *
+ * @param [in] memdev the device's own directory, resolved
+ * @param [out] device where the capacity goes, untouched unless it was read
+ */
+static void
+read_capacity(const char *memdev, struct pqos_cxl_device *device)
+{
+        static const char *const partitions[] = {"ram", "pmem"};
+        char path[PATH_MAX + sizeof("/pmem/size")];
+        uint64_t sizes[2] = {0, 0};
+        unsigned published = 0;
+        unsigned i;
+
+        for (i = 0; i < DIM(partitions); i++) {
+                int known = 1;
+
+                snprintf(path, sizeof(path), "%s/%s/size", memdev,
+                         partitions[i]);
+                if (!path_exists(path, &known)) {
+                        if (!known)
+                                return;
+                        continue;
+                }
+
+                if (pqos_fread_uint64(path, 16, &sizes[i]) != PQOS_RETVAL_OK) {
+                        LOG_WARN("CXL: %s could not be read\n", path);
+
+                        return;
+                }
+                published++;
+        }
+
+        if (published == 0) {
+                LOG_DEBUG("CXL: %s publishes no partition\n", memdev);
+
+                return;
+        }
+
+        device->capacity_valid = 1;
+        device->ram_capacity = sizes[0];
+        device->pmem_capacity = sizes[1];
+}
+
+/**
  * @brief Names the memory device and PCI function behind one endpoint decoder
  *
  * @param [in] decoder the decoder named by a region's target, e.g. "decoder4.0"
@@ -239,6 +291,11 @@ name_device(const char *decoder, struct pqos_cxl_device *device)
 
                 return;
         }
+
+        /* the uport is the device's own directory, so its capacity is read
+         * from here, before the path is cut into the two names
+         */
+        read_capacity(resolved, device);
 
         name = strrchr(resolved, '/');
         if (name == NULL)

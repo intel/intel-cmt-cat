@@ -214,6 +214,25 @@ fixture_target(const char *region,
                     FIXTURE_PCI, pci, mem, FIXTURE_DEVS, endpoint);
 }
 
+/**
+ * @brief Gives a memory device one partition, the way the kernel publishes it
+ *
+ * @param [in] pci the PCI function the device sits on
+ * @param [in] mem the memory device
+ * @param [in] partition "ram" or "pmem"
+ * @param [in] size what its size attribute says
+ */
+static void
+fixture_partition(const char *pci,
+                  const char *mem,
+                  const char *partition,
+                  const char *size)
+{
+        fixture_run("mkdir -p %s/%s/%s/%s", FIXTURE_PCI, pci, mem, partition);
+        fixture_run("echo %s > %s/%s/%s/%s/size", size, FIXTURE_PCI, pci, mem,
+                    partition);
+}
+
 /** One region, one device, everything readable: the platform the report was
  *  written against
  */
@@ -573,6 +592,223 @@ test_cxl_ignores_what_is_not_a_region(void **state)
         (void)state;
 }
 
+static void
+test_cxl_reads_the_capacity_of_a_device(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* the region is twice the device, as it is behind an extended linear
+         * cache: the capacity is the device's own and not the region's
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
+        fixture_partition("0000:11:00.0", "mem0", "pmem", "0x1000000000");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_int_equal(devices[0].capacity_valid, 1);
+        assert_true(devices[0].ram_capacity == 0x2000000000ULL);
+        assert_true(devices[0].pmem_capacity == 0x1000000000ULL);
+        assert_true(devices[0].size == 0x4000000000ULL);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
+test_cxl_reads_a_capacity_with_one_partition(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* a partition the kernel does not publish is one the device does not
+         * have, so the capacity is the other one
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_int_equal(devices[0].capacity_valid, 1);
+        assert_true(devices[0].ram_capacity == 0x2000000000ULL);
+        assert_true(devices[0].pmem_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
+test_cxl_reports_an_absent_capacity_as_absent(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* no partition at all: the device is reported, placed and named, and
+         * its capacity is unknown rather than zero bytes
+         */
+        fixture_one_device();
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(complete, 1);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_string_equal(devices[0].mem_name, "mem0");
+        assert_int_equal(devices[0].capacity_valid, 0);
+        assert_true(devices[0].ram_capacity == 0);
+        assert_true(devices[0].pmem_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
+test_cxl_drops_half_a_capacity(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* one partition read and the other published and unreadable: the sum
+         * of what was read would be a smaller device than the one there is
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
+        fixture_partition("0000:11:00.0", "mem0", "pmem", "garbage");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_int_equal(devices[0].capacity_valid, 0);
+        assert_true(devices[0].ram_capacity == 0);
+        assert_true(devices[0].pmem_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
+test_cxl_drops_a_capacity_it_could_not_ask_about(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+        int ret;
+
+        /* a partition nobody may look into is not a partition the device does
+         * not have: whether it is there is unknown, and so is the capacity
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
+        fixture_partition("0000:11:00.0", "mem0", "pmem", "0x1000000000");
+        fixture_run("chmod 000 %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
+        if (access(FIXTURE_PCI "/0000:11:00.0/mem0/pmem/size", F_OK) == 0) {
+                /* a user the permission does not stop has nothing to check */
+                fixture_run("chmod 755 %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
+                skip();
+        }
+
+        ret = cxl_devices_read(&available, &complete, &num, &devices);
+        /* back before anything is asserted, so the teardown can remove it */
+        fixture_run("chmod 755 %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_int_equal(devices[0].capacity_valid, 0);
+        assert_true(devices[0].ram_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
+test_cxl_reads_the_capacity_of_each_interleave_way(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* a region over several devices: each carries its own capacity, and
+         * the second has none published - which leaves the first's standing
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x1000000000");
+        fixture_target("region0", 1, "endpoint5", "decoder5.0", "0000:22:00.0",
+                       "mem1");
+        fixture_target("region0", 2, "endpoint6", "decoder6.0", "0000:33:00.0",
+                       "mem2");
+        fixture_partition("0000:33:00.0", "mem2", "ram", "0x3000000000");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(complete, 1);
+        assert_int_equal(num, 3);
+        assert_non_null(devices);
+
+        assert_string_equal(devices[0].mem_name, "mem0");
+        assert_int_equal(devices[0].capacity_valid, 1);
+        assert_true(devices[0].ram_capacity == 0x1000000000ULL);
+
+        assert_string_equal(devices[1].mem_name, "mem1");
+        assert_int_equal(devices[1].capacity_valid, 0);
+
+        assert_string_equal(devices[2].mem_name, "mem2");
+        assert_int_equal(devices[2].capacity_valid, 1);
+        assert_true(devices[2].ram_capacity == 0x3000000000ULL);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
+test_cxl_has_no_capacity_for_a_device_it_could_not_name(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* the partitions are there, and the chain that leads to them is not:
+         * a device that cannot be found has no capacity to read
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
+        fixture_run("rm -f %s/endpoint4/uport", FIXTURE_DEVS);
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_int_equal(devices[0].mem_name[0], '\0');
+        assert_int_equal(devices[0].capacity_valid, 0);
+        assert_true(devices[0].ram_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
 #else /* !__linux__ */
 
 /**
@@ -642,6 +878,26 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_cxl_ignores_what_is_not_a_region, fixture_setup,
                 fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_reads_the_capacity_of_a_device, fixture_setup,
+                fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_reads_a_capacity_with_one_partition, fixture_setup,
+                fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_reports_an_absent_capacity_as_absent, fixture_setup,
+                fixture_teardown),
+            cmocka_unit_test_setup_teardown(test_cxl_drops_half_a_capacity,
+                                            fixture_setup, fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_drops_a_capacity_it_could_not_ask_about, fixture_setup,
+                fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_reads_the_capacity_of_each_interleave_way,
+                fixture_setup, fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_has_no_capacity_for_a_device_it_could_not_name,
+                fixture_setup, fixture_teardown),
 #else
             cmocka_unit_test(test_cxl_answers_without_a_sysfs),
 #endif
