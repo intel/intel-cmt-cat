@@ -84,6 +84,7 @@ lock_release(void)
 #include <inttypes.h> /* PRIu64 */
 #include <limits.h>   /* INT_MAX */
 #include <pthread.h>
+#include <signal.h> /* kill() */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -227,7 +228,9 @@ static uint64_t m_start_time = 0;
  *
  * ENOENT is the first answer and not the second: a process that has gone has no
  * /proc entry, and a platform that publishes none has no /proc entry either -
- * neither is a failure to look.
+ * neither is a failure to look. On Linux it is checked with kill(pid, 0) first,
+ * because hidepid=2 gives a live process no entry either: one the kernel says
+ * is there is the third answer, with EACCES.
  *
  * @param [in] pid process id
  * @param [out] start_time the start time, zero where there is no record
@@ -253,8 +256,26 @@ get_process_start_time(pid_t pid, uint64_t *start_time)
         snprintf(stat_path, sizeof(stat_path), "/proc/%d/stat", pid);
         FILE *fp = fopen_cloexec(stat_path, O_RDONLY, "r", 0);
 
-        if (!fp)
-                return errno == ENOENT ? 0 : -1;
+        if (!fp) {
+                if (errno != ENOENT)
+                        return -1;
+#ifdef __linux__
+                /* No entry is not proof of no process: a /proc mounted with
+                 * hidepid=2 hides a live process from a caller that may still
+                 * be allowed to unlink its lock, and reading that as a holder
+                 * that has gone runs a second session beside it. The kernel is
+                 * asked directly, and only "no such process" is an absence -
+                 * one that is there and hidden cannot be examined
+                 */
+                if (kill(pid, 0) == 0 || errno == EPERM) {
+                        errno = EACCES;
+                        return -1;
+                }
+                if (errno != ESRCH)
+                        return -1;
+#endif
+                return 0;
+        }
 
         /* The whole record and not one line of it. The process name is field 2
          * and may contain a newline - this kernel does not escape one,

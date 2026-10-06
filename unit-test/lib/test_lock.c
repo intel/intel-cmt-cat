@@ -1577,6 +1577,43 @@ test_holder_whose_start_time_cannot_be_read_is_kept(void **state
 }
 
 static void
+test_holder_hidden_from_proc_is_kept(void **state __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* The ENOENT a /proc mounted with hidepid=2 gives for a live process
+         * this caller may not see. No entry is not no process, and a holder
+         * read as gone on the strength of it has its lock removed while it
+         * runs. The kernel says the child is there, so the lock stays and the
+         * caller is told it could not look.
+         */
+        child = start_a_child();
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child,
+                 start_time_of(child));
+        snprintf(proc_fail_path, sizeof(proc_fail_path), "/proc/%d/stat",
+                 (int)child);
+
+        content_fd = file_holding(line);
+        proc_open_errno = ENOENT;
+
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(EEXIST, -1);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        /* refused, and no unlink armed, so removing it fails this case */
+        assert_int_equal(lock_init(), -1);
+        assert_non_null(strstr(last_stderr, strerror(EACCES)));
+
+        stop_a_child(child);
+}
+
+static void
 test_holder_whose_record_is_cut_short_is_kept(void **state
                                               __attribute__((unused)))
 {
@@ -2381,6 +2418,7 @@ main(void)
             LOCK_CASE(test_lock_file_that_cannot_be_read_is_not_cleared),
 #ifdef __linux__
             LOCK_CASE(test_holder_whose_start_time_cannot_be_read_is_kept),
+            LOCK_CASE(test_holder_hidden_from_proc_is_kept),
             LOCK_CASE(test_holder_whose_record_is_cut_short_is_kept),
             LOCK_CASE(test_a_start_time_above_32_bits_is_carried),
             LOCK_CASE(test_a_forged_record_is_not_a_lock),
