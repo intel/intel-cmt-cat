@@ -2387,6 +2387,108 @@ test_a_current_record_of_a_reused_pid_is_cleared(void **state
 }
 #endif /* __linux__ */
 
+#ifdef __linux__
+/**
+ * @brief Waits until a process reads as a zombie in /proc, or the time is up
+ *
+ * @param [in] pid the process
+ *
+ * @return whether it did
+ */
+static int
+became_a_zombie(pid_t pid)
+{
+        char path[64];
+        char buf[512];
+        int tries;
+
+        snprintf(path, sizeof(path), "/proc/%d/stat", (int)pid);
+        for (tries = 0; tries < 200; tries++) {
+                FILE *f = fopen(path, "r");
+                size_t got = 0;
+                char *p;
+
+                if (f != NULL) {
+                        got = fread(buf, 1, sizeof(buf) - 1, f);
+                        fclose(f);
+                }
+                buf[got] = '\0';
+                p = strrchr(buf, ')');
+                if (p != NULL && p[1] == ' ' && p[2] == 'Z')
+                        return 1;
+                usleep(10000);
+        }
+        return 0;
+}
+
+static void *
+runs_until_killed(void *arg)
+{
+        (void)arg;
+        for (;;)
+                pause();
+        return NULL;
+}
+
+static void
+test_holder_that_exited_unreaped_is_cleared(void **state
+                                            __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* A holder killed without releasing the lock, whose parent has not
+         * waited for it yet: its /proc entry is still there with the start time
+         * it had, and nothing of it is running. Held until the reap, which may
+         * never come, the lock would be lost to every later caller.
+         */
+        fflush(stdout);
+        fflush(stderr);
+        child = fork();
+        assert_true(child >= 0);
+        if (child == 0)
+                _exit(0);
+        assert_true(became_a_zombie(child));
+
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child,
+                 start_time_of(child));
+        a_lock_that_is_cleared(line);
+
+        assert_true(waitpid(child, NULL, 0) == child);
+}
+
+static void
+test_holder_whose_leader_exited_is_kept(void **state __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* and a zombie leader is not that: one that called pthread_exit() with
+         * another thread still running reads as a zombie too, and its session
+         * is alive in that thread
+         */
+        fflush(stdout);
+        fflush(stderr);
+        child = fork();
+        assert_true(child >= 0);
+        if (child == 0) {
+                pthread_t worker;
+
+                if (pthread_create(&worker, NULL, runs_until_killed, NULL) != 0)
+                        _exit(1);
+                pthread_exit(NULL);
+        }
+        case_child = child;
+        assert_true(became_a_zombie(child));
+
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child,
+                 start_time_of(child));
+        a_lock_that_is_held(line);
+
+        stop_a_child(child);
+}
+#endif /* __linux__ */
+
 int
 main(void)
 {
@@ -2419,6 +2521,8 @@ main(void)
 #ifdef __linux__
             LOCK_CASE(test_holder_whose_start_time_cannot_be_read_is_kept),
             LOCK_CASE(test_holder_hidden_from_proc_is_kept),
+            LOCK_CASE(test_holder_that_exited_unreaped_is_cleared),
+            LOCK_CASE(test_holder_whose_leader_exited_is_kept),
             LOCK_CASE(test_holder_whose_record_is_cut_short_is_kept),
             LOCK_CASE(test_a_start_time_above_32_bits_is_carried),
             LOCK_CASE(test_a_forged_record_is_not_a_lock),

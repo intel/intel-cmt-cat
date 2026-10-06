@@ -117,13 +117,13 @@ lock_release(void)
  * the write test would be testing a directory the lock is not in. Both come
  * from LOCKFILE itself, through lockfile_dir() below.
  */
-#define PROBE_NAME                  "pqos-probe-XXXXXX"
+#define PROBE_NAME                    "pqos-probe-XXXXXX"
 /* Room for the directory LOCKFILE is in, or for a probe file beside it. The
  * directory is at most two characters shorter than LOCKFILE - the name it holds
  * and the separator - and what goes in their place is the probe's name and a
  * terminator, so the two sizes together are always enough.
  */
-#define LOCKFILE_PATH_LEN           (sizeof(LOCKFILE) + sizeof(PROBE_NAME))
+#define LOCKFILE_PATH_LEN             (sizeof(LOCKFILE) + sizeof(PROBE_NAME))
 /* The mode the lock file is published with: readable by everybody, writable by
  * the caller that holds it and by nobody else.
  *
@@ -135,14 +135,14 @@ lock_release(void)
  * root-owned lock has it read as a dead holder, after which the next caller
  * removes it and runs beside the session that still holds it.
  */
-#define LOCKFILE_PERMS              0644
-#define MAX_LINE                    128
+#define LOCKFILE_PERMS                0644
+#define MAX_LINE                      128
 /* The third field of a record this library writes. Earlier libraries wrote two
  * numbers and no version, and the second was not the start time - their walk
  * over /proc/<pid>/stat read field 23 - so a record without this field cannot
  * be checked against a start time, and is not read as though it could be.
  */
-#define LOCKFILE_RECORD_VERSION     2
+#define LOCKFILE_RECORD_VERSION       2
 /* /proc/<pid>/stat field 22 is the process start time. The walk below starts
  * after field 2 - the process name in parentheses, which may contain spaces and
  * parentheses of its own, so it is found by the *last* ')' on the line and not
@@ -157,9 +157,19 @@ lock_release(void)
  * lock somebody else was holding. Either way the protection against a reused
  * PID did nothing.
  */
-#define PROC_STAT_FIELDS_AFTER_COMM 19
-#define STAT_PATH_LENGTH            64
-#define PROCFILE_BUF_LEN            1024
+#define PROC_STAT_FIELDS_AFTER_COMM   19
+/* Field 3 is the state and field 20 the number of threads, which together say
+ * whether anything of the process is still running: a process that has exited
+ * and not been reaped is a zombie with its start time intact, and a lock it
+ * left would look held for as long as its parent does not wait for it. A
+ * zombie counts as gone only with no thread but its leader - a leader that
+ * called pthread_exit() is a zombie too, while its other threads hold the
+ * session. Measured: an unreaped child reads "Z" and 1; a leader that exited
+ * beside a running thread reads "Z" and 2, and "Z" and 1 once that thread ends.
+ */
+#define PROC_STAT_THREADS_AFTER_STATE 17
+#define STAT_PATH_LENGTH              64
+#define PROCFILE_BUF_LEN              1024
 
 /**
  * API thread/process safe access is secured through these locks.
@@ -237,7 +247,8 @@ static uint64_t m_start_time = 0;
  *
  * @return Operation status
  * @retval 1 a start time was read
- * @retval 0 there is no record for \a pid
+ * @retval 0 there is no record for \a pid, or only one of a process that has
+ *         exited and is waiting to be reaped
  * @retval -1 the record could not be read, with errno set
  */
 static int
@@ -250,6 +261,8 @@ get_process_start_time(pid_t pid, uint64_t *start_time)
         int i;
         size_t nread;
         uint64_t value = 0;
+        char state;
+        long threads = 0;
 
         *start_time = 0;
 
@@ -339,6 +352,7 @@ get_process_start_time(pid_t pid, uint64_t *start_time)
                 return -1;
         }
         p += 2;
+        state = *p;
 
         for (i = 0; i < PROC_STAT_FIELDS_AFTER_COMM; ++i) {
                 p = strchr(p, ' ');
@@ -348,6 +362,8 @@ get_process_start_time(pid_t pid, uint64_t *start_time)
                         return -1;
                 }
                 ++p;
+                if (i == PROC_STAT_THREADS_AFTER_STATE - 1)
+                        threads = strtol(p, NULL, 10);
         }
 
         /* a record that does not parse is the same answer: the entry is there
@@ -364,6 +380,12 @@ get_process_start_time(pid_t pid, uint64_t *start_time)
         }
         if (errno != 0)
                 return -1;
+
+        /* nothing of it is running any more: what is left is waiting to be
+         * reaped, which is no holder at all
+         */
+        if ((state == 'Z' || state == 'X') && threads <= 1)
+                return 0;
 
         *start_time = value;
 
