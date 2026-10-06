@@ -1118,16 +1118,15 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         will_return(__wrap_lock_init, -1);
         assert_int_equal(pqos_init(&cfg), PQOS_RETVAL_ERROR);
 
-        // fail at _pqos_check_init
+        // fail at _pqos_check_init: already initialised. The lock is
+        // released and not finalised - it is the running session's, and no
+        // lock_fini() is expected, so one called here fails the case
         expect_function_call(__wrap_lock_init);
         will_return(__wrap_lock_init, 0);
         expect_function_call(__wrap_lock_get);
         expect_value(__wrap__pqos_check_init, expect, 0);
         will_return(__wrap__pqos_check_init, PQOS_RETVAL_INIT);
-        // cleanup
         expect_function_call(__wrap_lock_release);
-        expect_function_call(__wrap_lock_fini);
-        will_return(__wrap_lock_fini, 0);
         assert_int_equal(pqos_init(&cfg), PQOS_RETVAL_INIT);
 
         // fail at log_init;
@@ -1190,12 +1189,14 @@ test_pqos_init_negative(void **state __attribute__((unused)))
 static void
 test_pqos_fini_negative(void **state __attribute__((unused)))
 {
+        /* never initialised: released, not finalised. lock_fini() would
+         * unlink LOCKFILE, which is the system-wide name and so another
+         * process's live lock; no call to it is expected
+         */
         expect_function_call(__wrap_lock_get);
         expect_function_call(__wrap_lock_release);
         expect_value(__wrap__pqos_check_init, expect, 1);
         will_return(__wrap__pqos_check_init, PQOS_RETVAL_INIT);
-        expect_function_call(__wrap_lock_fini);
-        will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
 
         expect_function_call(__wrap_lock_get);

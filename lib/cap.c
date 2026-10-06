@@ -890,10 +890,15 @@ pqos_init(const struct pqos_config *config)
 
         lock_get();
 
+        /* released and not finalised: the lock this call would tear down is
+         * not one it took. Already initialised means the session that is
+         * running owns it, and lock_fini() would destroy that session's mutex
+         * and unlink its lock file - after which another process initialises
+         * beside it
+         */
         ret = _pqos_check_init(0);
         if (ret != PQOS_RETVAL_OK) {
                 lock_release();
-                lock_fini();
                 return ret;
         }
 
@@ -1221,10 +1226,14 @@ pqos_fini(void)
         if (interface == PQOS_INTER_MMIO)
                 mmio_set_mbm_mba_mode(PQOS_TOTAL_MBM_MBA_MODE, m_sysconf.erdt);
 
+        /* and not finalised here either: a pqos_fini() on a library that was
+         * never initialised holds no lock file, and the one lock_fini() would
+         * unlink is LOCKFILE, the system-wide name - another process's live
+         * lock, which a third process could then take beside it
+         */
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 lock_release();
-                lock_fini();
                 return ret;
         }
 
