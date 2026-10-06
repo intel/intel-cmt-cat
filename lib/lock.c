@@ -1235,16 +1235,68 @@ lock_fini(void)
         return ret;
 }
 
+/**
+ * Whether this thread holds the API lock, so that a thread which leaves while
+ * holding it gives it back.
+ *
+ * An API call takes the lock, does its work - which logs - and releases it. A
+ * log callback that leaves by pthread_exit() or a cancellation never returns
+ * to the release, and every later API call on any thread would wait on the
+ * lock for ever. A cleanup handler around each call would have to pair with it
+ * lexically in fifty-odd places, several with more than one return. A key's
+ * destructor needs neither: POSIX runs it when a thread exits or is cancelled
+ * with a non-NULL value, and the value is non-NULL exactly while this thread
+ * holds the lock, so the destructor unlocks a mutex the exiting thread owns.
+ *
+ * Neither lock_get() nor lock_release() contains a cancellation point between
+ * the mutex and the key, so a deferred cancellation cannot land between them.
+ */
+static pthread_key_t m_apilock_held;
+static pthread_once_t m_apilock_held_once = PTHREAD_ONCE_INIT;
+static int m_apilock_held_valid = 0;
+
+/**
+ * @brief Gives back the API lock of a thread leaving without releasing it
+ *
+ * @param [in] held this thread's value for the key, non-NULL while it holds
+ *             the lock
+ */
+static void
+lock_held_destructor(void *held)
+{
+        (void)held;
+        pthread_mutex_unlock(&m_apilock_mutex);
+}
+
+/**
+ * @brief Creates the key, once per process
+ */
+static void
+lock_held_key_create(void)
+{
+        m_apilock_held_valid =
+            pthread_key_create(&m_apilock_held, lock_held_destructor) == 0;
+}
+
 void
 lock_get(void)
 {
-        if (pthread_mutex_lock(&m_apilock_mutex) != 0)
+        if (pthread_mutex_lock(&m_apilock_mutex) != 0) {
                 fprintf(stderr, "API mutex lock error: %s\n", strerror(errno));
+                return;
+        }
+
+        (void)pthread_once(&m_apilock_held_once, lock_held_key_create);
+        if (m_apilock_held_valid)
+                (void)pthread_setspecific(m_apilock_held, &m_apilock_held);
 }
 
 void
 lock_release(void)
 {
+        if (m_apilock_held_valid)
+                (void)pthread_setspecific(m_apilock_held, NULL);
+
         if (pthread_mutex_unlock(&m_apilock_mutex) != 0)
                 fprintf(stderr, "API mutex unlock error: %s\n",
                         strerror(errno));
