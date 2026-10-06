@@ -201,10 +201,10 @@ read_attribute(const char *path, char *buf, size_t size)
  * @brief Reads the capacity of one memory device
  *
  * The kernel publishes a device's capacity as its partitions, volatile and
- * persistent, each a directory with a size in it. A partition it does not
- * publish is one the device does not have; one it publishes and that cannot be
- * read leaves the capacity unknown, because the sum without it would be a
- * smaller device than the one there is.
+ * persistent, each a directory with a size in it. A partition whose directory
+ * is not there is one the device does not have; one whose directory is there
+ * and whose size cannot be read leaves the capacity unknown, because the sum
+ * without it would be a smaller device than the one there is.
  *
  * @param [in] memdev the device's own directory, resolved
  * @param [out] device where the capacity goes, untouched unless it was read
@@ -221,14 +221,19 @@ read_capacity(const char *memdev, struct pqos_cxl_device *device)
         for (i = 0; i < DIM(partitions); i++) {
                 int known = 1;
 
-                snprintf(path, sizeof(path), "%s/%s/size", memdev,
-                         partitions[i]);
+                /* published is the partition's directory being there; its
+                 * size is then a figure the device owes, and one that cannot
+                 * be read leaves the capacity unknown rather than short
+                 */
+                snprintf(path, sizeof(path), "%s/%s", memdev, partitions[i]);
                 if (!path_exists(path, &known)) {
                         if (!known)
                                 return;
                         continue;
                 }
 
+                snprintf(path, sizeof(path), "%s/%s/size", memdev,
+                         partitions[i]);
                 if (pqos_fread_uint64(path, 16, &sizes[i]) != PQOS_RETVAL_OK) {
                         LOG_WARN("CXL: %s could not be read\n", path);
 

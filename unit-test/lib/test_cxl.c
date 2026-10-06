@@ -705,6 +705,33 @@ test_cxl_drops_half_a_capacity(void **state)
 }
 
 static void
+test_cxl_drops_a_partition_without_a_size(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+
+        /* the partition is published and says nothing about its size: that is
+         * not a partition of no bytes, and the other one is not the device
+         */
+        fixture_one_device();
+        fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
+        fixture_run("mkdir -p %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(num, 1);
+        assert_non_null(devices);
+        assert_int_equal(devices[0].capacity_valid, 0);
+        assert_true(devices[0].ram_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
 test_cxl_drops_a_capacity_it_could_not_ask_about(void **state)
 {
         struct pqos_cxl_device *devices = NULL;
@@ -889,6 +916,9 @@ main(void)
                 fixture_teardown),
             cmocka_unit_test_setup_teardown(test_cxl_drops_half_a_capacity,
                                             fixture_setup, fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_drops_a_partition_without_a_size, fixture_setup,
+                fixture_teardown),
             cmocka_unit_test_setup_teardown(
                 test_cxl_drops_a_capacity_it_could_not_ask_about, fixture_setup,
                 fixture_teardown),
