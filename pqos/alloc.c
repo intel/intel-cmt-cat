@@ -2809,7 +2809,6 @@ selfn_alloc_mem_regions(const char *arg)
 {
         char *str = NULL;
         unsigned int i = 0;
-        unsigned int j = 0;
         unsigned int n = 0;
 
         if (arg == NULL)
@@ -2824,10 +2823,14 @@ selfn_alloc_mem_regions(const char *arg)
         for (i = 0; i < PQOS_MAX_MEM_REGIONS; i++)
                 sel_alloc_mem_regions.region_num[i] = -1;
 
+        /* the messages below print arg and not str: strlisttotab() writes
+         * over the commas and dashes of what it is given, so after it str is
+         * only the first element of the list the user typed
+         */
         n = strlisttotab(str, sel_alloc_mem_regions.region_num,
                          PQOS_MAX_MEM_REGIONS);
         if (n == 0) {
-                printf("No Mem Region specified: %s\n", str);
+                printf("No Mem Region specified: %s\n", arg);
                 exit(EXIT_FAILURE);
         }
 
@@ -2837,25 +2840,17 @@ selfn_alloc_mem_regions(const char *arg)
         for (i = 0; i < n; i++) {
                 if (sel_alloc_mem_regions.region_num[i] >=
                     PQOS_MAX_MEM_REGIONS) {
-                        printf("Mem Region out of range: %s\n", str);
+                        print_out_of_range("Mem Region",
+                                           sel_alloc_mem_regions.region_num[i],
+                                           arg);
                         exit(EXIT_FAILURE);
                 }
         }
 
-        /* Check duplicate memory region entry */
-        for (i = 0; i < n; i++) {
-                for (j = i + 1; j < n; j++) {
-                        if (sel_alloc_mem_regions.region_num[i] ==
-                            sel_alloc_mem_regions.region_num[j]) {
-                                parse_error(str,
-                                            "Duplicate Mem Region selection");
-                                printf("The Mem Region %ld is entered two "
-                                       "times\n",
-                                       sel_alloc_mem_regions.region_num[i]);
-                                exit(EXIT_FAILURE);
-                        }
-                }
-        }
+        /* A region named twice needs nothing here, as with the domain list:
+         * strlisttotab() drops a repeat before storing it, so the table cannot
+         * hold one, and "duplicates dropped" is what this option documents.
+         */
 
         free(str);
 }

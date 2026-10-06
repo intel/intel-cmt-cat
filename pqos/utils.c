@@ -507,6 +507,20 @@ realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size)
         return tmp_ptr;
 }
 
+void
+print_out_of_range(const char *what, const uint64_t value, const char *list)
+{
+        /* the value first, so the line reads the same as it always did where
+         * the list was that one value; and the list as typed where it was
+         * more, so the user can find the value in it
+         */
+        if (strchr(list, ',') != NULL || strchr(list, '-') != NULL)
+                printf("%s out of range: %" PRIu64 " in %s\n", what, value,
+                       list);
+        else
+                printf("%s out of range: %" PRIu64 "\n", what, value);
+}
+
 unsigned
 selfn_domain_id_list(const char *arg, uint64_t *tab, const unsigned max)
 {
@@ -521,16 +535,19 @@ selfn_domain_id_list(const char *arg, uint64_t *tab, const unsigned max)
 
         selfn_strdup(&str, arg);
 
+        /* arg and not str in the messages: strlisttotab() leaves str holding
+         * only the first element of the list
+         */
         n = strlisttotab(str, tab, max);
         if (n == 0) {
-                printf("No Domain ID specified: %s\n", str);
+                printf("No Domain ID specified: %s\n", arg);
                 exit(EXIT_FAILURE);
         }
 
         /* an identifier this platform cannot have */
         for (i = 0; i < n; i++) {
                 if (tab[i] >= MAX_DOMAINS) {
-                        printf("Domain ID out of range: %s\n", str);
+                        print_out_of_range("Domain ID", tab[i], arg);
                         exit(EXIT_FAILURE);
                 }
         }

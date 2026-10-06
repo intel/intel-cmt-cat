@@ -1939,6 +1939,80 @@ test_alloc_check_options_rejects_bandwidth_flag_without_class(void **state)
         }
 }
 
+static void
+test_alloc_mem_regions_names_the_value_and_the_list(void **state)
+{
+        (void)state;
+
+        /* the ticket's own case: the parser leaves its buffer holding "4",
+         * so the message used to say "4" of a list the user typed as "4-5"
+         */
+        run_void_function(selfn_alloc_mem_regions, "4-5");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(output_has_text("Mem Region out of range: 4 in 4-5"));
+}
+
+static void
+test_alloc_mem_regions_one_value_reads_as_before(void **state)
+{
+        (void)state;
+
+        run_void_function(selfn_alloc_mem_regions, "8");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(output_has_text("Mem Region out of range: 8"));
+        assert_false(output_has_text(" in 8"));
+}
+
+static void
+test_alloc_mem_regions_repeat_is_one_selection(void **state)
+{
+        (void)state;
+
+        /* "duplicates dropped" is what the option documents */
+        run_void_function(selfn_alloc_mem_regions, "1,1,0-1");
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(sel_alloc_mem_regions.num_mem_regions, 2);
+        assert_int_equal(sel_alloc_mem_regions.region_num[0], 1);
+        assert_int_equal(sel_alloc_mem_regions.region_num[1], 0);
+}
+
+static void
+test_alloc_mem_regions_empty_list_is_printed_whole(void **state)
+{
+        (void)state;
+
+        run_void_function(selfn_alloc_mem_regions, ",");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(output_has_text("No Mem Region specified: ,"));
+}
+
+static void
+test_alloc_domain_id_names_the_value_and_the_list(void **state)
+{
+        (void)state;
+
+        run_void_function(selfn_alloc_domain_id, "0,70000");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(
+            output_has_text("Domain ID out of range: 70000 in 0,70000"));
+
+        /* and a single value in the exact form the functional suite asserts */
+        run_void_function(selfn_alloc_domain_id, "70000");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(output_has_text("Domain ID out of range: 70000"));
+        assert_false(output_has_text(" in 70000"));
+}
+
+static void
+test_alloc_domain_id_repeat_is_one_selection(void **state)
+{
+        (void)state;
+
+        run_void_function(selfn_alloc_domain_id, "3,3");
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(sel_alloc_domain_id.num_domain_ids, 1);
+}
+
 int
 main(void)
 {
@@ -1970,7 +2044,15 @@ main(void)
                                       cleanup_alloc_opts),
             cmocka_unit_test(test_alloc_print_config_negative),
             cmocka_unit_test(test_fill_dev_tab_rejects_invalid_vc),
-            cmocka_unit_test(test_fill_dev_tab_prints_the_standard_device_id)};
+            cmocka_unit_test(test_fill_dev_tab_prints_the_standard_device_id),
+            cmocka_unit_test(
+                test_alloc_mem_regions_names_the_value_and_the_list),
+            cmocka_unit_test(test_alloc_mem_regions_one_value_reads_as_before),
+            cmocka_unit_test(test_alloc_mem_regions_repeat_is_one_selection),
+            cmocka_unit_test(
+                test_alloc_mem_regions_empty_list_is_printed_whole),
+            cmocka_unit_test(test_alloc_domain_id_names_the_value_and_the_list),
+            cmocka_unit_test(test_alloc_domain_id_repeat_is_one_selection)};
 
         const struct CMUnitTest tests_need_all_caps[] = {
             cmocka_unit_test(test_alloc_print_config_msr),

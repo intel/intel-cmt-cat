@@ -174,6 +174,20 @@ unsigned strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max);
 void *realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size);
 
 /**
+ * @brief Says that a value in a list given on the command line is out of range
+ *
+ * Prints "<what> out of range: <value>", and " in <list>" where the list held
+ * more than that one value. The list is the argument as the user typed it,
+ * which strlisttotab() does not leave intact in its own buffer.
+ *
+ * @param [in] what what the values are, as the message names them
+ * @param [in] value the one that is out of range
+ * @param [in] list the argument it came from
+ */
+void
+print_out_of_range(const char *what, const uint64_t value, const char *list);
+
+/**
  * @brief Reads a domain identifier list given on the command line
  *
  * Three options take one - --dump-domain-id, --dump-rmid-domain-ids and
