@@ -133,13 +133,21 @@ NOLDCONFIG ?= n
 
 all: $(LIBNAME)
 
+# The form that was not built goes once this one is made. Consumers link with
+# -lpqos, and the linker prefers a .so where both are there, so a "make
+# SHARED=n" that left the shared library from an earlier build in place had
+# every consumer link that one instead of the archive just built. After the
+# build and not before it, so that a build which fails leaves what was working
+# where it was.
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(LIB).so.$(SO_VERSION) -o $(LIBNAME) $^ -lc
 	ln -f -s $(LIBNAME) $(LIB).so.$(SO_VERSION)
 	ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
+	rm -f $(LIB).a
 else
 	$(AR) crvsD $@ $^
+	rm -f $(LIB).so $(LIB).so.$(SO_VERSION) $(LIB).so.$(VERSION)
 endif
 
 install: $(LIBNAME)
