@@ -510,15 +510,15 @@ realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size)
 void
 print_out_of_range(const char *what, const uint64_t value, const char *list)
 {
-        /* the value first, so the line reads the same as it always did where
-         * the list was that one value; and the list as typed where it was
-         * more, so the user can find the value in it
+        /* a list of one value is printed as typed, which is how the line has
+         * always read - "0x8" stays "0x8". A longer one gets the value at
+         * fault and the list as typed, so the user can find the value in it
          */
         if (strchr(list, ',') != NULL || strchr(list, '-') != NULL)
                 printf("%s out of range: %" PRIu64 " in %s\n", what, value,
                        list);
         else
-                printf("%s out of range: %" PRIu64 "\n", what, value);
+                printf("%s out of range: %s\n", what, list);
 }
 
 unsigned

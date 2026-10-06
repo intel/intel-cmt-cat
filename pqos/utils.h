@@ -176,9 +176,10 @@ void *realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size);
 /**
  * @brief Says that a value in a list given on the command line is out of range
  *
- * Prints "<what> out of range: <value>", and " in <list>" where the list held
- * more than that one value. The list is the argument as the user typed it,
- * which strlisttotab() does not leave intact in its own buffer.
+ * Prints "<what> out of range: <list>" where the list is one value, as typed,
+ * and "<what> out of range: <value> in <list>" where it held more. The list is
+ * the argument as the user typed it, which strlisttotab() does not leave intact
+ * in its own buffer.
  *
  * @param [in] what what the values are, as the message names them
  * @param [in] value the one that is out of range

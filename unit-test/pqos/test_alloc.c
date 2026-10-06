@@ -1961,6 +1961,11 @@ test_alloc_mem_regions_one_value_reads_as_before(void **state)
         assert_int_equal(output_exit_was_called(), 1);
         assert_true(output_has_text("Mem Region out of range: 8"));
         assert_false(output_has_text(" in 8"));
+
+        /* as typed, not as parsed */
+        run_void_function(selfn_alloc_mem_regions, "0x8");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(output_has_text("Mem Region out of range: 0x8\n"));
 }
 
 static void
@@ -2001,6 +2006,10 @@ test_alloc_domain_id_names_the_value_and_the_list(void **state)
         assert_int_equal(output_exit_was_called(), 1);
         assert_true(output_has_text("Domain ID out of range: 70000"));
         assert_false(output_has_text(" in 70000"));
+
+        run_void_function(selfn_alloc_domain_id, "0x11170");
+        assert_int_equal(output_exit_was_called(), 1);
+        assert_true(output_has_text("Domain ID out of range: 0x11170\n"));
 }
 
 static void
