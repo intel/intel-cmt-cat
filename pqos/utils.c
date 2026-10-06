@@ -138,114 +138,180 @@ strtouint64_base(const char *s, int default_base)
         return n;
 }
 
+/**
+ * @brief Strips the whitespace around one element of a list, in place
+ *
+ * @param [in] str the element
+ *
+ * @return the element without it
+ */
+static char *
+list_trim(char *str)
+{
+        char *end;
+
+        while (isspace((unsigned char)*str))
+                str++;
+
+        end = str + strlen(str);
+        while (end > str && isspace((unsigned char)end[-1]))
+                end--;
+        *end = '\0';
+
+        return str;
+}
+
+/**
+ * @brief Reads one number of a list element
+ *
+ * pqos_parse_uint64(), which refuses a sign, and a leading '+' before a digit
+ * besides: the list options have always accepted one, since strtoull() does,
+ * and "-" stays refused because it is what separates the ends of a range.
+ *
+ * @param [in] text the number
+ * @param [out] value what it reads as
+ *
+ * @return 0 on success, -1 where it is not a number
+ */
+static int
+list_number(const char *text, uint64_t *value)
+{
+        while (isspace((unsigned char)*text))
+                text++;
+        if (text[0] == '+' && isdigit((unsigned char)text[1]))
+                text++;
+
+        return pqos_parse_uint64(text, value);
+}
+
+int
+list_parse(char *s,
+           uint64_t *tab,
+           const unsigned max,
+           const uint64_t limit,
+           const unsigned flags,
+           struct list_fault *fault)
+{
+        struct list_fault unused;
+        char *saveptr = NULL;
+        char *token;
+        unsigned count = 0;
+
+        if (fault == NULL)
+                fault = &unused;
+        fault->token = NULL;
+        fault->value = 0;
+
+        if (s == NULL || tab == NULL || max == 0 || max > INT_MAX)
+                return 0;
+
+        for (token = strtok_r(s, ",", &saveptr); token != NULL;
+             token = strtok_r(NULL, ",", &saveptr)) {
+                uint64_t start;
+                uint64_t end;
+                uint64_t n;
+                char *dash;
+
+                token = list_trim(token);
+                if (*token == '\0')
+                        continue;
+
+                /* a range is two numbers and one dash between them, which the
+                 * number reader enforces: it refuses an empty side, a sign,
+                 * and a second dash left in the end of the range
+                 */
+                fault->token = token;
+                dash = strchr(token, '-');
+                if (dash != NULL) {
+                        *dash = '\0';
+                        if (list_number(token, &start) != 0 ||
+                            list_number(dash + 1, &end) != 0) {
+                                *dash = '-';
+                                return LIST_SYNTAX;
+                        }
+                        *dash = '-';
+                } else if (list_number(token, &start) != 0)
+                        return LIST_SYNTAX;
+                else
+                        end = start;
+
+                /* the limit before anything is stored: a value that does not
+                 * exist is the fault, and reporting the table full or a repeat
+                 * instead would name the wrong one
+                 */
+                if (start > limit || end > limit) {
+                        fault->value = start > limit ? start : end;
+                        return LIST_RANGE;
+                }
+
+                if (start > end && !(flags & LIST_KEEP_ORDER)) {
+                        n = start;
+                        start = end;
+                        end = n;
+                }
+
+                /* the endpoint ends the loop rather than a test that has
+                 * already passed it: the range is inclusive and these are
+                 * 64-bit values, so "n <= end" with an end of UINT64_MAX is
+                 * true again after n has wrapped to zero, and "n >= end" with
+                 * an end of 0 after n has wrapped to UINT64_MAX. And capacity
+                 * is asked about a value that is going to be stored, so a
+                 * repeat needs no room in the table
+                 */
+                for (n = start;; n = start <= end ? n + 1 : n - 1) {
+                        if (isdup(tab, count, n)) {
+                                if (flags & LIST_UNIQUE) {
+                                        fault->value = n;
+                                        return LIST_DUPLICATE;
+                                }
+                        } else {
+                                if (count >= max)
+                                        return LIST_FULL;
+                                tab[count++] = n;
+                        }
+
+                        if (n == end)
+                                break;
+                }
+        }
+
+        fault->token = NULL;
+        return (int)count;
+}
+
 unsigned
 strlisttotab(char *s, uint64_t *tab, const unsigned max)
 {
-        unsigned index = 0;
-        char *saveptr = NULL;
+        struct list_fault fault;
         char *tmp = NULL;
+        int n;
 
         if (s == NULL || tab == NULL || max == 0)
-                return index;
+                return 0;
 
+        /* the list as the user gave it, for the message: list_parse()
+         * tokenises its argument in place
+         */
         tmp = strdup(s);
         if (tmp == NULL) {
                 printf("Failed to allocate memory for argument copy!\n");
                 exit(EXIT_FAILURE);
         }
 
-        for (;;) {
-                char *p = NULL;
-                char *token = NULL;
-
-                token = strtok_r(s, ",", &saveptr);
-                if (token == NULL)
-                        break;
-
-                s = NULL;
-
-                /* get rid of leading spaces & skip empty tokens */
-                while (isspace(*token))
-                        token++;
-                if (*token == '\0')
-                        continue;
-
-                p = strchr(token, '-');
-                if (p != NULL) {
-                        /**
-                         * range of numbers provided
-                         * example: 1-5 or 12-9
-                         */
-                        uint64_t n, start, end;
-                        *p = '\0';
-                        start = strtouint64(token);
-                        end = strtouint64(p + 1);
-                        if (start > end) {
-                                /**
-                                 * no big deal just swap start with end
-                                 */
-                                n = start;
-                                start = end;
-                                end = n;
-                        }
-                        if (end > UINT_FAST64_MAX) {
-                                printf("Too large group items.\n");
-                                exit(EXIT_FAILURE);
-                        }
-                        /* the endpoint ends the loop rather than a test that
-                         * has already passed it: the range is inclusive and
-                         * these are 64-bit values, so "n <= end" with an end of
-                         * UINT64_MAX is true again after n has wrapped to zero,
-                         * and a range like UINT64_MAX-UINT64_MAX filled the
-                         * table with wrapped values instead of storing one
-                         */
-                        for (n = start;; n++) {
-                                /* capacity is asked about a value that is going
-                                 * to be stored, and a duplicate is not stored:
-                                 * asking first refuses a range that adds
-                                 * nothing to a full table, where the same value
-                                 * written on its own is accepted
-                                 */
-                                if (!(isdup(tab, index, n))) {
-                                        if (index >= max) {
-                                                printf("Exceeded parser "
-                                                       "capacity of %u "
-                                                       "entries\n",
-                                                       max);
-                                                parse_error(tmp,
-                                                            "Too many groups "
-                                                            "selected.\n");
-                                        }
-                                        tab[index] = n;
-                                        index++;
-                                }
-
-                                if (n == end)
-                                        break;
-                        }
-                } else {
-                        /**
-                         * single number provided here
-                         * remove duplicates if necessary
-                         */
-                        uint64_t val = strtouint64(token);
-
-                        if (!(isdup(tab, index, val))) {
-                                if (index >= max) {
-                                        printf("Exceeded parser capacity of "
-                                               "%u entries\n",
-                                               max);
-                                        parse_error(
-                                            tmp, "Too many groups selected.\n");
-                                }
-                                tab[index] = val;
-                                index++;
-                        }
-                }
+        n = list_parse(s, tab, max, UINT64_MAX, 0, &fault);
+        if (n == LIST_FULL) {
+                printf("Exceeded parser capacity of %u entries\n", max);
+                parse_error(tmp, "Too many groups selected.\n");
+        }
+        if (n < 0) {
+                printf("Error converting '%s' to unsigned number!\n",
+                       fault.token != NULL ? fault.token : tmp);
+                free(tmp);
+                exit(EXIT_FAILURE);
         }
 
         free(tmp);
-        return index;
+        return (unsigned)n;
 }
 
 unsigned

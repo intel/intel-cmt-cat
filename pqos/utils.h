@@ -70,12 +70,68 @@ uint64_t strtouint64(const char *s);
  */
 uint64_t strhextouint64(const char *s);
 
+/** list_parse() fails with one of these, for its caller to word */
+enum list_error {
+        LIST_SYNTAX = -1,    /**< an element is not a number or a range */
+        LIST_FULL = -2,      /**< more distinct values than the table holds */
+        LIST_DUPLICATE = -3, /**< a value repeated, where repeats are refused */
+        LIST_RANGE = -4,     /**< a value above the caller's limit */
+};
+
+/** list_parse() flag: a repeated value is an error rather than dropped */
+#define LIST_UNIQUE 0x1
+/** list_parse() flag: a descending range is read in the order written, so
+ *  "3-1" is 3, 2, 1 rather than 1, 2, 3
+ */
+#define LIST_KEEP_ORDER 0x2
+
+/** What list_parse() failed on */
+struct list_fault {
+        const char *token; /**< the element at fault, inside the list itself */
+        uint64_t value;    /**< the value at fault, for LIST_DUPLICATE and
+                                LIST_RANGE */
+};
+
+/**
+ * @brief Reads a comma separated list of numbers and ranges into a table
+ *
+ * The list reader strlisttotab() and the --mon-dev channel list share. It
+ * neither prints nor exits: it says what was wrong and where, and each caller
+ * decides what that means on its command line - strlisttotab() keeps its own
+ * message and exits, the --mon-dev channel list words its own.
+ * strlisttotabrealloc(), which grows its table, still reads lists itself.
+ *
+ * Elements are decimal or 0x-prefixed numbers, optionally signed '+', or
+ * inclusive ranges in either
+ * order: "5-1" is "1-5", or with LIST_KEEP_ORDER 5, 4, 3, 2, 1. Whitespace
+ * around an element or either end of a range is ignored, and so is an empty
+ * element. A repeat is dropped, or with LIST_UNIQUE refused; it needs no room
+ * in the table either way. A value above \a limit is refused, and is asked
+ * about first, of both ends of a range, so neither capacity nor a repeat can
+ * hide it.
+ *
+ * @param [in] s the list, which this modifies while parsing
+ * @param [out] tab where the values go
+ * @param [in] max how many \a tab holds
+ * @param [in] limit the largest value accepted; UINT64_MAX for any
+ * @param [in] flags 0, or LIST_UNIQUE and LIST_KEEP_ORDER in any combination
+ * @param [out] fault what was wrong, where this fails; may be NULL
+ *
+ * @return how many values were placed in \a tab, or an enum list_error
+ */
+int list_parse(char *s,
+               uint64_t *tab,
+               const unsigned max,
+               const uint64_t limit,
+               const unsigned flags,
+               struct list_fault *fault);
+
 /**
  * @brief Converts a comma separated list into a table of numbers
  *
- * Accepts single numbers and inclusive ranges, in either order - "5-1" is the
- * same list as "1-5" - and drops duplicates. A list longer than \a max entries,
- * or an element that is not a number, ends the process.
+ * list_parse() for the command line options that take a list and end the
+ * process on one they cannot use: a list longer than \a max entries, or an
+ * element that is not a number or a range, prints why and exits.
  *
  * @param [in] s the list, which this modifies while parsing
  * @param [out] tab where the numbers go

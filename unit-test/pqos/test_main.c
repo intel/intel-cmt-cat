@@ -31,6 +31,7 @@
  */
 #include "common.h"
 #include "main.h"
+#include "monitor.h"
 #include "output.h"
 #include "utils.h"
 
@@ -452,6 +453,253 @@ test_unknown_option_returns_failure(void **state)
         (void)state;
 }
 
+static void
+test_list_parse_numbers_and_ranges(void **state)
+{
+        uint64_t tab[8] = {0};
+        char input[] = "1,3-5,0x8";
+
+        assert_int_equal(list_parse(input, tab, 8, UINT64_MAX, 0, NULL), 5);
+        assert_true(tab[0] == 1);
+        assert_true(tab[1] == 3);
+        assert_true(tab[2] == 4);
+        assert_true(tab[3] == 5);
+        assert_true(tab[4] == 8);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_descending_range(void **state)
+{
+        uint64_t tab[4] = {0};
+        char swapped[] = "5-3";
+        char kept[] = "5-3";
+        char to_zero[] = "2-0";
+
+        /* swapped by default, which is what every strlisttotab() caller has
+         * always had, and in the order written where the caller asks for it
+         */
+        assert_int_equal(list_parse(swapped, tab, 4, UINT64_MAX, 0, NULL), 3);
+        assert_true(tab[0] == 3 && tab[1] == 4 && tab[2] == 5);
+
+        assert_int_equal(
+            list_parse(kept, tab, 4, UINT64_MAX, LIST_KEEP_ORDER, NULL), 3);
+        assert_true(tab[0] == 5 && tab[1] == 4 && tab[2] == 3);
+
+        /* and a descending range ends on its endpoint rather than wrapping
+         * past zero to UINT64_MAX
+         */
+        assert_int_equal(
+            list_parse(to_zero, tab, 4, UINT64_MAX, LIST_KEEP_ORDER, NULL), 3);
+        assert_true(tab[0] == 2 && tab[1] == 1 && tab[2] == 0);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_descending_range_from_the_top(void **state)
+{
+        uint64_t tab[4] = {0};
+        char input[] = "18446744073709551615-18446744073709551614";
+
+        assert_int_equal(
+            list_parse(input, tab, 4, UINT64_MAX, LIST_KEEP_ORDER, NULL), 2);
+        assert_true(tab[0] == UINT64_MAX);
+        assert_true(tab[1] == UINT64_MAX - 1);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_repeats_dropped_or_refused(void **state)
+{
+        uint64_t tab[4] = {0};
+        char dropped[] = "1,0-2";
+        char refused[] = "1,0-2";
+        struct list_fault fault;
+
+        assert_int_equal(list_parse(dropped, tab, 4, UINT64_MAX, 0, NULL), 3);
+        assert_true(tab[0] == 1 && tab[1] == 0 && tab[2] == 2);
+
+        assert_int_equal(
+            list_parse(refused, tab, 4, UINT64_MAX, LIST_UNIQUE, &fault),
+            LIST_DUPLICATE);
+        assert_true(fault.value == 1);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_whitespace_and_empty_elements(void **state)
+{
+        uint64_t tab[4] = {0};
+        char spaced[] = " 1 , 2 ,, 3 ,  ";
+        char range[] = " 1 - 3 ";
+
+        assert_int_equal(list_parse(spaced, tab, 4, UINT64_MAX, 0, NULL), 3);
+        assert_true(tab[0] == 1 && tab[1] == 2 && tab[2] == 3);
+
+        assert_int_equal(list_parse(range, tab, 4, UINT64_MAX, 0, NULL), 3);
+        assert_true(tab[0] == 1 && tab[2] == 3);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_refuses_what_is_not_a_list(void **state)
+{
+        const char *const bad[] = {"x", "1-", "-1", "1-2-3", "+", "0x", "1x"};
+        unsigned i;
+
+        for (i = 0; i < DIM(bad); i++) {
+                uint64_t tab[4] = {0};
+                struct list_fault fault;
+                char input[16];
+
+                /* the bad element after a good one, so the fault has to name
+                 * the element and not the start of the list
+                 */
+                snprintf(input, sizeof(input), "7, %s", bad[i]);
+                assert_int_equal(
+                    list_parse(input, tab, 4, UINT64_MAX, 0, &fault),
+                    LIST_SYNTAX);
+                assert_non_null(fault.token);
+                assert_string_equal(fault.token, bad[i]);
+        }
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_accepts_a_leading_plus(void **state)
+{
+        uint64_t tab[4] = {0};
+        char input[] = "+5,+1-+3";
+
+        /* what strtoull() has always let the list options take */
+        assert_int_equal(list_parse(input, tab, 4, UINT64_MAX, 0, NULL), 4);
+        assert_true(tab[0] == 5 && tab[1] == 1 && tab[2] == 2 && tab[3] == 3);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_limit_comes_first(void **state)
+{
+        uint64_t tab[2] = {0};
+        char over_capacity[] = "0-8";
+        char repeated[] = "8,8";
+        struct list_fault fault;
+
+        /* a value above the limit is the fault even where the table would
+         * also fill, or the value repeat - those would name the wrong one
+         */
+        assert_int_equal(list_parse(over_capacity, tab, 2, 7, 0, &fault),
+                         LIST_RANGE);
+        assert_true(fault.value == 8);
+        assert_string_equal(fault.token, "0-8");
+
+        assert_int_equal(list_parse(repeated, tab, 2, 7, LIST_UNIQUE, &fault),
+                         LIST_RANGE);
+        assert_true(fault.value == 8);
+
+        (void)state; /* unused */
+}
+
+static void
+test_list_parse_capacity(void **state)
+{
+        uint64_t tab[3] = {0};
+        char too_many[] = "0-3";
+        char repeats[] = "0-2,2-0";
+
+        assert_int_equal(list_parse(too_many, tab, 3, UINT64_MAX, 0, NULL),
+                         LIST_FULL);
+
+        /* a repeat is not stored, so it needs no room */
+        assert_int_equal(list_parse(repeats, tab, 3, UINT64_MAX, 0, NULL), 3);
+
+        (void)state; /* unused */
+}
+
+/**
+ * The --mon-dev channel list, through the option's own entry point. Each case
+ * names a device of its own, because a selection that matches one already made
+ * is merged into it and these cases share the monitoring groups.
+ */
+static void
+test_mon_dev_channels_in_the_order_written(void **state)
+{
+        const char *out;
+        const char *c3, *c2, *c1;
+
+        run_void_function(selfn_monitor_devs, "llc:0000:1a:00.0@3-1");
+        assert_false(output_exit_was_called());
+
+        out = output_get();
+        c3 = strstr(out, "0000:1a:00.0@3");
+        c2 = strstr(out, "0000:1a:00.0@2");
+        c1 = strstr(out, "0000:1a:00.0@1");
+        assert_non_null(c3);
+        assert_non_null(c2);
+        assert_non_null(c1);
+        assert_true(c3 < c2 && c2 < c1);
+
+        (void)state; /* unused */
+}
+
+static void
+test_mon_dev_refuses_a_channel_named_twice(void **state)
+{
+        run_void_function(selfn_monitor_devs, "llc:0000:1b:00.0@0-2,1");
+        assert_true(output_exit_was_called());
+        assert_true(
+            output_has_text("Virtual channel 1 is selected more than once"));
+
+        (void)state; /* unused */
+}
+
+static void
+test_mon_dev_refuses_a_channel_that_does_not_exist(void **state)
+{
+        run_void_function(selfn_monitor_devs, "llc:0000:1c:00.0@8");
+        assert_true(output_exit_was_called());
+        assert_true(output_has_text(
+            "Virtual channel 8 exceeds supported range [0, 7]"));
+
+        (void)state; /* unused */
+}
+
+static void
+test_mon_dev_names_the_range_that_does_not_exist(void **state)
+{
+        /* nine channels named, so the table would also be full: the range is
+         * what is wrong, and it is what the message names
+         */
+        run_void_function(selfn_monitor_devs, "llc:0000:1f:00.0@0-8");
+        assert_true(output_exit_was_called());
+        assert_true(output_has_text(
+            "Virtual channel range 0-8 exceeds supported range [0, 7]"));
+        assert_false(output_has_text("Too many virtual channels"));
+
+        (void)state; /* unused */
+}
+
+static void
+test_mon_dev_names_the_element_it_cannot_read(void **state)
+{
+        run_void_function(selfn_monitor_devs, "llc:0000:1d:00.0@0,x");
+        assert_true(output_exit_was_called());
+        assert_true(output_has_text("Invalid virtual channel 'x'"));
+
+        run_void_function(selfn_monitor_devs, "llc:0000:1e:00.0@1-2-3");
+        assert_true(output_exit_was_called());
+        assert_true(output_has_text("Invalid virtual channel range '1-2-3'"));
+
+        (void)state; /* unused */
+}
+
 /**
  * Where the missing class is caught is the guarantee, so this drives the
  * whole utility rather than the check on its own: the interface is named
@@ -578,6 +826,21 @@ main(void)
                 test_parse_mem_regions_separates_id_range_from_capacity),
             cmocka_unit_test(test_parse_pci_id_accepts_valid_fields),
             cmocka_unit_test(test_parse_pci_id_rejects_invalid_fields),
+            cmocka_unit_test(test_list_parse_numbers_and_ranges),
+            cmocka_unit_test(test_list_parse_descending_range),
+            cmocka_unit_test(test_list_parse_descending_range_from_the_top),
+            cmocka_unit_test(test_list_parse_repeats_dropped_or_refused),
+            cmocka_unit_test(test_list_parse_whitespace_and_empty_elements),
+            cmocka_unit_test(test_list_parse_refuses_what_is_not_a_list),
+            cmocka_unit_test(test_list_parse_accepts_a_leading_plus),
+            cmocka_unit_test(test_list_parse_limit_comes_first),
+            cmocka_unit_test(test_list_parse_capacity),
+            cmocka_unit_test(test_mon_dev_channels_in_the_order_written),
+            cmocka_unit_test(test_mon_dev_refuses_a_channel_named_twice),
+            cmocka_unit_test(
+                test_mon_dev_refuses_a_channel_that_does_not_exist),
+            cmocka_unit_test(test_mon_dev_names_the_range_that_does_not_exist),
+            cmocka_unit_test(test_mon_dev_names_the_element_it_cannot_read),
             cmocka_unit_test(test_unknown_option_returns_failure),
             /* last: its command line stays in the selection globals */
             cmocka_unit_test(test_alloc_option_without_class_returns_failure)};

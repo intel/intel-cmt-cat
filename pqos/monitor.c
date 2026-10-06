@@ -2264,7 +2264,15 @@ error_exit:
 #endif
 
 /**
- * @brief Parse input string and fill vc array, return count
+ * @brief Reads the virtual channels a --mon-dev device selection names
+ *
+ * The list itself is list_parse()'s, as every other list option's is. What is
+ * this option's own is what it refuses on top of that, and the words it uses: a
+ * channel named twice is an error rather than collapsed into one, because two
+ * selections of one channel are two monitoring groups the platform cannot
+ * tell apart; a descending range is kept in the order written, which is the
+ * order the groups are set up and reported in; and a channel outside
+ * [0, PQOS_DEV_MAX_CHANNELS) does not exist.
  *
  * @param str All virtual channels string passed to
  *            --mon-dev command line option
@@ -2276,91 +2284,63 @@ error_exit:
 static int
 parse_virtual_channels(char *str, unsigned int *vc, const int max_numbers)
 {
-        char *next;
-        char *token;
-        int count = 0;
+        uint64_t values[PQOS_DEV_MAX_CHANNELS];
+        struct list_fault fault;
+        int count;
+        int i;
 
-        if (str == NULL || vc == NULL || max_numbers <= 0) {
+        if (str == NULL || vc == NULL || max_numbers <= 0 ||
+            max_numbers > (int)DIM(values)) {
                 fprintf(stderr,
                         "Virtual channel parser received invalid parameters\n");
                 return -1;
         }
 
-        next = str;
-        for (token = strsep(&next, ","); token != NULL;
-             token = strsep(&next, ",")) {
-                uint64_t start;
-                uint64_t end;
-                uint64_t value;
-                char *dash;
-                int direction;
-
-                token = trim(token);
-                dash = strchr(token, '-');
-                if (dash != NULL) {
-                        if (dash == token || dash[1] == '\0' ||
-                            strchr(dash + 1, '-') != NULL) {
-                                fprintf(stderr,
-                                        "Invalid virtual channel range '%s'\n",
-                                        token);
-                                return -1;
-                        }
-                        *dash = '\0';
-                        if (pqos_parse_uint64(token, &start) != 0 ||
-                            pqos_parse_uint64(dash + 1, &end) != 0) {
-                                fprintf(
-                                    stderr,
-                                    "Invalid virtual channel range '%s-%s'\n",
-                                    token, dash + 1);
-                                return -1;
-                        }
-                } else if (pqos_parse_uint64(token, &start) != 0) {
+        count = list_parse(str, values, (unsigned)max_numbers,
+                           PQOS_DEV_MAX_CHANNELS - 1,
+                           LIST_UNIQUE | LIST_KEEP_ORDER, &fault);
+        switch (count) {
+        case LIST_SYNTAX:
+                if (strchr(fault.token, '-') != NULL)
+                        fprintf(stderr, "Invalid virtual channel range '%s'\n",
+                                fault.token);
+                else
                         fprintf(stderr, "Invalid virtual channel '%s'\n",
-                                token);
-                        return -1;
-                } else
-                        end = start;
-
-                if (start >= PQOS_DEV_MAX_CHANNELS ||
-                    end >= PQOS_DEV_MAX_CHANNELS) {
+                                fault.token);
+                return -1;
+        case LIST_FULL:
+                fprintf(stderr, "Too many virtual channels; maximum is %d\n",
+                        max_numbers);
+                return -1;
+        case LIST_RANGE:
+                if (strchr(fault.token, '-') != NULL)
                         fprintf(stderr,
-                                "Virtual channel range %" PRIu64 "-%" PRIu64
+                                "Virtual channel range %s exceeds supported "
+                                "range [0, %u]\n",
+                                fault.token, PQOS_DEV_MAX_CHANNELS - 1);
+                else
+                        fprintf(stderr,
+                                "Virtual channel %" PRIu64
                                 " exceeds supported range [0, %u]\n",
-                                start, end, PQOS_DEV_MAX_CHANNELS - 1);
-                        return -1;
-                }
-
-                direction = start <= end ? 1 : -1;
-                value = start;
-                while (1) {
-                        int i;
-
-                        if (count >= max_numbers) {
-                                fprintf(stderr,
-                                        "Too many virtual channels; maximum "
-                                        "is %d\n",
-                                        max_numbers);
-                                return -1;
-                        }
-                        for (i = 0; i < count; i++)
-                                if (vc[i] == value) {
-                                        fprintf(stderr,
-                                                "Virtual channel %" PRIu64
-                                                " is selected more than once\n",
-                                                value);
-                                        return -1;
-                                }
-                        vc[count++] = (unsigned)value;
-                        if (value == end)
-                                break;
-                        value = (uint64_t)((int64_t)value + direction);
-                }
+                                fault.value, PQOS_DEV_MAX_CHANNELS - 1);
+                return -1;
+        case LIST_DUPLICATE:
+                fprintf(stderr,
+                        "Virtual channel %" PRIu64
+                        " is selected more than once\n",
+                        fault.value);
+                return -1;
+        default:
+                break;
         }
 
         if (count == 0) {
                 fprintf(stderr, "No virtual channels specified\n");
                 return -1;
         }
+
+        for (i = 0; i < count; i++)
+                vc[i] = (unsigned)values[i];
 
         return count;
 }

@@ -215,6 +215,7 @@ $(BIN_DIR)/test_main: ./test_main.c $(PQOS_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=puts \
 		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
 		-Wl,--start-group \
