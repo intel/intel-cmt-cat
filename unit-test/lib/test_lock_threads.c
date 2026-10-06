@@ -127,26 +127,43 @@ probe(void *arg)
         return NULL;
 }
 
+/** a probe still waiting for the lock, joined once the case lets it go */
+static pthread_t m_probe;
+static int m_probe_waiting;
+
 /**
  * @brief Whether another thread takes the lock within \a ms
  *
- * The probe is joined only where it got the lock; one that did not is left
- * blocked, since a lock nobody gives back is the failure being asserted.
+ * The probe is joined where it got the lock. One that did not is left waiting
+ * and joinable: the_waiting_probe_gets_the_lock() joins it once the case gives
+ * the lock up, so no probe is still inside lock_release() when the teardown
+ * destroys the mutex.
  */
 static int
 another_thread_takes_the_lock(const unsigned ms)
 {
-        pthread_t t;
         int got;
 
         __atomic_store_n(&m_probe_got, 0, __ATOMIC_RELEASE);
-        assert_int_equal(pthread_create(&t, NULL, probe, NULL), 0);
+        assert_int_equal(pthread_create(&m_probe, NULL, probe, NULL), 0);
         got = wait_for(&m_probe_got, ms);
         if (got)
-                assert_int_equal(pthread_join(t, NULL), 0);
+                assert_int_equal(pthread_join(m_probe, NULL), 0);
         else
-                (void)pthread_detach(t);
+                m_probe_waiting = 1;
         return got;
+}
+
+/**
+ * @brief The probe left waiting takes the lock, and is joined
+ */
+static void
+the_waiting_probe_gets_the_lock(void)
+{
+        assert_true(m_probe_waiting);
+        assert_true(wait_for(&m_probe_got, FREE_WAIT_MS));
+        assert_int_equal(pthread_join(m_probe, NULL), 0);
+        m_probe_waiting = 0;
 }
 
 static void *
@@ -236,7 +253,7 @@ test_a_released_lock_is_not_given_back_twice(void **state)
 
         /* and once the case lets it go, the waiting probe gets it */
         lock_release();
-        assert_true(wait_for(&m_probe_got, FREE_WAIT_MS));
+        the_waiting_probe_gets_the_lock();
 }
 
 static void
@@ -271,7 +288,7 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
 
         assert_false(another_thread_takes_the_lock(300));
         lock_release();
-        assert_true(wait_for(&m_probe_got, FREE_WAIT_MS));
+        the_waiting_probe_gets_the_lock();
 }
 
 static void
