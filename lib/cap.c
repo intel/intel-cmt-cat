@@ -890,11 +890,10 @@ pqos_init(const struct pqos_config *config)
 
         lock_get();
 
-        /* released and not finalised: the lock this call would tear down is
-         * not one it took. Already initialised means the session that is
-         * running owns it, and lock_fini() would destroy that session's mutex
-         * and unlink its lock file - after which another process initialises
-         * beside it
+        /* released and not finalised: the lock is taken here only to
+         * serialise with the running session, which is what owns its mutex
+         * and its lock file. lock_fini() would destroy the one and unlink the
+         * other - after which another process initialises beside it
          */
         ret = _pqos_check_init(0);
         if (ret != PQOS_RETVAL_OK) {

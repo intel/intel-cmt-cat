@@ -1194,9 +1194,9 @@ test_pqos_fini_negative(void **state __attribute__((unused)))
          * process's live lock; no call to it is expected
          */
         expect_function_call(__wrap_lock_get);
-        expect_function_call(__wrap_lock_release);
         expect_value(__wrap__pqos_check_init, expect, 1);
         will_return(__wrap__pqos_check_init, PQOS_RETVAL_INIT);
+        expect_function_call(__wrap_lock_release);
         assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
 
         expect_function_call(__wrap_lock_get);
