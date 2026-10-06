@@ -46,7 +46,7 @@ Example:
 Description:    Selects log file
 Syntax:         log-file: <log file>
 Example:
-                log-file: /tmp/example.log
+                log-file: example.log
 
 
 Description:    Selects event monitoring time
@@ -65,7 +65,7 @@ Example:
 Description:    Selects event monitoring output file
 Syntax:         monitor-file: <file name>
 Example:
-                monitor-file: /tmp/example.xml
+                monitor-file: example.xml
 
 
 Description:    Selects type of event monitoring output file
