@@ -209,6 +209,9 @@ static int proc_short_is_error = 1;
 /** the last thing lock.c wrote to stderr */
 static char last_stderr[256];
 
+/** a record as this library writes it: pid, start time and version 2 */
+#define TEST_RECORD "%d %" PRIu64 " 2\n"
+
 typedef size_t fread_fn(void *ptr, size_t size, size_t n, FILE *stream);
 fread_fn __real_fread;
 typedef int ferror_fn(FILE *stream);
@@ -299,6 +302,9 @@ __wrap_read(int fd, void *buf, size_t count)
 typedef int fchmod_fn(int fd, mode_t mode);
 fchmod_fn __real_fchmod;
 
+/** the last record written to the lock file */
+static char written_record[128];
+
 ssize_t
 __wrap_write(int fd, const void *buf, size_t count)
 {
@@ -306,6 +312,13 @@ __wrap_write(int fd, const void *buf, size_t count)
                 return __real_write(fd, buf, count);
 
         function_called();
+
+        /* kept, for the case that asks what the record says */
+        snprintf(written_record, sizeof(written_record), "%.*s",
+                 (int)(count < sizeof(written_record)
+                           ? count
+                           : sizeof(written_record) - 1),
+                 (const char *)buf);
 
         /* as many bytes as it was given: what the cases are about is that the
          * record is written before the name exists, not how long it is
@@ -1092,8 +1105,13 @@ test_lock_opens_close_on_exec(void **state __attribute__((unused)))
         expect_check_lockdir_access_ok();
         expect_lockfile_open(EEXIST, -1);
 
-        /* whatever the stale check decides, the read has happened by then, and
-         * the init fails because the unlink of a file this test does not own
+        /* a stale record of this case's own, and not whatever a file of this
+         * name on the host holds: one naming a live process would be held,
+         * and the unlink below never asked for
+         */
+        content_fd = file_holding("0 0\n");
+
+        /* the read has happened by then, and the init fails because the unlink
          * is not mocked to succeed
          */
         expect_function_call(__wrap_unlink);
@@ -1166,7 +1184,7 @@ test_lock_of_another_owner_is_honoured_while_it_lives(void **state
          *
          * The holder here is this process, so the file names something alive.
          */
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)getpid(),
+        snprintf(line, sizeof(line), TEST_RECORD, (int)getpid(),
                  own_start_time());
 
         stat_ret = 0;
@@ -1491,7 +1509,7 @@ test_live_holder_whose_record_arrives_in_pieces(void **state
          * at all. That is what lock_init() treats as stale, so a live holder's
          * lock would be removed and a second session would take it.
          */
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)getpid(),
+        snprintf(line, sizeof(line), TEST_RECORD, (int)getpid(),
                  own_start_time());
 
         content_fd = file_holding(line);
@@ -1535,7 +1553,7 @@ test_holder_whose_start_time_cannot_be_read_is_kept(void **state
          * /proc entry is the case below, where that read is the one that fails.
          */
         child = start_a_child();
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)child,
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child,
                  start_time_of(child));
         snprintf(proc_fail_path, sizeof(proc_fail_path), "/proc/%d/stat",
                  (int)child);
@@ -1577,7 +1595,7 @@ test_holder_whose_record_is_cut_short_is_kept(void **state
          * this cannot tell from a complete one.
          */
         child = start_a_child();
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)child,
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child,
                  start_time_of(child));
         snprintf(proc_fail_path, sizeof(proc_fail_path), "/proc/%d/stat",
                  (int)child);
@@ -1632,7 +1650,7 @@ test_a_start_time_above_32_bits_is_carried(void **state __attribute__((unused)))
          * otherwise lose.
          */
         child = start_a_child();
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)child, big);
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child, big);
         snprintf(proc_fail_path, sizeof(proc_fail_path), "/proc/%d/stat",
                  (int)child);
 
@@ -1883,8 +1901,11 @@ test_lock_file_that_went_away_is_not_an_error(void **state
         expect_string(__wrap_unlink, pathname, LOCKFILE);
         will_return(__wrap_unlink, -1);
 
-        /* and the name is free, so the second attempt publishes */
-        lock_open_errno = 0;
+        /* and the name is free, so the second attempt publishes. Through
+         * mkostemp() and link(), so the ENOENT armed above stays: reset here,
+         * before lock_init() runs, it let the examining open reach the real
+         * file of this name, and the case pass or fail on what that held
+         */
         expect_lockfile_open(0, TEST_LOCK_FD2);
 
         expect_function_call(__wrap_pthread_mutex_init);
@@ -1988,7 +2009,7 @@ test_lock_live_holder_is_recognised_by_its_start_time(void **state
          * The holder here is this process, and the start time comes from
          * /proc/self/stat read independently of lock.c's arithmetic.
          */
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)getpid(),
+        snprintf(line, sizeof(line), TEST_RECORD, (int)getpid(),
                  own_start_time());
 
         content_fd = file_holding(line);
@@ -2029,7 +2050,7 @@ test_live_holder_whose_name_holds_a_newline(void **state
         assert_int_equal(prctl(PR_GET_NAME, saved, 0, 0, 0), 0);
         assert_int_equal(prctl(PR_SET_NAME, newlined, 0, 0, 0), 0);
 
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)getpid(),
+        snprintf(line, sizeof(line), TEST_RECORD, (int)getpid(),
                  own_start_time());
 
         stat_uid = 0;
@@ -2072,7 +2093,7 @@ test_live_holder_whose_name_holds_a_space(void **state __attribute__((unused)))
         assert_int_equal(prctl(PR_GET_NAME, saved, 0, 0, 0), 0);
         assert_int_equal(prctl(PR_SET_NAME, spaced, 0, 0, 0), 0);
 
-        snprintf(line, sizeof(line), "%d %" PRIu64 "\n", (int)getpid(),
+        snprintf(line, sizeof(line), TEST_RECORD, (int)getpid(),
                  own_start_time());
 
         stat_ret = 0;
@@ -2169,6 +2190,166 @@ lock_case_teardown(void **state __attribute__((unused)))
         return 0;
 }
 
+/**
+ * @brief Runs one init over an existing lock file that a holder keeps
+ *
+ * @param [in] line the record in the file
+ */
+static void
+a_lock_that_is_held(const char *line)
+{
+        content_fd = file_holding(line);
+
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(EEXIST, -1);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        /* refused, and no unlink armed, so removing it fails the case */
+        assert_int_equal(lock_init(), -1);
+}
+
+/**
+ * @brief Runs one init over an existing lock file that is stale
+ *
+ * @param [in] line the record in the file
+ */
+static void
+a_lock_that_is_cleared(const char *line)
+{
+        content_fd = file_holding(line);
+
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(EEXIST, -1);
+
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
+
+        expect_lockfile_open(0, TEST_LOCK_FD2);
+
+        expect_function_call(__wrap_pthread_mutex_init);
+        will_return(__wrap_pthread_mutex_init, 0);
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        assert_int_equal(lock_init(), 0);
+
+        expect_function_call(__wrap_close);
+        expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
+        will_return(__wrap_close, 0);
+        expect_function_call(__wrap_pthread_mutex_destroy);
+        will_return(__wrap_pthread_mutex_destroy, 0);
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
+        assert_int_equal(lock_fini(), 0);
+}
+
+#ifdef __linux__
+static void
+test_a_published_record_carries_its_version(void **state
+                                            __attribute__((unused)))
+{
+        char expected[64];
+
+        /* the version is what tells the next caller this record's second
+         * number is a start time
+         */
+        written_record[0] = '\0';
+        a_lock_that_is_cleared("0 0\n");
+
+        snprintf(expected, sizeof(expected), TEST_RECORD, (int)getpid(),
+                 own_start_time());
+        assert_string_equal(written_record, expected);
+}
+
+static void
+test_a_live_holder_of_an_earlier_version_keeps_the_lock(void **state
+                                                        __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* Two numbers and no version: an earlier library's record, whose
+         * second number was field 23 of /proc/<pid>/stat and so is not a start
+         * time to compare. Compared anyway it never matches, and the live
+         * session's lock was removed under it. The holder is running, so it
+         * keeps the lock, and the caller is told what to do about it.
+         */
+        child = start_a_child();
+        snprintf(line, sizeof(line), "%d 5828608\n", (int)child);
+
+        a_lock_that_is_held(line);
+        assert_non_null(strstr(last_stderr, "another version"));
+
+        stop_a_child(child);
+}
+
+static void
+test_a_record_of_a_later_version_fails_closed(void **state
+                                              __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* a version this library does not write is not one it can check: its
+         * second number need not be a start time at all, so one that does not
+         * match this process's is no evidence the holder has gone
+         */
+        child = start_a_child();
+        snprintf(line, sizeof(line), "%d %" PRIu64 " 3\n", (int)child,
+                 start_time_of(child) + 1);
+
+        a_lock_that_is_held(line);
+
+        stop_a_child(child);
+}
+
+static void
+test_a_holder_of_an_earlier_version_that_has_gone_is_cleared(
+    void **state __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* and one whose process is not running is stale, whatever version
+         * wrote it
+         */
+        child = start_a_child();
+        stop_a_child(child);
+        snprintf(line, sizeof(line), "%d 5828608\n", (int)child);
+
+        a_lock_that_is_cleared(line);
+}
+
+static void
+test_a_current_record_of_a_reused_pid_is_cleared(void **state
+                                                 __attribute__((unused)))
+{
+        char line[64];
+        pid_t child;
+
+        /* the check the version keeps: a running process whose start time is
+         * not the record's took the id after the holder had gone
+         */
+        child = start_a_child();
+        snprintf(line, sizeof(line), TEST_RECORD, (int)child,
+                 start_time_of(child) + 1);
+
+        a_lock_that_is_cleared(line);
+
+        stop_a_child(child);
+}
+#endif /* __linux__ */
+
 int
 main(void)
 {
@@ -2213,6 +2394,12 @@ main(void)
 #ifdef __linux__
             LOCK_CASE(test_live_holder_whose_name_holds_a_space),
             LOCK_CASE(test_live_holder_whose_name_holds_a_newline),
+            LOCK_CASE(test_a_published_record_carries_its_version),
+            LOCK_CASE(test_a_live_holder_of_an_earlier_version_keeps_the_lock),
+            LOCK_CASE(test_a_record_of_a_later_version_fails_closed),
+            LOCK_CASE(
+                test_a_holder_of_an_earlier_version_that_has_gone_is_cleared),
+            LOCK_CASE(test_a_current_record_of_a_reused_pid_is_cleared),
 #endif
         };
 

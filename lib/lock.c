@@ -136,6 +136,12 @@ lock_release(void)
  */
 #define LOCKFILE_PERMS              0644
 #define MAX_LINE                    128
+/* The third field of a record this library writes. Earlier libraries wrote two
+ * numbers and no version, and the second was not the start time - their walk
+ * over /proc/<pid>/stat read field 23 - so a record without this field cannot
+ * be checked against a start time, and is not read as though it could be.
+ */
+#define LOCKFILE_RECORD_VERSION     2
 /* /proc/<pid>/stat field 22 is the process start time. The walk below starts
  * after field 2 - the process name in parentheses, which may contain spaces and
  * parentheses of its own, so it is found by the *last* ')' on the line and not
@@ -597,7 +603,30 @@ is_pid_alive(pid_t pid, uint64_t start_time)
 }
 
 /**
- * @brief Reads the two numbers a lock file record is made of
+ * @brief Whether a process of this id is running, whenever it started
+ *
+ * The answer for a record whose start time cannot be checked, and the one that
+ * fails closed: a holder that is running keeps the lock, and a process that
+ * took its id since is mistaken for it - after which the lock is left for
+ * whoever knows it is stale to remove, which is what the caller's message
+ * says.
+ *
+ * @param [in] pid process id
+ *
+ * @retval 1 it is running
+ * @retval 0 it is not
+ * @retval -1 it could not be determined, with errno set
+ */
+static int
+is_pid_running(pid_t pid)
+{
+        uint64_t start_time = 0;
+
+        return get_process_start_time(pid, &start_time);
+}
+
+/**
+ * @brief Reads the numbers a lock file record is made of
  *
  * Checked conversions and not scanf's: this file is in a world writable
  * directory, so both numbers are whatever any local user cared to put there,
@@ -610,13 +639,19 @@ is_pid_alive(pid_t pid, uint64_t start_time)
  * here is a record this library did not write - which the caller reads as a
  * lock nobody holds.
  *
+ * A record with no version, or with one this library does not write, is read
+ * and answered as such: an earlier library's session, or a later one's, may be
+ * holding it, and its second number cannot be compared with a start time.
+ *
  * @param [in] line the record, NUL terminated
  * @param [out] pid process id
- * @param [out] start_time its start time
+ * @param [out] start_time its start time, or what an unverifiable record says
  *
  * @return Operation status
- * @retval 1 both numbers were read
- * @retval 0 the record is not one this library wrote
+ * @retval 1 a record of this library's version was read
+ * @retval 2 a record of another version was read: \a pid is its holder and
+ *         \a start_time cannot be checked
+ * @retval 0 the record is not one any version of this library wrote
  */
 static int
 parse_record(const char *line, pid_t *pid, uint64_t *start_time)
@@ -624,6 +659,7 @@ parse_record(const char *line, pid_t *pid, uint64_t *start_time)
         char *end = NULL;
         long long id;
         unsigned long long when;
+        unsigned long long version = 0;
 
         /* a sign is not part of either number, and the first field is a process
          * id: pid_t is a signed int type on every platform this builds for, so
@@ -650,6 +686,15 @@ parse_record(const char *line, pid_t *pid, uint64_t *start_time)
         if (end == line || errno != 0)
                 return 0;
 
+        /* the version, after one space, where there is one */
+        if (*end == ' ' && end[1] >= '0' && end[1] <= '9') {
+                line = end + 1;
+                errno = 0;
+                version = strtoull(line, &end, 10);
+                if (errno != 0)
+                        return 0;
+        }
+
         /* and nothing after it but the end of the line */
         while (*end == '\n' || *end == '\r' || *end == ' ' || *end == '\t')
                 ++end;
@@ -659,7 +704,7 @@ parse_record(const char *line, pid_t *pid, uint64_t *start_time)
         *pid = (pid_t)id;
         *start_time = (uint64_t)when;
 
-        return 1;
+        return version == LOCKFILE_RECORD_VERSION ? 1 : 2;
 }
 
 /**
@@ -678,6 +723,8 @@ parse_record(const char *line, pid_t *pid, uint64_t *start_time)
  *
  * @return Operation status
  * @retval 1 a record was read, and \a pid and \a start_time are it
+ * @retval 2 a record of another version was read: \a pid is its holder and
+ *         \a start_time cannot be checked
  * @retval 0 the file was read and holds no record
  * @retval -1 the file could not be read, with errno set
  */
@@ -809,8 +856,8 @@ create_the_lockfile(pid_t pid, uint64_t start_time)
         if (fd < 0)
                 return -1;
 
-        length = snprintf(record, sizeof(record), "%d %" PRIu64 "\n", (int)pid,
-                          start_time);
+        length = snprintf(record, sizeof(record), "%d %" PRIu64 " %d\n",
+                          (int)pid, start_time, LOCKFILE_RECORD_VERSION);
 
         /* 0600 is what mkostemp() makes, and the lock file has to be readable
          * by anybody - it is read by every other caller to find out who holds
@@ -986,6 +1033,7 @@ lock_init(void)
                          */
                         int lockfd = -1;
                         int held = 0;
+                        int unverified = 0;
                         int examined = open_the_lockfile(&lockfd);
 
                         if (examined == 1) {
@@ -1008,17 +1056,24 @@ lock_init(void)
 
                                 if (record < 0) {
                                         examined = -1;
-                                } else if (record == 1) {
+                                } else if (record > 0) {
                                         /* and the same three answers about the
                                          * process it names: one that cannot be
-                                         * asked about is not one that has gone
+                                         * asked about is not one that has gone.
+                                         * A record of another version names a
+                                         * holder whose start time cannot be
+                                         * checked, so it holds while it runs
                                          */
-                                        int alive = is_pid_alive(pid, stime);
+                                        int alive =
+                                            record == 1
+                                                ? is_pid_alive(pid, stime)
+                                                : is_pid_running(pid);
 
                                         if (alive < 0)
                                                 examined = -1;
                                         else
                                                 held = alive;
+                                        unverified = record == 2;
                                 }
                         }
 
@@ -1086,6 +1141,14 @@ lock_init(void)
                                         "Lock file \"%s\" is already in use "
                                         "by PID %d\n",
                                         LOCKFILE, pid);
+                                if (unverified)
+                                        fprintf(stderr,
+                                                "It was written by another "
+                                                "version of the library and "
+                                                "names a running process. Stop "
+                                                "that session, or remove the "
+                                                "file if PID %d is not one.\n",
+                                                pid);
                                 pthread_mutex_unlock(&init_mutex);
                                 return -1;
                         }
