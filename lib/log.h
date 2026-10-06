@@ -206,9 +206,10 @@ PQOS_LOCAL void log_resume(void);
  * callback that returns: a thread cancelled inside a log callback, or one that
  * exits from it, costs *this module* nothing.
  *
- * What it costs the rest of the library is another matter, and the public
- * contract in pqos.h is where that is stated: a message is usually written from
- * inside an API call holding the API lock, and no handler gives that lock back.
+ * What it costs the rest of the library is stated in the public contract in
+ * pqos.h: a message is usually written from inside an API call holding the API
+ * lock, which lib/lock.c gives back when the thread ends - what is lost is the
+ * rest of that call.
  *
  * That is cancellation in the deferred mode, which is PTHREAD_CANCEL_DEFERRED,
  * the mode a thread has unless it asks for the other one. A thread with

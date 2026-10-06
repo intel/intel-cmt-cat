@@ -230,20 +230,19 @@ typedef uint32_t pqos_rmid_t;
  * Two things the library asks of \a callback_log, which it cannot check:
  *
  * It must return. Not by a non-local jump - a longjmp(), or a C++ exception
- * thrown through it - and not by pthread_exit() or a cancellation either.
+ * thrown through it. pthread_exit() and a cancellation are survived, at the
+ * cost of the API call they interrupt.
  *
  * What each of those costs is different, and the difference is worth stating. A
  * non-local jump keeps the reference the message holds, so the descriptor and
- * the context that message was using are held for the life of the process.
- * pthread_exit() and a cancellation do give that reference back, because the
- * emission registers a cleanup handler and both run it - but that handler is
- * the log's, and a message is usually being written from inside an API call
- * that holds the library's own lock. Nothing gives that lock back, so a thread
- * that leaves a callback either way while an API call is on its stack leaves
- * the library locked, and the next API call made by any thread waits on it for
- * ever. Only a callback reached outside an API call - pqos_open() and
- * pqos_fopen() log without the lock - can be left that way without stopping the
- * library.
+ * the context that message was using are held for the life of the process; and
+ * a message is usually written from inside an API call that holds the
+ * library's own lock, which the jump keeps too, so the next API call made by
+ * any thread waits on it for ever. pthread_exit() and a cancellation give both
+ * back: the emission registers a cleanup handler for the reference, and the
+ * lock records the thread holding it and is released when that thread ends.
+ * What neither does is finish the call - an API call left that way has done
+ * part of its work, and what it was changing is left as far as it got.
  *
  * And a cancellation means one in the deferred mode, PTHREAD_CANCEL_DEFERRED,
  * which is what a thread has unless it asks for the other one. A thread with
