@@ -131,9 +131,13 @@ HDR_DIR ?= $(PREFIX)/include
 DEPFILE = $(LIB).dep
 NOLDCONFIG ?= n
 # Registers LIB_INSTALL_DIR with the dynamic linker when it is not searched
-# by default (e.g. /usr/local/lib on Fedora/RHEL)
+# by default (e.g. /usr/local/lib on Fedora/RHEL). The file is changed only
+# when its first line is LDCONF_MARK, so one written by anyone else is kept.
 LDCONF_DIR ?= /etc/ld.so.conf.d
 LDCONF_FILE = $(LDCONF_DIR)/$(LIB).conf
+LDCONF_MARK = \# Added by $(LIB) make install
+LDCONF_OURS = head -n 1 $(LDCONF_FILE) 2>/dev/null | \
+	grep -qxF '$(LDCONF_MARK)'
 LDCACHE_HAS_LIB = ldconfig -p | \
 	grep -qF " => $(LIB_INSTALL_DIR)/$(LIB).so.$(SO_VERSION)"
 
@@ -184,18 +188,21 @@ ifeq ($(SHARED),y)
 ifneq ($(NOLDCONFIG),y)
 	ldconfig
 ifneq ($(shell uname), FreeBSD)
-	@if ! $(LDCACHE_HAS_LIB); then \
-		if [ -d $(LDCONF_DIR) ]; then \
+	@if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
+		[ -e $(LDCONF_FILE) ] || echo '$(LDCONF_MARK)' > $(LDCONF_FILE); \
+		if ! $(LDCONF_OURS); then \
+			echo "$(LDCONF_FILE) was not written by $(LIB)" \
+				"make install, leaving it unchanged"; \
+		elif ! grep -qxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE); then \
 			echo "Adding $(LIB_INSTALL_DIR) to the dynamic linker" \
 				"search path in $(LDCONF_FILE)"; \
-			printf '# Added by $(LIB) make install\n%s\n' \
-				"$(LIB_INSTALL_DIR)" > $(LDCONF_FILE); \
+			echo "$(LIB_INSTALL_DIR)" >> $(LDCONF_FILE); \
 			ldconfig; \
 		fi; \
-		$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not" \
-			"in the dynamic linker search path," \
-			"add it to LD_LIBRARY_PATH"; \
 	fi
+	@$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not in" \
+		"the dynamic linker search path, add it to a file in" \
+		"$(LDCONF_DIR) or to LD_LIBRARY_PATH"
 endif
 endif
 endif
@@ -205,9 +212,15 @@ uninstall:
 ifeq ($(SHARED),y)
 ifneq ($(NOLDCONFIG),y)
 ifneq ($(shell uname), FreeBSD)
-	@if grep -qsxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE); then \
-		echo "Removing $(LDCONF_FILE)"; \
-		rm -f $(LDCONF_FILE); \
+	@if $(LDCONF_OURS) && \
+	    grep -qxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE); then \
+		echo "Removing $(LIB_INSTALL_DIR) from $(LDCONF_FILE)"; \
+		keep=$$(grep -vxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE)); \
+		if [ "$$keep" = '$(LDCONF_MARK)' ]; then \
+			rm -f $(LDCONF_FILE); \
+		else \
+			printf '%s\n' "$$keep" > $(LDCONF_FILE); \
+		fi; \
 	fi
 endif
 	ldconfig
