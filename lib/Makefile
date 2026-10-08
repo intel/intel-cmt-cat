@@ -146,6 +146,17 @@ LDCACHE_HAS_LIB = ldconfig -p | \
 		[ "$$so" -ef "$(LIB_INSTALL_DIR)/$(LIB).so.$(SO_VERSION)" ] && \
 			echo "$$so"; \
 	done | grep -q .
+# LIB_INSTALL_DIR with symbolic links resolved. This is what gets
+# registered, so no link above it can later point the loader elsewhere.
+LIBDIR_REAL = cd "$(LIB_INSTALL_DIR)" 2>/dev/null && pwd -P
+# True when "dir" and every directory above it are owned by root and
+# writable by no one else. Otherwise another user could replace what
+# privileged programs load from it, so it is not registered.
+LIBDIR_TRUSTED = ( d="$$dir"; \
+	while [ -n "$$(find "$$d" -maxdepth 0 -user 0 ! -perm /022)" ]; do \
+		[ "$$d" = / ] && exit 0; \
+		d=$$(dirname "$$d"); \
+	done; exit 1 )
 
 all: unselected-form
 
@@ -194,16 +205,24 @@ ifeq ($(SHARED),y)
 ifneq ($(NOLDCONFIG),y)
 	ldconfig
 ifneq ($(shell uname), FreeBSD)
-	@if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
-		[ -e $(LDCONF_FILE) ] || echo '$(LDCONF_MARK)' > $(LDCONF_FILE); \
-		if ! $(LDCONF_OURS); then \
-			echo "$(LDCONF_FILE) was not written by $(LIB)" \
-				"make install, leaving it unchanged"; \
-		elif ! grep -qxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE); then \
-			echo "Adding $(LIB_INSTALL_DIR) to the dynamic linker" \
-				"search path in $(LDCONF_FILE)"; \
-			echo "$(LIB_INSTALL_DIR)" >> $(LDCONF_FILE); \
-			ldconfig; \
+	@dir=$$($(LIBDIR_REAL)); \
+	if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
+		if ! $(LIBDIR_TRUSTED); then \
+			echo "Not adding $$dir to the dynamic linker search" \
+				"path: it or a directory above it is not owned" \
+				"by root or is writable by others"; \
+		else \
+			[ -e $(LDCONF_FILE) ] || \
+				echo '$(LDCONF_MARK)' > $(LDCONF_FILE); \
+			if ! $(LDCONF_OURS); then \
+				echo "$(LDCONF_FILE) was not written by $(LIB)" \
+					"make install, leaving it unchanged"; \
+			elif ! grep -qxF "$$dir" $(LDCONF_FILE); then \
+				echo "Adding $$dir to the dynamic linker" \
+					"search path in $(LDCONF_FILE)"; \
+				echo "$$dir" >> $(LDCONF_FILE); \
+				ldconfig; \
+			fi; \
 		fi; \
 	fi
 	@$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not in" \
@@ -218,10 +237,10 @@ uninstall:
 ifeq ($(SHARED),y)
 ifneq ($(NOLDCONFIG),y)
 ifneq ($(shell uname), FreeBSD)
-	@if $(LDCONF_OURS) && \
-	    grep -qxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE); then \
-		echo "Removing $(LIB_INSTALL_DIR) from $(LDCONF_FILE)"; \
-		keep=$$(grep -vxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE)); \
+	@dir=$$($(LIBDIR_REAL) || echo "$(LIB_INSTALL_DIR)"); \
+	if $(LDCONF_OURS) && grep -qxF "$$dir" $(LDCONF_FILE); then \
+		echo "Removing $$dir from $(LDCONF_FILE)"; \
+		keep=$$(grep -vxF "$$dir" $(LDCONF_FILE)); \
 		if [ "$$keep" = '$(LDCONF_MARK)' ]; then \
 			rm -f $(LDCONF_FILE); \
 		else \

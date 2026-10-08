@@ -54,9 +54,11 @@ $ sudo make uninstall PREFIX=/some/where
 On Linux, if the library install directory (PREFIX/lib) is not in the
 dynamic linker search path, as is the case for /usr/local/lib on
 Fedora/RHEL, "make install" adds it to /etc/ld.so.conf.d/libpqos.conf
-and "make uninstall" removes it again. A libpqos.conf that was not
-written by "make install" is left unchanged. Use NOLDCONFIG=y to skip
-running ldconfig and changing the dynamic linker configuration.
+and "make uninstall" removes it again. The directory is added only when
+it and every directory above it are owned by root and writable by no
+one else, and a libpqos.conf that was not written by "make install" is
+left unchanged. Use NOLDCONFIG=y to skip running ldconfig and changing
+the dynamic linker configuration.
 
 Software package files can be cleaned with "make clean" command.
 
