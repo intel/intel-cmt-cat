@@ -138,8 +138,14 @@ LDCONF_FILE = $(LDCONF_DIR)/$(LIB).conf
 LDCONF_MARK = \# Added by $(LIB) make install
 LDCONF_OURS = head -n 1 $(LDCONF_FILE) 2>/dev/null | \
 	grep -qxF '$(LDCONF_MARK)'
+# The cache names a library by the directory ldconfig scanned (/lib64 for
+# /usr/lib64 on Fedora), so an entry is matched by file, not by path
 LDCACHE_HAS_LIB = ldconfig -p | \
-	grep -qF " => $(LIB_INSTALL_DIR)/$(LIB).so.$(SO_VERSION)"
+	sed -n 's|.* => \(.*/$(LIB)\.so\.$(SO_VERSION)\)$$|\1|p' | \
+	while read -r so; do \
+		[ "$$so" -ef "$(LIB_INSTALL_DIR)/$(LIB).so.$(SO_VERSION)" ] && \
+			echo "$$so"; \
+	done | grep -q .
 
 all: unselected-form
 
