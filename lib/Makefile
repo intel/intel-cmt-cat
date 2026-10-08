@@ -213,7 +213,8 @@ ifneq ($(shell uname), FreeBSD)
 				"by root or is writable by others"; \
 		else \
 			[ -e $(LDCONF_FILE) ] || \
-				echo '$(LDCONF_MARK)' > $(LDCONF_FILE); \
+				{ install -m 0644 /dev/null $(LDCONF_FILE) && \
+				  echo '$(LDCONF_MARK)' >> $(LDCONF_FILE); }; \
 			if ! $(LDCONF_OURS); then \
 				echo "$(LDCONF_FILE) was not written by $(LIB)" \
 					"make install, leaving it unchanged"; \
