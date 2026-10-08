@@ -130,6 +130,12 @@ LIB_INSTALL_DIR ?= $(PREFIX)/lib
 HDR_DIR ?= $(PREFIX)/include
 DEPFILE = $(LIB).dep
 NOLDCONFIG ?= n
+# Registers LIB_INSTALL_DIR with the dynamic linker when it is not searched
+# by default (e.g. /usr/local/lib on Fedora/RHEL)
+LDCONF_DIR ?= /etc/ld.so.conf.d
+LDCONF_FILE = $(LDCONF_DIR)/$(LIB).conf
+LDCACHE_HAS_LIB = ldconfig -p | \
+	grep -qF " => $(LIB_INSTALL_DIR)/$(LIB).so.$(SO_VERSION)"
 
 all: unselected-form
 
@@ -177,6 +183,20 @@ ifeq ($(SHARED),y)
 		ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 ifneq ($(NOLDCONFIG),y)
 	ldconfig
+ifneq ($(shell uname), FreeBSD)
+	@if ! $(LDCACHE_HAS_LIB); then \
+		if [ -d $(LDCONF_DIR) ]; then \
+			echo "Adding $(LIB_INSTALL_DIR) to the dynamic linker" \
+				"search path in $(LDCONF_FILE)"; \
+			printf '# Added by $(LIB) make install\n%s\n' \
+				"$(LIB_INSTALL_DIR)" > $(LDCONF_FILE); \
+			ldconfig; \
+		fi; \
+		$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not" \
+			"in the dynamic linker search path," \
+			"add it to LD_LIBRARY_PATH"; \
+	fi
+endif
 endif
 endif
 
@@ -184,6 +204,12 @@ uninstall:
 	-rm $(LIB_INSTALL_DIR)/libpqos*
 ifeq ($(SHARED),y)
 ifneq ($(NOLDCONFIG),y)
+ifneq ($(shell uname), FreeBSD)
+	@if grep -qsxF "$(LIB_INSTALL_DIR)" $(LDCONF_FILE); then \
+		echo "Removing $(LDCONF_FILE)"; \
+		rm -f $(LDCONF_FILE); \
+	fi
+endif
 	ldconfig
 endif
 endif
