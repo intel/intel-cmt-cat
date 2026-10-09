@@ -138,6 +138,23 @@ LDCONF_FILE = $(LDCONF_DIR)/$(LIB).conf
 LDCONF_MARK = \# Added by $(LIB) make install
 LDCONF_OURS = head -n 1 $(LDCONF_FILE) 2>/dev/null | \
 	grep -qxF '$(LDCONF_MARK)'
+# Serialises the read and the rewrite of LDCONF_FILE between installs and
+# uninstalls running at once: a lock on LDCONF_DIR, held on descriptor 9 until
+# the recipe's shell exits, so one's registration is not lost to the other's
+# rewrite of what it read before. A lock that cannot be taken - another
+# install holding it past the wait - stops the recipe rather than let the
+# write race the other's. Without flock, which a minimal system may lack, the
+# recipe says so and goes on without a lock, as every install did before
+# there was one. No LDCONF_DIR means nothing to register in and nothing to
+# lock.
+LDCONF_LOCK = if [ -d $(LDCONF_DIR) ]; then \
+	if command -v flock >/dev/null; then \
+		exec 9<$(LDCONF_DIR) && flock -w 30 9 || \
+			{ echo "Could not lock $(LDCONF_DIR)" >&2; exit 1; }; \
+	else \
+		echo "flock not found: no lock against another install or" \
+			"uninstall running at once" >&2; \
+	fi; fi
 # A shell function that writes its arguments, one per line, as the whole of
 # LDCONF_FILE: into a file made beside it, 0644 once complete, then renamed
 # into place, so the loader's configuration is replaced in one step and never
@@ -260,9 +277,19 @@ ifeq ($(SHARED),y)
 		ln -f -s $(LIB).so.$(VERSION) $(LIB).so.$(SO_VERSION); \
 		ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 ifneq ($(NOLDCONFIG),y)
+ifeq ($(shell uname), FreeBSD)
 	ldconfig
-ifneq ($(shell uname), FreeBSD)
-	@$(LDCONF_WRITE); dir=$$($(LIBDIR_REAL)); \
+else
+# ldconfig under the lock as well: two running at once clash on the cache's
+# temporary name and one of them fails, which ended that install before it
+# registered its directory. The library is looked for again once the lock is
+# held: an uninstall of the same prefix running at the same time removes it
+# before its own turn under the lock, and its sweep keeps no line for a
+# directory with no library in it, so none is made for one either
+	@$(LDCONF_LOCK); $(LDCONF_WRITE); ldconfig || exit 1; \
+	dir=$$($(LIBDIR_REAL)); \
+	[ -f "$$dir/$(LIBNAME)" ] || { echo "$(LIB_INSTALL_DIR)/$(LIBNAME)" \
+		"was removed before it could be registered" >&2; exit 1; }; \
 	if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
 		if ! why=$$( $(LIBDIR_TRUSTED) ); then \
 			echo "Not adding $$dir to the dynamic linker search" \
@@ -317,7 +344,7 @@ else
 # the tree again here, and a link added since the install could lead anywhere.
 # A directory that cannot be seen at the time, on a filesystem not mounted,
 # reads as empty and goes too; the next install there puts it back.
-	@$(LDCONF_WRITE); if $(LDCONF_OURS); then \
+	@$(LDCONF_LOCK); $(LDCONF_WRITE); if $(LDCONF_OURS); then \
 		lines=$$(tail -n +2 $(LDCONF_FILE)) || exit 1; \
 		keep=$$(printf '%s\n' "$$lines" | while IFS= read -r d; do \
 			[ -n "$$d" ] || continue; \
@@ -333,7 +360,7 @@ else
 		else \
 			ldconf_write '$(LDCONF_MARK)' "$$keep" || exit 1; \
 		fi; \
-	fi
+	fi; \
 	ldconfig
 endif
 endif

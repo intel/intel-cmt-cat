@@ -61,8 +61,10 @@ else, and no link below it points outside it or reaches its target
 through another link; otherwise "make install" names what is wrong, and
 the library is found through LD_LIBRARY_PATH or by installing below such
 a directory. A libpqos.conf that was not written by "make install" is
-left unchanged. Use NOLDCONFIG=y to skip running ldconfig and changing
-the dynamic linker configuration.
+left unchanged. Two installs or uninstalls running at once are kept
+apart with flock; without it "make install" says so and goes on. Use
+NOLDCONFIG=y to skip running ldconfig and changing the dynamic linker
+configuration.
 
 Software package files can be cleaned with "make clean" command.
 
