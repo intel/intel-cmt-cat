@@ -49,12 +49,16 @@
 
 #include <getopt.h>
 #include <setjmp.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
@@ -235,49 +239,103 @@ test_profile_list_before_a_class_returns_failure(void **state)
  * return the same option with the same value without end. The handlers end in
  * exit(), which the harness turns into a longjmp, so the status is read from
  * the output module rather than from the return value.
+ *
+ * What these cases guard against is a loop, so each runs the utility in a
+ * child and waits a bounded time for it: run in this process, a regression
+ * would never return, and the run of the suite would stall rather than fail.
  */
+
+/** how long one run may take before it is taken for the loop */
+#define RUN_BOUND_MS 5000
+
+/** what a child reports, beside 0 for a run that answered as expected */
+enum bounded_result {
+        BOUNDED_NO_EXIT = 1,     /**< returned instead of calling exit() */
+        BOUNDED_WRONG_STATUS,    /**< exited with something but failure */
+        BOUNDED_NO_MESSAGE,      /**< exited without the expected message */
+        BOUNDED_HUNG = 100,      /**< still running when the bound ran out */
+        BOUNDED_NOT_EXITED = 101 /**< ended by a signal of its own */
+};
+
+/**
+ * @brief Runs the utility with one argument in a child, for a bounded time
+ *
+ * @param [in] arg the argument after the utility name
+ * @param [in] text what the output has to hold, or NULL for nothing
+ *
+ * @return 0 where the utility exited with EXIT_FAILURE and printed \a text,
+ *         or one of enum bounded_result saying what it did instead
+ */
+static int
+run_pqos_bounded(const char *arg, const char *text)
+{
+        const struct timespec tick = {0, 10 * 1000 * 1000};
+        unsigned waited;
+        int status = 0;
+        pid_t child;
+
+        /* anything buffered would be written twice, once by each process */
+        fflush(stdout);
+        fflush(stderr);
+        child = fork();
+        assert_true(child >= 0);
+        if (child == 0) {
+                int ret = EXIT_SUCCESS;
+
+                run_pqos(&ret, 2, arg);
+                if (!output_exit_was_called())
+                        _exit(BOUNDED_NO_EXIT);
+                if (output_get_exit_status() != EXIT_FAILURE)
+                        _exit(BOUNDED_WRONG_STATUS);
+                if (text != NULL && !output_has_text(text))
+                        _exit(BOUNDED_NO_MESSAGE);
+                _exit(0);
+        }
+
+        for (waited = 0; waited < RUN_BOUND_MS; waited += 10) {
+                pid_t got = waitpid(child, &status, WNOHANG);
+
+                assert_true(got >= 0);
+                if (got == child)
+                        return WIFEXITED(status) ? WEXITSTATUS(status)
+                                                 : BOUNDED_NOT_EXITED;
+                (void)nanosleep(&tick, NULL);
+        }
+
+        (void)kill(child, SIGKILL);
+        (void)waitpid(child, NULL, 0);
+
+        return BOUNDED_HUNG;
+}
+
 static void
 test_reset_alloc_attached_dash_returns_failure(void **state)
 {
-        int ret = EXIT_SUCCESS;
-
         UNUSED_ARG(state);
 
-        run_pqos(&ret, 2, "-R-");
-
-        assert_true(output_exit_was_called());
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
-        assert_true(
-            output_has_text("Unrecognized '-' allocation reset option"));
+        assert_int_equal(
+            run_pqos_bounded("-R-", "Unrecognized '-' allocation reset option"),
+            0);
 }
 
 static void
 test_reset_alloc_long_option_dash_returns_failure(void **state)
 {
-        int ret = EXIT_SUCCESS;
-
         UNUSED_ARG(state);
 
-        run_pqos(&ret, 2, "--alloc-reset=-");
-
-        assert_true(output_exit_was_called());
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
-        assert_true(
-            output_has_text("Unrecognized '-' allocation reset option"));
+        assert_int_equal(
+            run_pqos_bounded("--alloc-reset=-",
+                             "Unrecognized '-' allocation reset option"),
+            0);
 }
 
 static void
 test_reset_mon_attached_dash_returns_failure(void **state)
 {
-        int ret = EXIT_SUCCESS;
-
         UNUSED_ARG(state);
 
-        run_pqos(&ret, 2, "-r-");
-
-        assert_true(output_exit_was_called());
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
-        assert_true(output_has_text("Unrecognized '-' monitoring"));
+        assert_int_equal(run_pqos_bounded("-r-", "Unrecognized '-' monitoring"),
+                         0);
 }
 
 /* Only the status here: which message rejects "-" depends on the interface an
@@ -288,14 +346,9 @@ test_reset_mon_attached_dash_returns_failure(void **state)
 static void
 test_monitor_pids_attached_dash_returns_failure(void **state)
 {
-        int ret = EXIT_SUCCESS;
-
         UNUSED_ARG(state);
 
-        run_pqos(&ret, 2, "-p-");
-
-        assert_true(output_exit_was_called());
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_int_equal(run_pqos_bounded("-p-", NULL), 0);
 }
 
 /* The control: the next switch as its own word is still given back to getopt.
