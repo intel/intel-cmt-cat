@@ -138,6 +138,14 @@ LDCONF_FILE = $(LDCONF_DIR)/$(LIB).conf
 LDCONF_MARK = \# Added by $(LIB) make install
 LDCONF_OURS = head -n 1 $(LDCONF_FILE) 2>/dev/null | \
 	grep -qxF '$(LDCONF_MARK)'
+# A shell function that writes its arguments, one per line, as the whole of
+# LDCONF_FILE: into a file made beside it, 0644 once complete, then renamed
+# into place, so the loader's configuration is replaced in one step and never
+# seen half written or left truncated by a write that failed. ldconfig reads
+# *.conf only, so the file being made is not read by one that runs meanwhile.
+LDCONF_WRITE = ldconf_write() { tmp=$$(mktemp $(LDCONF_FILE).XXXXXX) && \
+	{ printf '%s\n' "$$@" > "$$tmp" && chmod 0644 "$$tmp" && \
+	  mv -f "$$tmp" $(LDCONF_FILE) || { rm -f "$$tmp"; false; }; }; }
 # The cache names a library by the directory ldconfig scanned (/lib64 for
 # /usr/lib64 on Fedora), so an entry is matched by file, not by path
 LDCACHE_HAS_LIB = ldconfig -p | \
@@ -205,24 +213,26 @@ ifeq ($(SHARED),y)
 ifneq ($(NOLDCONFIG),y)
 	ldconfig
 ifneq ($(shell uname), FreeBSD)
-	@dir=$$($(LIBDIR_REAL)); \
+	@$(LDCONF_WRITE); dir=$$($(LIBDIR_REAL)); \
 	if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
 		if ! $(LIBDIR_TRUSTED); then \
 			echo "Not adding $$dir to the dynamic linker search" \
 				"path: it or a directory above it is not owned" \
 				"by root or is writable by others"; \
 		else \
-			[ -e $(LDCONF_FILE) ] || \
-				{ install -m 0644 /dev/null $(LDCONF_FILE) && \
-				  echo '$(LDCONF_MARK)' >> $(LDCONF_FILE); }; \
-			if ! $(LDCONF_OURS); then \
+			[ -e $(LDCONF_FILE) ] || [ -L $(LDCONF_FILE) ] || \
+				ldconf_write '$(LDCONF_MARK)'; \
+			if [ ! -e $(LDCONF_FILE) ] && [ ! -L $(LDCONF_FILE) ]; then \
+				echo "Could not create $(LDCONF_FILE)" >&2; exit 1; \
+			elif ! $(LDCONF_OURS); then \
 				echo "$(LDCONF_FILE) was not written by $(LIB)" \
 					"make install, leaving it unchanged"; \
 			elif ! grep -qxF "$$dir" $(LDCONF_FILE); then \
 				echo "Adding $$dir to the dynamic linker" \
 					"search path in $(LDCONF_FILE)"; \
-				echo "$$dir" >> $(LDCONF_FILE); \
-				ldconfig; \
+				keep=$$(tail -n +2 $(LDCONF_FILE)) || exit 1; \
+				ldconf_write '$(LDCONF_MARK)' $${keep:+"$$keep"} \
+					"$$dir" && ldconfig || exit 1; \
 			fi; \
 		fi; \
 	fi
@@ -235,20 +245,45 @@ endif
 
 uninstall:
 	-rm $(LIB_INSTALL_DIR)/libpqos*
-ifeq ($(SHARED),y)
+# on Linux whatever SHARED is: the rm above took the shared library too, if
+# it was there, so the loader's configuration and cache are brought up to date
 ifneq ($(NOLDCONFIG),y)
-ifneq ($(shell uname), FreeBSD)
-	@dir=$$($(LIBDIR_REAL) || echo "$(LIB_INSTALL_DIR)"); \
-	if $(LDCONF_OURS) && grep -qxF "$$dir" $(LDCONF_FILE); then \
-		echo "Removing $$dir from $(LDCONF_FILE)"; \
-		keep=$$(grep -vxF "$$dir" $(LDCONF_FILE)); \
-		if [ "$$keep" = '$(LDCONF_MARK)' ]; then \
-			rm -f $(LDCONF_FILE); \
+ifeq ($(shell uname), FreeBSD)
+ifeq ($(SHARED),y)
+	ldconfig
+endif
+else
+# Every line of ours names a directory install put the library in, so one whose
+# directory holds no libpqos shared object of any version any more, anywhere
+# below it - the loader searches a directory's hwcaps subdirectories as well -
+# is stale and goes: this uninstall's own directory, just emptied above, and
+# any emptied or removed since it was registered - under whatever name, or
+# through whatever link, it is reached by today. A line whose library is still
+# there stays, which is what a prefix that still holds an install needs; of any
+# version, so that a library of another SONAME installed there by another
+# release of this file keeps its line, and a regular file that is there, or a
+# link that resolves to one, not a link left dangling by one removed. The tree
+# is walked as it lies on disk, no link to a directory followed: nothing vets
+# the tree again here, and a link added since the install could lead anywhere.
+# A directory that cannot be seen at the time, on a filesystem not mounted,
+# reads as empty and goes too; the next install there puts it back.
+	@$(LDCONF_WRITE); if $(LDCONF_OURS); then \
+		lines=$$(tail -n +2 $(LDCONF_FILE)) || exit 1; \
+		keep=$$(printf '%s\n' "$$lines" | while IFS= read -r d; do \
+			[ -n "$$d" ] || continue; \
+			if find "$$d" -name '$(LIB).so.[0-9]*' \( -type f -o -type l \) \
+				-exec test -f {} \; -print -quit 2>/dev/null | grep -q .; then \
+				printf '%s\n' "$$d"; \
+			else \
+				echo "Removing $$d from $(LDCONF_FILE)" >&2; \
+			fi; \
+		done); \
+		if [ -z "$$keep" ]; then \
+			rm -f $(LDCONF_FILE) || exit 1; \
 		else \
-			printf '%s\n' "$$keep" > $(LDCONF_FILE); \
+			ldconf_write '$(LDCONF_MARK)' "$$keep" || exit 1; \
 		fi; \
 	fi
-endif
 	ldconfig
 endif
 endif
