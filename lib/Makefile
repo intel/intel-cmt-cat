@@ -157,14 +157,63 @@ LDCACHE_HAS_LIB = ldconfig -p | \
 # LIB_INSTALL_DIR with symbolic links resolved. This is what gets
 # registered, so no link above it can later point the loader elsewhere.
 LIBDIR_REAL = cd "$(LIB_INSTALL_DIR)" 2>/dev/null && pwd -P
-# True when "dir" and every directory above it are owned by root and
-# writable by no one else. Otherwise another user could replace what
-# privileged programs load from it, so it is not registered.
+# True when "dir", everything below it and every directory above it are owned
+# by root and writable by no one else, and no link below it points out of it;
+# otherwise another user could replace what privileged programs load from it,
+# and it is not registered. A directory the loader is told to search is
+# searched whole, so a file in it another user can write is as good to them as
+# the directory; and its subdirectories are searched as well - glibc-
+# hwcaps/<subdir> from glibc 2.33 on, and before 2.37 tls, the platform's name
+# and hardware capability names in any combination - which ones depending on
+# the glibc and the CPU, so the whole tree below is held to the test. The mode
+# bits see an ACL too: the mask an ACL carries bounds every right it grants and
+# is what the group bits of the mode show, so what another user may write
+# through an ACL shows as group-writable. Links are followed, since what the
+# loader loads through one is its target: a link's own mode is 0777 and says
+# nothing; a dangling link loads nothing and is left out - under -L, -type l is
+# true of a dangling link alone. A link's target is taken as written: one that
+# is absolute or climbs above "dir" may pass through a path some component of
+# which is another user's to repoint, and none of that is looked at here, so it
+# is refused; one that stays below "dir", as the library's own links do, passes
+# through nothing but what this test covers - as long as no directory on its
+# way is itself a link, since a link to "." or to a parent makes a path shorter
+# than it reads, so a target that passes through one is refused as well. Each
+# link is read by name, one at a time, so a name or a target with a tab or a
+# newline in it is read whole. The links are judged first, so that the scan
+# that follows them is made only once it is known to stay below "dir". A tree
+# that cannot be looked at whole - part of it unreadable, a loop among its
+# links, a mount that fails - is refused as well, rather than vouched for on
+# what was seen. The first thing found wanting is named.
 LIBDIR_TRUSTED = ( d="$$dir"; \
+	f=$$(find "$$d" -type l -exec sh -c 'd=$$1; shift; set -f; IFS=/; \
+		for l; do t=$$(readlink -- "$$l") || exit 2; \
+			case $$t in /*) echo "$$l out"; exit 0;; esac; \
+			p=$${l%/*}; p=$${p\#"$$d"}/$$t; k=0; cur=$$d; \
+			n=$$(set -- $$p; echo $$\#); i=0; \
+			for c in $$p; do i=$$((i + 1)); case $$c in \
+				""|.) ;; \
+				..) k=$$((k - 1)); [ $$k -ge 0 ] || { echo "$$l out"; exit 0; }; \
+					cur=$${cur%/*};; \
+				*) k=$$((k + 1)); cur=$$cur/$$c; [ $$i -eq $$n ] || \
+					[ ! -L "$$cur" ] || { echo "$$l via"; exit 0; };; \
+			esac; done; \
+		done' sh "$$d" {} + 2>/dev/null) || \
+		{ echo "not all of $$d could be examined"; exit 1; }; \
+	case $$f in \
+		"") ;; \
+		*" via") echo "$${f% via} is a link whose target passes through" \
+			"another link"; exit 1;; \
+		*) echo "$${f% out} is a link pointing out of $$dir"; exit 1;; \
+	esac; \
+	f=$$(find -L "$$d" ! -type l \( ! -user 0 -o -perm /022 \) \
+		-print -quit 2>/dev/null) || \
+		{ echo "not all of $$d could be examined"; exit 1; }; \
+	[ -z "$$f" ] || \
+		{ echo "$$f is not owned by root or is writable by others"; exit 1; }; \
 	while [ -n "$$(find "$$d" -maxdepth 0 -user 0 ! -perm /022)" ]; do \
 		[ "$$d" = / ] && exit 0; \
 		d=$$(dirname "$$d"); \
-	done; exit 1 )
+	done; echo "$$d is not owned by root or is writable by others"; exit 1 )
 
 all: unselected-form
 
@@ -215,10 +264,11 @@ ifneq ($(NOLDCONFIG),y)
 ifneq ($(shell uname), FreeBSD)
 	@$(LDCONF_WRITE); dir=$$($(LIBDIR_REAL)); \
 	if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
-		if ! $(LIBDIR_TRUSTED); then \
+		if ! why=$$( $(LIBDIR_TRUSTED) ); then \
 			echo "Not adding $$dir to the dynamic linker search" \
-				"path: it or a directory above it is not owned" \
-				"by root or is writable by others"; \
+				"path: $$why"; \
+			hint="set LD_LIBRARY_PATH, or install below a directory" \
+			hint="$$hint owned by root and writable by no one else"; \
 		else \
 			[ -e $(LDCONF_FILE) ] || [ -L $(LDCONF_FILE) ] || \
 				ldconf_write '$(LDCONF_MARK)'; \
@@ -235,10 +285,10 @@ ifneq ($(shell uname), FreeBSD)
 					"$$dir" && ldconfig || exit 1; \
 			fi; \
 		fi; \
-	fi
-	@$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not in" \
-		"the dynamic linker search path, add it to a file in" \
-		"$(LDCONF_DIR) or to LD_LIBRARY_PATH"
+	fi; \
+	$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not in" \
+		"the dynamic linker search path:" \
+		"$${hint:-add it to a file in $(LDCONF_DIR) or to LD_LIBRARY_PATH}"
 endif
 endif
 endif
