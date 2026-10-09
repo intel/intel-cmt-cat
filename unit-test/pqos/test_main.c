@@ -706,6 +706,16 @@ test_mon_dev_refuses_a_channel_named_twice(void **state)
         assert_true(
             output_has_text("Virtual channel 1 is selected more than once"));
 
+        /* every channel there is, and one of them again: the repeat is the
+         * fault, not the size - eight distinct channels fit. The parser this
+         * replaced reported "Too many virtual channels" here
+         */
+        run_void_function(selfn_monitor_devs, "llc:0000:1c:00.0@0-7,0");
+        assert_true(output_exit_was_called());
+        assert_true(
+            output_has_text("Virtual channel 0 is selected more than once"));
+        assert_false(output_has_text("Too many virtual channels"));
+
         (void)state; /* unused */
 }
 
