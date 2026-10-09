@@ -738,26 +738,21 @@ test_cxl_drops_a_capacity_it_could_not_ask_about(void **state)
         unsigned num = 0;
         int available = -1;
         int complete = -1;
-        int ret;
 
-        /* a partition nobody may look into is not a partition the device does
-         * not have: whether it is there is unknown, and so is the capacity
+        /* a partition whose existence cannot be checked is not a partition the
+         * device does not have: whether it is there is unknown, and so is the
+         * capacity. A link to itself is that question, and one no privilege
+         * answers - access() gives ELOOP, which is neither ENOENT nor ENOTDIR -
+         * where a directory of mode 000 still answers "there" and only its size
+         * cannot be read, which is the case before this one
          */
         fixture_one_device();
         fixture_partition("0000:11:00.0", "mem0", "ram", "0x2000000000");
-        fixture_partition("0000:11:00.0", "mem0", "pmem", "0x1000000000");
-        fixture_run("chmod 000 %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
-        if (access(FIXTURE_PCI "/0000:11:00.0/mem0/pmem/size", F_OK) == 0) {
-                /* a user the permission does not stop has nothing to check */
-                fixture_run("chmod 755 %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
-                skip();
-        }
+        fixture_run("ln -s pmem %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
 
-        ret = cxl_devices_read(&available, &complete, &num, &devices);
-        /* back before anything is asserted, so the teardown can remove it */
-        fixture_run("chmod 755 %s/0000:11:00.0/mem0/pmem", FIXTURE_PCI);
-
-        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
         assert_int_equal(num, 1);
         assert_non_null(devices);
         assert_int_equal(devices[0].capacity_valid, 0);
