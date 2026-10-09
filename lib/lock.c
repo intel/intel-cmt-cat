@@ -1006,11 +1006,19 @@ remove_the_lockfile(void)
  * lock for ever. A cleanup handler around each call would have to pair with it
  * lexically in fifty-odd places, several with more than one return. A key's
  * destructor needs neither: POSIX runs it when a thread exits or is cancelled
- * with a non-NULL value, and the value is non-NULL exactly while this thread
- * holds the lock, so the destructor unlocks a mutex the exiting thread owns.
+ * with a non-NULL value. The value is this thread's record, made the first
+ * time the thread takes the lock and kept for the thread's life, and the
+ * record says whether the lock is held: taking and releasing it afterwards is
+ * a write to that memory, which cannot fail. A record set and cleared through
+ * the key instead would be cleared by a call that can fail, and a thread whose
+ * clear had failed would look like the holder after giving the lock back - its
+ * destructor would then unlock a mutex another thread holds by then, or one
+ * pqos_fini() has destroyed. The record is written by its own thread alone,
+ * and read by that thread's destructor once the thread is gone.
  *
  * Neither lock_get() nor lock_release() contains a cancellation point between
- * the mutex and the key, so a deferred cancellation cannot land between them.
+ * the mutex and the record, so a deferred cancellation cannot land between
+ * them.
  *
  * The key is created once per process, by the first lock_init(), which can
  * fail and say so: a key that could not be created fails the initialisation,
@@ -1023,16 +1031,26 @@ static pthread_once_t m_apilock_held_once = PTHREAD_ONCE_INIT;
 static int m_apilock_held_valid = 0;
 
 /**
+ * @brief One thread's record of its hold on the API lock
+ */
+struct apilock_record {
+        int held; /**< whether this thread holds the lock */
+};
+
+/**
  * @brief Gives back the API lock of a thread leaving without releasing it
  *
- * @param [in] held this thread's value for the key, non-NULL while it holds
- *             the lock
+ * @param [in] value this thread's record, which says whether it holds the
+ *             lock; freed here, the thread being gone
  */
 static void
-lock_held_destructor(void *held)
+lock_held_destructor(void *value)
 {
-        (void)held;
-        pthread_mutex_unlock(&m_apilock_mutex);
+        struct apilock_record *record = value;
+
+        if (record->held)
+                pthread_mutex_unlock(&m_apilock_mutex);
+        free(record);
 }
 
 /**
@@ -1311,14 +1329,35 @@ lock_get(void)
          */
         (void)pthread_once(&m_apilock_held_once, lock_held_key_create);
         if (m_apilock_held_valid) {
-                const int err =
-                    pthread_setspecific(m_apilock_held, &m_apilock_held);
+                struct apilock_record *record =
+                    pthread_getspecific(m_apilock_held);
 
-                if (err != 0)
-                        fprintf(stderr,
-                                "API lock holder not recorded, a thread that "
-                                "exits holding it will not give it back: %s\n",
-                                strerror(err));
+                /* made on the thread's first lock, and kept: a thread whose
+                 * record could not be made is told so, holds the lock as
+                 * usual and gives it back on return; only its exit while
+                 * holding it would go unanswered. The next lock tries again.
+                 */
+                if (record == NULL) {
+                        int err = ENOMEM;
+
+                        record = calloc(1, sizeof(*record));
+                        if (record != NULL) {
+                                err =
+                                    pthread_setspecific(m_apilock_held, record);
+                                if (err != 0) {
+                                        free(record);
+                                        record = NULL;
+                                }
+                        }
+                        if (record == NULL)
+                                fprintf(stderr,
+                                        "API lock holder not recorded, a "
+                                        "thread that exits holding it will "
+                                        "not give it back: %s\n",
+                                        strerror(err));
+                }
+                if (record != NULL)
+                        record->held = 1;
         }
 }
 
@@ -1326,11 +1365,14 @@ void
 lock_release(void)
 {
         if (m_apilock_held_valid) {
-                const int err = pthread_setspecific(m_apilock_held, NULL);
+                struct apilock_record *record =
+                    pthread_getspecific(m_apilock_held);
 
-                if (err != 0)
-                        fprintf(stderr, "API lock holder not cleared: %s\n",
-                                strerror(err));
+                /* cleared before the unlock, in memory, so it cannot fail and
+                 * cannot be seen as held once the lock is another's
+                 */
+                if (record != NULL)
+                        record->held = 0;
         }
 
         if (pthread_mutex_unlock(&m_apilock_mutex) != 0)

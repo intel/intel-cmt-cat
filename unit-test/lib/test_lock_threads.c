@@ -73,6 +73,8 @@ static int m_holder_go;
  */
 static int m_key_create_error;
 static int m_setspecific_error;
+/** how many times pthread_setspecific() was called */
+static int m_setspecific_calls;
 
 int
 __wrap_pthread_key_create(pthread_key_t *key, void (*destructor)(void *))
@@ -88,6 +90,7 @@ __wrap_pthread_setspecific(pthread_key_t key, const void *value)
         const int err =
             __atomic_exchange_n(&m_setspecific_error, 0, __ATOMIC_ACQ_REL);
 
+        __atomic_fetch_add(&m_setspecific_calls, 1, __ATOMIC_ACQ_REL);
         if (err != 0)
                 return err;
         return __real_pthread_setspecific(key, value);
@@ -188,6 +191,18 @@ holder_waits_to_be_cancelled(void *arg)
 }
 
 static void *
+holder_holds_then_waits(void *arg)
+{
+        (void)arg;
+        lock_get();
+        __atomic_store_n(&m_holder_has, 1, __ATOMIC_RELEASE);
+        while (!__atomic_load_n(&m_holder_go, __ATOMIC_ACQUIRE))
+                sleep_ms(10);
+        lock_release();
+        return NULL;
+}
+
+static void *
 holder_releases_then_waits(void *arg)
 {
         (void)arg;
@@ -264,12 +279,17 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
         char buf[256] = "";
         FILE *captured;
         int saved;
+        pthread_t t;
 
         /* The record could not be made: the call still holds the lock and
          * gives it back on return, and what it cannot do - give it back on a
-         * thread exit - is said rather than left silent.
+         * thread exit - is said rather than left silent. On a thread of its
+         * own, since a record is made by a thread's first lock and this
+         * thread has locked before.
          */
         (void)state;
+        __atomic_store_n(&m_holder_has, 0, __ATOMIC_RELEASE);
+        __atomic_store_n(&m_holder_go, 0, __ATOMIC_RELEASE);
         captured = tmpfile();
         assert_non_null(captured);
         fflush(stderr);
@@ -278,7 +298,9 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
         assert_true(dup2(fileno(captured), STDERR_FILENO) >= 0);
 
         __atomic_store_n(&m_setspecific_error, ENOMEM, __ATOMIC_RELEASE);
-        lock_get();
+        assert_int_equal(
+            pthread_create(&t, NULL, holder_holds_then_waits, NULL), 0);
+        assert_true(wait_for(&m_holder_has, FREE_WAIT_MS));
 
         fflush(stderr);
         assert_true(dup2(saved, STDERR_FILENO) >= 0);
@@ -289,6 +311,55 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
         assert_non_null(strstr(buf, "API lock holder not recorded"));
 
         assert_false(another_thread_takes_the_lock(300));
+        __atomic_store_n(&m_holder_go, 1, __ATOMIC_RELEASE);
+        assert_int_equal(pthread_join(t, NULL), 0);
+        the_waiting_probe_gets_the_lock();
+}
+
+static void *
+holder_locks_twice_then_waits(void *arg)
+{
+        (void)arg;
+        lock_get();
+        lock_release();
+        lock_get();
+        lock_release();
+        __atomic_store_n(&m_holder_has, 1, __ATOMIC_RELEASE);
+        while (!__atomic_load_n(&m_holder_go, __ATOMIC_ACQUIRE))
+                sleep_ms(10);
+        return NULL;
+}
+
+static void
+test_a_release_clears_the_record_in_memory(void **state)
+{
+        pthread_t t;
+        int calls;
+
+        /* A thread's record is made once, by its first lock, and held and
+         * released by writing to it, so a release cannot fail to clear it:
+         * two locks and two releases are one call to the key. The thread
+         * then exits with the lock released while this thread holds it, and
+         * the destructor, reading a record that says not held, unlocks
+         * nothing - if it did, a third thread would take a lock the case is
+         * still holding.
+         */
+        (void)state;
+        __atomic_store_n(&m_holder_has, 0, __ATOMIC_RELEASE);
+        __atomic_store_n(&m_holder_go, 0, __ATOMIC_RELEASE);
+        calls = __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE);
+        assert_int_equal(
+            pthread_create(&t, NULL, holder_locks_twice_then_waits, NULL), 0);
+        assert_true(wait_for(&m_holder_has, FREE_WAIT_MS));
+        assert_int_equal(
+            __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE) - calls, 1);
+
+        lock_get();
+        __atomic_store_n(&m_holder_go, 1, __ATOMIC_RELEASE);
+        assert_int_equal(pthread_join(t, NULL), 0);
+
+        assert_false(another_thread_takes_the_lock(300));
+
         lock_release();
         the_waiting_probe_gets_the_lock();
 }
@@ -378,6 +449,7 @@ main(void)
             cmocka_unit_test(
                 test_a_thread_that_exits_holding_the_lock_gives_it_back),
             cmocka_unit_test(test_a_cancelled_thread_gives_the_lock_back),
+            cmocka_unit_test(test_a_release_clears_the_record_in_memory),
             cmocka_unit_test(test_a_holder_that_is_not_recorded_is_reported)};
 
         result += cmocka_run_group_tests(tests_init, dir_setup, dir_teardown);
