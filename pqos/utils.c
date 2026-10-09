@@ -165,10 +165,12 @@ list_trim(char *str)
  * @brief Reads one number of a list element
  *
  * pqos_parse_uint64(), which refuses a sign, and where the caller asks for it
- * a leading '+' before a digit besides: the options strlisttotab() reads have
- * always accepted one, since strtoull() does, and --mon-dev, which parsed with
- * pqos_parse_uint64(), never has. "-" stays refused because it is what
- * separates the ends of a range.
+ * a leading '+' before a decimal number besides: the options strlisttotab()
+ * reads have always accepted one, since strtoull() does, and --mon-dev, which
+ * parsed with pqos_parse_uint64(), never has. Before a decimal number only,
+ * because that is the form those options took: their parser looked for "0x"
+ * first and read anything else as decimal, so "+0x5" was a "+0" with a stray
+ * "x5" after it. "-" stays refused because it separates the ends of a range.
  *
  * @param [in] text the number
  * @param [out] value what it reads as
@@ -181,7 +183,8 @@ list_number(const char *text, uint64_t *value, const int plus)
 {
         while (isspace((unsigned char)*text))
                 text++;
-        if (plus && text[0] == '+' && isdigit((unsigned char)text[1]))
+        if (plus && text[0] == '+' && isdigit((unsigned char)text[1]) &&
+            !(text[1] == '0' && (text[2] == 'x' || text[2] == 'X')))
                 text++;
 
         return pqos_parse_uint64(text, value);

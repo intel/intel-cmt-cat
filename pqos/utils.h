@@ -84,8 +84,9 @@ enum list_error {
  *  "3-1" is 3, 2, 1 rather than 1, 2, 3
  */
 #define LIST_KEEP_ORDER 0x2
-/** list_parse() flag: a number may carry a leading '+', which the options
- *  strlisttotab() reads have always taken and --mon-dev never has
+/** list_parse() flag: a decimal number may carry a leading '+', which the
+ *  options strlisttotab() reads have always taken and --mon-dev never has.
+ *  Not a hexadecimal one: "+0x5" was never accepted
  */
 #define LIST_PLUS 0x4
 

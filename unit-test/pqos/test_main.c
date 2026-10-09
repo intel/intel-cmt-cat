@@ -309,6 +309,7 @@ test_strlisttotab_accepts_a_leading_plus(void **state)
 {
         uint64_t tab[4] = {0};
         char input[] = "+1,+3-+4";
+        char signed_hex[] = "+0x5";
         unsigned parsed = 0;
 
         /* what the options it reads have always taken: list_parse() refuses a
@@ -319,6 +320,10 @@ test_strlisttotab_accepts_a_leading_plus(void **state)
         assert_false(output_exit_was_called());
         assert_int_equal(parsed, 3);
         assert_true(tab[0] == 1 && tab[1] == 3 && tab[2] == 4);
+
+        /* and only before a decimal number, as they always have */
+        run_function(strlisttotab, parsed, signed_hex, tab, 4);
+        assert_true(output_exit_was_called());
 
         (void)state; /* unused */
 }
@@ -596,6 +601,8 @@ test_list_parse_accepts_a_leading_plus(void **state)
         uint64_t tab[4] = {0};
         char input[] = "+5,+1-+3";
         char refused[] = "+5";
+        char signed_hex[] = "+0x5";
+        char signed_hex_end[] = "1-+0X5";
         struct list_fault fault;
 
         /* what strtoull() has always let the options strlisttotab() reads
@@ -609,6 +616,19 @@ test_list_parse_accepts_a_leading_plus(void **state)
         assert_int_equal(list_parse(refused, tab, 4, UINT64_MAX, 0, &fault),
                          LIST_SYNTAX);
         assert_string_equal(fault.token, "+5");
+
+        /* nor before a hexadecimal number, with the flag or without: those
+         * options read "0x" first and anything else as decimal, so "+0x5"
+         * was never one they took
+         */
+        assert_int_equal(
+            list_parse(signed_hex, tab, 4, UINT64_MAX, LIST_PLUS, &fault),
+            LIST_SYNTAX);
+        assert_string_equal(fault.token, "+0x5");
+        assert_int_equal(
+            list_parse(signed_hex_end, tab, 4, UINT64_MAX, LIST_PLUS, &fault),
+            LIST_SYNTAX);
+        assert_string_equal(fault.token, "1-+0X5");
 
         (void)state; /* unused */
 }
