@@ -732,6 +732,50 @@ test_cxl_drops_a_partition_without_a_size(void **state)
 }
 
 static void
+test_cxl_has_no_capacity_for_a_name_too_long_to_keep(void **state)
+{
+        struct pqos_cxl_device *devices = NULL;
+        unsigned num = 0;
+        int available = -1;
+        int complete = -1;
+        /* longer than PQOS_CXL_NAME_LEN, so the name is not kept */
+        const char *long_mem = "mem0123456789012345678901234567890123";
+        const char *long_pci = "0000:11:00.0-0123456789012345678901234";
+
+        /* the chain resolves and the partitions are there; what is missing is
+         * a name the structure can hold, once for the memory device and once
+         * for its PCI function. A device that could not be named carries no
+         * capacity either
+         */
+        fixture_region("region0", "1", "0x6200000000", "0x4000000000");
+        fixture_target("region0", 0, "endpoint4", "decoder4.0", "0000:11:00.0",
+                       long_mem);
+        fixture_partition("0000:11:00.0", long_mem, "ram", "0x2000000000");
+        fixture_target("region0", 1, "endpoint5", "decoder5.0", long_pci,
+                       "mem1");
+        fixture_partition(long_pci, "mem1", "ram", "0x2000000000");
+
+        assert_int_equal(
+            cxl_devices_read(&available, &complete, &num, &devices),
+            PQOS_RETVAL_OK);
+        assert_int_equal(num, 2);
+        assert_non_null(devices);
+
+        assert_int_equal(devices[0].mem_name[0], '\0');
+        assert_string_equal(devices[0].pci_address, "0000:11:00.0");
+        assert_int_equal(devices[0].capacity_valid, 0);
+        assert_true(devices[0].ram_capacity == 0);
+
+        assert_string_equal(devices[1].mem_name, "mem1");
+        assert_int_equal(devices[1].pci_address[0], '\0');
+        assert_int_equal(devices[1].capacity_valid, 0);
+        assert_true(devices[1].ram_capacity == 0);
+
+        cxl_devices_free(devices);
+        (void)state;
+}
+
+static void
 test_cxl_drops_a_capacity_it_could_not_ask_about(void **state)
 {
         struct pqos_cxl_device *devices = NULL;
@@ -914,6 +958,9 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_cxl_drops_a_partition_without_a_size, fixture_setup,
                 fixture_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_cxl_has_no_capacity_for_a_name_too_long_to_keep,
+                fixture_setup, fixture_teardown),
             cmocka_unit_test_setup_teardown(
                 test_cxl_drops_a_capacity_it_could_not_ask_about, fixture_setup,
                 fixture_teardown),

@@ -268,6 +268,10 @@ name_device(const char *decoder, struct pqos_cxl_device *device)
          * this one is not bounded by PATH_MAX alone
          */
         char uport[PATH_MAX + sizeof("/uport")];
+        /* the device's own directory, kept whole: the path above is cut into
+         * the two names, and the capacity is read from here once both are
+         */
+        char memdev[PATH_MAX];
         char *endpoint;
         char *name;
         char *parent;
@@ -297,10 +301,7 @@ name_device(const char *decoder, struct pqos_cxl_device *device)
                 return;
         }
 
-        /* the uport is the device's own directory, so its capacity is read
-         * from here, before the path is cut into the two names
-         */
-        read_capacity(resolved, device);
+        memcpy(memdev, resolved, sizeof(memdev));
 
         name = strrchr(resolved, '/');
         if (name == NULL)
@@ -319,6 +320,13 @@ name_device(const char *decoder, struct pqos_cxl_device *device)
         if (strlen(parent) < sizeof(device->pci_address))
                 strncpy(device->pci_address, parent,
                         sizeof(device->pci_address) - 1);
+
+        /* and the capacity only of a device both names were found for: one
+         * that could not be named has no capacity in the report either, which
+         * is what the field promises
+         */
+        if (device->mem_name[0] != '\0' && device->pci_address[0] != '\0')
+                read_capacity(memdev, device);
 }
 
 /**
