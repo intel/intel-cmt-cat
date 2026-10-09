@@ -164,21 +164,24 @@ list_trim(char *str)
 /**
  * @brief Reads one number of a list element
  *
- * pqos_parse_uint64(), which refuses a sign, and a leading '+' before a digit
- * besides: the list options have always accepted one, since strtoull() does,
- * and "-" stays refused because it is what separates the ends of a range.
+ * pqos_parse_uint64(), which refuses a sign, and where the caller asks for it
+ * a leading '+' before a digit besides: the options strlisttotab() reads have
+ * always accepted one, since strtoull() does, and --mon-dev, which parsed with
+ * pqos_parse_uint64(), never has. "-" stays refused because it is what
+ * separates the ends of a range.
  *
  * @param [in] text the number
  * @param [out] value what it reads as
+ * @param [in] plus whether a leading '+' is accepted
  *
  * @return 0 on success, -1 where it is not a number
  */
 static int
-list_number(const char *text, uint64_t *value)
+list_number(const char *text, uint64_t *value, const int plus)
 {
         while (isspace((unsigned char)*text))
                 text++;
-        if (text[0] == '+' && isdigit((unsigned char)text[1]))
+        if (plus && text[0] == '+' && isdigit((unsigned char)text[1]))
                 text++;
 
         return pqos_parse_uint64(text, value);
@@ -193,6 +196,7 @@ list_parse(char *s,
            struct list_fault *fault)
 {
         struct list_fault unused;
+        const int plus = (flags & LIST_PLUS) != 0;
         char *saveptr = NULL;
         char *token;
         unsigned count = 0;
@@ -224,13 +228,13 @@ list_parse(char *s,
                 dash = strchr(token, '-');
                 if (dash != NULL) {
                         *dash = '\0';
-                        if (list_number(token, &start) != 0 ||
-                            list_number(dash + 1, &end) != 0) {
+                        if (list_number(token, &start, plus) != 0 ||
+                            list_number(dash + 1, &end, plus) != 0) {
                                 *dash = '-';
                                 return LIST_SYNTAX;
                         }
                         *dash = '-';
-                } else if (list_number(token, &start) != 0)
+                } else if (list_number(token, &start, plus) != 0)
                         return LIST_SYNTAX;
                 else
                         end = start;
@@ -298,7 +302,7 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                 exit(EXIT_FAILURE);
         }
 
-        n = list_parse(s, tab, max, UINT64_MAX, 0, &fault);
+        n = list_parse(s, tab, max, UINT64_MAX, LIST_PLUS, &fault);
         if (n == LIST_FULL) {
                 printf("Exceeded parser capacity of %u entries\n", max);
                 parse_error(tmp, "Too many groups selected.\n");

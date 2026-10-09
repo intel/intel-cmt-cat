@@ -305,6 +305,25 @@ test_strlisttotab_range_of_duplicates_fits_a_full_table(void **state)
 }
 
 static void
+test_strlisttotab_accepts_a_leading_plus(void **state)
+{
+        uint64_t tab[4] = {0};
+        char input[] = "+1,+3-+4";
+        unsigned parsed = 0;
+
+        /* what the options it reads have always taken: list_parse() refuses a
+         * sign unless asked, and strlisttotab() asks. Through the harness,
+         * because a refusal ends in exit()
+         */
+        run_function(strlisttotab, parsed, input, tab, 4);
+        assert_false(output_exit_was_called());
+        assert_int_equal(parsed, 3);
+        assert_true(tab[0] == 1 && tab[1] == 3 && tab[2] == 4);
+
+        (void)state; /* unused */
+}
+
+static void
 test_parse_uint64_formats_and_errors(void **state)
 {
         uint64_t value = 0;
@@ -576,10 +595,20 @@ test_list_parse_accepts_a_leading_plus(void **state)
 {
         uint64_t tab[4] = {0};
         char input[] = "+5,+1-+3";
+        char refused[] = "+5";
+        struct list_fault fault;
 
-        /* what strtoull() has always let the list options take */
-        assert_int_equal(list_parse(input, tab, 4, UINT64_MAX, 0, NULL), 4);
+        /* what strtoull() has always let the options strlisttotab() reads
+         * take, where the caller asks for it
+         */
+        assert_int_equal(list_parse(input, tab, 4, UINT64_MAX, LIST_PLUS, NULL),
+                         4);
         assert_true(tab[0] == 5 && tab[1] == 1 && tab[2] == 2 && tab[3] == 3);
+
+        /* and not otherwise */
+        assert_int_equal(list_parse(refused, tab, 4, UINT64_MAX, 0, &fault),
+                         LIST_SYNTAX);
+        assert_string_equal(fault.token, "+5");
 
         (void)state; /* unused */
 }
@@ -696,6 +725,15 @@ test_mon_dev_names_the_element_it_cannot_read(void **state)
         run_void_function(selfn_monitor_devs, "llc:0000:1e:00.0@1-2-3");
         assert_true(output_exit_was_called());
         assert_true(output_has_text("Invalid virtual channel range '1-2-3'"));
+
+        /* a signed channel, which --mon-dev has never taken */
+        run_void_function(selfn_monitor_devs, "llc:0000:1f:00.0@+1");
+        assert_true(output_exit_was_called());
+        assert_true(output_has_text("Invalid virtual channel '+1'"));
+
+        run_void_function(selfn_monitor_devs, "llc:0000:20:00.0@+1-+3");
+        assert_true(output_exit_was_called());
+        assert_true(output_has_text("Invalid virtual channel range '+1-+3'"));
 
         (void)state; /* unused */
 }
@@ -832,6 +870,7 @@ main(void)
             cmocka_unit_test(test_list_parse_repeats_dropped_or_refused),
             cmocka_unit_test(test_list_parse_whitespace_and_empty_elements),
             cmocka_unit_test(test_list_parse_refuses_what_is_not_a_list),
+            cmocka_unit_test(test_strlisttotab_accepts_a_leading_plus),
             cmocka_unit_test(test_list_parse_accepts_a_leading_plus),
             cmocka_unit_test(test_list_parse_limit_comes_first),
             cmocka_unit_test(test_list_parse_capacity),

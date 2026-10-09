@@ -84,6 +84,10 @@ enum list_error {
  *  "3-1" is 3, 2, 1 rather than 1, 2, 3
  */
 #define LIST_KEEP_ORDER 0x2
+/** list_parse() flag: a number may carry a leading '+', which the options
+ *  strlisttotab() reads have always taken and --mon-dev never has
+ */
+#define LIST_PLUS 0x4
 
 /** What list_parse() failed on */
 struct list_fault {
@@ -101,8 +105,8 @@ struct list_fault {
  * message and exits, the --mon-dev channel list words its own.
  * strlisttotabrealloc(), which grows its table, still reads lists itself.
  *
- * Elements are decimal or 0x-prefixed numbers, optionally signed '+', or
- * inclusive ranges in either
+ * Elements are decimal or 0x-prefixed numbers, with LIST_PLUS optionally
+ * signed '+', or inclusive ranges in either
  * order: "5-1" is "1-5", or with LIST_KEEP_ORDER 5, 4, 3, 2, 1. Whitespace
  * around an element or either end of a range is ignored, and so is an empty
  * element. A repeat is dropped, or with LIST_UNIQUE refused; it needs no room
@@ -114,7 +118,8 @@ struct list_fault {
  * @param [out] tab where the values go
  * @param [in] max how many \a tab holds
  * @param [in] limit the largest value accepted; UINT64_MAX for any
- * @param [in] flags 0, or LIST_UNIQUE and LIST_KEEP_ORDER in any combination
+ * @param [in] flags 0, or LIST_UNIQUE, LIST_KEEP_ORDER and LIST_PLUS in any
+ *             combination
  * @param [out] fault what was wrong, where this fails; may be NULL
  *
  * @return how many values were placed in \a tab, or an enum list_error
