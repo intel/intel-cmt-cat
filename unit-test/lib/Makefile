@@ -118,7 +118,8 @@ $(LIB_DEPS) $(TESTS_DEPS): Makefile $(FLAGS_STAMP)
 # and they are read - see depfiles.mk, which is where the conditions on that are
 # written down. Included here rather than at the top so that the default goal is
 # still "all".
-DEPFILES_TO_READ = $(LIB_DEPS) $(TESTS_DEPS) $(OBJ_DIR)/cxl_fixture.d
+DEPFILES_TO_READ = $(LIB_DEPS) $(TESTS_DEPS) $(OBJ_DIR)/cxl_fixture.d \
+	$(OBJ_DIR)/lock_fixture.d
 include ../depfiles.mk
 
 
@@ -283,6 +284,12 @@ $(OBJ_DIR)/cxl_fixture.d: $(LIB_DIR)/cxl.c Makefile $(FLAGS_STAMP)
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) \
 		-UCXL_BUS_PATH -DCXL_BUS_PATH=\"bus/cxl\" $<
+
+# and the same for the lock module test_lock_threads links, for its lock path
+$(OBJ_DIR)/lock_fixture.d: $(LIB_DIR)/lock.c Makefile $(FLAGS_STAMP)
+	mkdir -p $(OBJ_DIR)
+	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) \
+		-ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $<
 
 # each binary waits for its own, which the pattern above cannot say: these rules
 # carry no recipe and only add a prerequisite.
@@ -1118,13 +1125,25 @@ $(BIN_DIR)/test_common_fread_uint64: ./test_common_fread_uint64.c $(LIB_OBJS)
 
 # the API lock with real threads and the real mutex, so nothing that it locks
 # with is wrapped
-$(BIN_DIR)/test_lock_threads: ./test_lock_threads.c $(LIB_OBJS)
+# The thread cases run the real lock_init(), so they need a lock file of their
+# own: the shared -DLOCKFILE path is in /tmp, where a file another user's run
+# left cannot be removed, and its lock_init() then fails for a reason that has
+# nothing to do with the code. This copy of the module names a relative path,
+# which the binary resolves inside a directory it makes for itself - the shape
+# test_cxl uses, for the same reason, with the Makefile a prerequisite as there.
+$(OBJ_DIR)/lock_fixture.o: $(LIB_DIR)/lock.c $(OBJ_DIR)/lock_fixture.d Makefile
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS) -ULOCKFILE -DLOCKFILE=\"lock/libpqos\" -c $< -o $@
+
+$(BIN_DIR)/test_lock_threads: ./test_lock_threads.c \
+		$(filter-out $(OBJ_DIR)/lock.o,$(LIB_OBJS)) $(OBJ_DIR)/lock_fixture.o
 	mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(WRAP) \
+	$(CC) $(CFLAGS) -ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $(WRAP) \
 		-Wl,--wrap=pthread_key_create \
 		-Wl,--wrap=pthread_setspecific \
 		-Wl,--start-group \
-		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+		$(LDFLAGS) $(filter-out $(OBJ_DIR)/lock.o,$(LIB_OBJS)) \
+		$(OBJ_DIR)/lock_fixture.o $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_log: ./test_log.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)

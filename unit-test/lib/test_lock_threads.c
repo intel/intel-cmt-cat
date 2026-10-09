@@ -44,9 +44,11 @@
 #include "test_lock.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -307,10 +309,7 @@ test_a_key_that_cannot_be_created_fails_init(void **state)
         assert_true(pid >= 0);
         if (pid == 0) {
                 m_key_create_error = EAGAIN;
-                /* refused, and before the lock file was made - one an
-                 * earlier run left is this binary's own, and goes first
-                 */
-                (void)unlink(LOCKFILE);
+                /* refused, and before the lock file was made */
                 _exit(lock_init() == -1 && access(LOCKFILE, F_OK) != 0 ? 0 : 1);
         }
 
@@ -319,19 +318,51 @@ test_a_key_that_cannot_be_created_fails_init(void **state)
         assert_int_equal(WEXITSTATUS(status), 0);
 }
 
+/* The lock module this binary links names a relative LOCKFILE (see the recipe
+ * in unit-test/lib/Makefile), and each group runs in a directory of its own
+ * that holds it: a lock file another user's run left in /tmp cannot be removed
+ * by this one, so a shared path made the cases pass or fail on the host.
+ */
+static char m_dir[PATH_MAX];
+static char m_home[PATH_MAX];
+
+static int
+dir_setup(void **state)
+{
+        (void)state;
+        if (getcwd(m_home, sizeof(m_home)) == NULL)
+                return -1;
+        snprintf(m_dir, sizeof(m_dir), "/tmp/pqos_ut_lock_threads_XXXXXX");
+        if (mkdtemp(m_dir) == NULL || chdir(m_dir) != 0)
+                return -1;
+        return mkdir("lock", 0755);
+}
+
+static int
+dir_teardown(void **state)
+{
+        (void)state;
+        (void)unlink(LOCKFILE);
+        if (rmdir("lock") != 0 || chdir(m_home) != 0)
+                return -1;
+        return rmdir(m_dir);
+}
+
 /** The lock as the library sets it up, with its own lock file */
 static int
 lock_setup(void **state)
 {
-        (void)state;
+        if (dir_setup(state) != 0)
+                return -1;
         return lock_init();
 }
 
 static int
 lock_teardown(void **state)
 {
-        (void)state;
-        return lock_fini();
+        const int ret = lock_fini();
+
+        return dir_teardown(state) != 0 ? -1 : ret;
 }
 
 int
@@ -349,7 +380,7 @@ main(void)
             cmocka_unit_test(test_a_cancelled_thread_gives_the_lock_back),
             cmocka_unit_test(test_a_holder_that_is_not_recorded_is_reported)};
 
-        result += cmocka_run_group_tests(tests_init, NULL, NULL);
+        result += cmocka_run_group_tests(tests_init, dir_setup, dir_teardown);
         result += cmocka_run_group_tests(tests, lock_setup, lock_teardown);
 
         return result;
