@@ -1253,8 +1253,8 @@ cap_print_region_devices(const struct pqos_mem_regions *regions,
                                ", PMEM 0x%" PRIx64 "\n",
                                dev->ram_capacity, dev->pmem_capacity);
                 else
-                        printf("      Capacity : Unknown - the device does not "
-                               "report it\n");
+                        printf("      Capacity : Unknown - capacity could not "
+                               "be determined\n");
         }
 
         /* and a list of devices is not the claim that it is the whole list.

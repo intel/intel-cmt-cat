@@ -830,8 +830,8 @@ test_cap_print_region_devices_without_a_capacity(void **state)
         run_void_function(cap_print_mem_regions, &sys);
 
         /* unknown, not a device of no bytes */
-        assert_int_equal(output_has_text("      Capacity : Unknown - the "
-                                         "device does not report it\n"),
+        assert_int_equal(output_has_text("      Capacity : Unknown - capacity "
+                                         "could not be determined\n"),
                          1);
         assert_int_equal(output_has_text("RAM 0x"), 0);
 }
