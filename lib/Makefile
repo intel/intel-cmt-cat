@@ -290,7 +290,8 @@ else
 	dir=$$($(LIBDIR_REAL)); \
 	[ -f "$$dir/$(LIBNAME)" ] || { echo "$(LIB_INSTALL_DIR)/$(LIBNAME)" \
 		"was removed before it could be registered" >&2; exit 1; }; \
-	if ! $(LDCACHE_HAS_LIB) && [ -d "$(LDCONF_DIR)" ]; then \
+	cached=n; $(LDCACHE_HAS_LIB) && cached=y; \
+	if [ $$cached = n ] && [ -d "$(LDCONF_DIR)" ]; then \
 		if ! why=$$( $(LIBDIR_TRUSTED) ); then \
 			echo "Not adding $$dir to the dynamic linker search" \
 				"path: $$why"; \
@@ -310,10 +311,11 @@ else
 				keep=$$(tail -n +2 "$(LDCONF_FILE)") || exit 1; \
 				ldconf_write '$(LDCONF_MARK)' $${keep:+"$$keep"} \
 					"$$dir" && ldconfig || exit 1; \
+				$(LDCACHE_HAS_LIB) && cached=y; \
 			fi; \
 		fi; \
 	fi; \
-	$(LDCACHE_HAS_LIB) || echo "WARNING: $(LIB_INSTALL_DIR) is not in" \
+	[ $$cached = y ] || echo "WARNING: $(LIB_INSTALL_DIR) is not in" \
 		"the dynamic linker search path:" \
 		"$${hint:-add it to a file in $(LDCONF_DIR) or to LD_LIBRARY_PATH}"
 endif
