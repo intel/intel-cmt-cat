@@ -136,7 +136,7 @@ NOLDCONFIG ?= n
 LDCONF_DIR ?= /etc/ld.so.conf.d
 LDCONF_FILE = $(LDCONF_DIR)/$(LIB).conf
 LDCONF_MARK = \# Added by $(LIB) make install
-LDCONF_OURS = head -n 1 $(LDCONF_FILE) 2>/dev/null | \
+LDCONF_OURS = head -n 1 "$(LDCONF_FILE)" 2>/dev/null | \
 	grep -qxF '$(LDCONF_MARK)'
 # Serialises the read and the rewrite of LDCONF_FILE between installs and
 # uninstalls running at once: a lock on LDCONF_DIR, held on descriptor 9 until
@@ -147,9 +147,9 @@ LDCONF_OURS = head -n 1 $(LDCONF_FILE) 2>/dev/null | \
 # recipe says so and goes on without a lock, as every install did before
 # there was one. No LDCONF_DIR means nothing to register in and nothing to
 # lock.
-LDCONF_LOCK = if [ -d $(LDCONF_DIR) ]; then \
+LDCONF_LOCK = if [ -d "$(LDCONF_DIR)" ]; then \
 	if command -v flock >/dev/null; then \
-		exec 9<$(LDCONF_DIR) && flock -w 30 9 || \
+		exec 9<"$(LDCONF_DIR)" && flock -w 30 9 || \
 			{ echo "Could not lock $(LDCONF_DIR)" >&2; exit 1; }; \
 	else \
 		echo "flock not found: no lock against another install or" \
@@ -160,9 +160,9 @@ LDCONF_LOCK = if [ -d $(LDCONF_DIR) ]; then \
 # into place, so the loader's configuration is replaced in one step and never
 # seen half written or left truncated by a write that failed. ldconfig reads
 # *.conf only, so the file being made is not read by one that runs meanwhile.
-LDCONF_WRITE = ldconf_write() { tmp=$$(mktemp $(LDCONF_FILE).XXXXXX) && \
+LDCONF_WRITE = ldconf_write() { tmp=$$(mktemp "$(LDCONF_FILE).XXXXXX") && \
 	{ printf '%s\n' "$$@" > "$$tmp" && chmod 0644 "$$tmp" && \
-	  mv -f "$$tmp" $(LDCONF_FILE) || { rm -f "$$tmp"; false; }; }; }
+	  mv -f -- "$$tmp" "$(LDCONF_FILE)" || { rm -f -- "$$tmp"; false; }; }; }
 # The cache names a library by the directory ldconfig scanned (/lib64 for
 # /usr/lib64 on Fedora), so an entry is matched by file, not by path
 LDCACHE_HAS_LIB = ldconfig -p | \
@@ -290,24 +290,24 @@ else
 	dir=$$($(LIBDIR_REAL)); \
 	[ -f "$$dir/$(LIBNAME)" ] || { echo "$(LIB_INSTALL_DIR)/$(LIBNAME)" \
 		"was removed before it could be registered" >&2; exit 1; }; \
-	if ! $(LDCACHE_HAS_LIB) && [ -d $(LDCONF_DIR) ]; then \
+	if ! $(LDCACHE_HAS_LIB) && [ -d "$(LDCONF_DIR)" ]; then \
 		if ! why=$$( $(LIBDIR_TRUSTED) ); then \
 			echo "Not adding $$dir to the dynamic linker search" \
 				"path: $$why"; \
 			hint="set LD_LIBRARY_PATH, or install below a directory" \
 			hint="$$hint owned by root and writable by no one else"; \
 		else \
-			[ -e $(LDCONF_FILE) ] || [ -L $(LDCONF_FILE) ] || \
+			[ -e "$(LDCONF_FILE)" ] || [ -L "$(LDCONF_FILE)" ] || \
 				ldconf_write '$(LDCONF_MARK)'; \
-			if [ ! -e $(LDCONF_FILE) ] && [ ! -L $(LDCONF_FILE) ]; then \
+			if [ ! -e "$(LDCONF_FILE)" ] && [ ! -L "$(LDCONF_FILE)" ]; then \
 				echo "Could not create $(LDCONF_FILE)" >&2; exit 1; \
 			elif ! $(LDCONF_OURS); then \
 				echo "$(LDCONF_FILE) was not written by $(LIB)" \
 					"make install, leaving it unchanged"; \
-			elif ! grep -qxF "$$dir" $(LDCONF_FILE); then \
+			elif ! grep -qxF -- "$$dir" "$(LDCONF_FILE)"; then \
 				echo "Adding $$dir to the dynamic linker" \
 					"search path in $(LDCONF_FILE)"; \
-				keep=$$(tail -n +2 $(LDCONF_FILE)) || exit 1; \
+				keep=$$(tail -n +2 "$(LDCONF_FILE)") || exit 1; \
 				ldconf_write '$(LDCONF_MARK)' $${keep:+"$$keep"} \
 					"$$dir" && ldconfig || exit 1; \
 			fi; \
@@ -345,7 +345,7 @@ else
 # A directory that cannot be seen at the time, on a filesystem not mounted,
 # reads as empty and goes too; the next install there puts it back.
 	@$(LDCONF_LOCK); $(LDCONF_WRITE); if $(LDCONF_OURS); then \
-		lines=$$(tail -n +2 $(LDCONF_FILE)) || exit 1; \
+		lines=$$(tail -n +2 "$(LDCONF_FILE)") || exit 1; \
 		keep=$$(printf '%s\n' "$$lines" | while IFS= read -r d; do \
 			[ -n "$$d" ] || continue; \
 			if find "$$d" -name '$(LIB).so.[0-9]*' \( -type f -o -type l \) \
@@ -356,7 +356,7 @@ else
 			fi; \
 		done); \
 		if [ -z "$$keep" ]; then \
-			rm -f $(LDCONF_FILE) || exit 1; \
+			rm -f -- "$(LDCONF_FILE)" || exit 1; \
 		else \
 			ldconf_write '$(LDCONF_MARK)' "$$keep" || exit 1; \
 		fi; \
