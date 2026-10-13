@@ -1030,14 +1030,18 @@ remove_the_lockfile(void)
  * by a thread that exits after the library is gone, which has no lock left to
  * give back.
  *
- * The key is created once per process, by the first lock_init(), which can
- * fail and say so: a key that could not be created fails the initialisation,
- * this one and every later one, rather than leaving a lock without the record
- * that gives it back. lock_get() goes through the same pthread_once(), which is
- * what orders its read of the flag after the creation.
+ * The key is created by lock_init(), under its init_mutex, the first time an
+ * initialisation gets that far, and kept for the process. A creation that
+ * fails - PTHREAD_KEYS_MAX is a pool the whole process shares, and
+ * pthread_key_create() says EAGAIN when it is spent - fails that
+ * initialisation and says so, rather than leave a lock without the record
+ * that gives it back; the next initialisation tries again, since a key freed
+ * by another library meanwhile makes the next attempt succeed. lock_get()
+ * reads the flag without a fence: the initialisation that set it did so under
+ * init_mutex before it made the API mutex, and a thread that takes the API
+ * mutex has synchronised with the initialisation that made it.
  */
 static pthread_key_t m_apilock_held;
-static pthread_once_t m_apilock_held_once = PTHREAD_ONCE_INIT;
 static int m_apilock_held_valid = 0;
 
 /**
@@ -1081,20 +1085,28 @@ lock_held_key_unload(void)
 }
 
 /**
- * @brief Creates the key, once per process
+ * @brief Creates the key, the first time an initialisation gets here
+ *
+ * Under lock_init()'s init_mutex. A failure is reported and leaves the key
+ * for the next initialisation to try.
+ *
+ * @return 0 on success, -1 where the key could not be created
  */
-static void
+static int
 lock_held_key_create(void)
 {
-        const int err =
-            pthread_key_create(&m_apilock_held, lock_held_destructor);
+        int err;
 
+        if (m_apilock_held_valid)
+                return 0;
+        err = pthread_key_create(&m_apilock_held, lock_held_destructor);
         if (err != 0) {
                 fprintf(stderr, "Couldn't create the API lock key: %s\n",
                         strerror(err));
-                return;
+                return -1;
         }
         m_apilock_held_valid = 1;
+        return 0;
 }
 
 int
@@ -1107,9 +1119,8 @@ lock_init(void)
 
         pthread_mutex_lock(&init_mutex);
 
-        /* the record that gives the lock back, before anything is created */
-        if (pthread_once(&m_apilock_held_once, lock_held_key_create) != 0 ||
-            !m_apilock_held_valid) {
+        /* the key that gives the lock back, before anything is created */
+        if (lock_held_key_create() != 0) {
                 pthread_mutex_unlock(&init_mutex);
                 return -1;
         }
@@ -1360,10 +1371,10 @@ lock_get(void)
                 return;
         }
 
-        /* clear only where the key could not be created, which lock_init()
-         * has already reported and failed on
+        /* armed where there is a key - one that could not be created was
+         * reported by lock_init(), which failed on it - and this thread has
+         * set no value in it yet
          */
-        (void)pthread_once(&m_apilock_held_once, lock_held_key_create);
         if (m_apilock_held_valid &&
             pthread_getspecific(m_apilock_held) == NULL) {
                 /* armed on the thread's first lock, and kept. A thread whose

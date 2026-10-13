@@ -457,8 +457,10 @@ test_a_key_that_cannot_be_created_fails_init(void **state)
         pid_t pid;
         int status = -1;
 
-        /* In a child: the key is made once per process, so a failure here is
-         * permanent for whoever sees it, and the other cases need a key.
+        /* In a child, so that the failure is seen by a process of its own and
+         * the other cases keep their key. The failure is not permanent: the
+         * next initialisation tries again, and succeeds once the key can be
+         * made.
          */
         (void)state;
         fflush(stdout);
@@ -466,9 +468,16 @@ test_a_key_that_cannot_be_created_fails_init(void **state)
         pid = fork();
         assert_true(pid >= 0);
         if (pid == 0) {
+                int refused, retried;
+
                 m_key_create_error = EAGAIN;
                 /* refused, and before the lock file was made */
-                _exit(lock_init() == -1 && access(LOCKFILE, F_OK) != 0 ? 0 : 1);
+                refused = lock_init() == -1 && access(LOCKFILE, F_OK) != 0;
+                m_key_create_error = 0;
+                retried = lock_init() == 0 && access(LOCKFILE, F_OK) == 0;
+                if (retried)
+                        lock_fini();
+                _exit(refused && retried ? 0 : 1);
         }
 
         assert_int_equal(waitpid(pid, &status, 0), pid);
