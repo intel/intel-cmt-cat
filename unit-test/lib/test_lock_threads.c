@@ -77,6 +77,15 @@ static int m_holder_go;
  */
 static int m_key_create_error;
 static int m_setspecific_error;
+/** how many of the next pthread_setspecific() calls fail, one each, before
+ *  the calls pass through again
+ */
+static int m_setspecific_failures_left;
+/** what each of them returns: positive, as pthread_setspecific() returns
+ *  its error rather than setting errno - named, since checkpatch takes a
+ *  bare positive errno constant returned for a missing minus sign
+ */
+static const int m_setspecific_failure = ENOMEM;
 /** how many times pthread_setspecific() was called */
 static int m_setspecific_calls;
 
@@ -93,10 +102,18 @@ __wrap_pthread_setspecific(pthread_key_t key, const void *value)
 {
         const int err =
             __atomic_exchange_n(&m_setspecific_error, 0, __ATOMIC_ACQ_REL);
+        int left =
+            __atomic_load_n(&m_setspecific_failures_left, __ATOMIC_ACQUIRE);
 
         __atomic_fetch_add(&m_setspecific_calls, 1, __ATOMIC_ACQ_REL);
         if (err != 0)
                 return err;
+        while (left > 0) {
+                if (__atomic_compare_exchange_n(
+                        &m_setspecific_failures_left, &left, left - 1, 0,
+                        __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+                        return m_setspecific_failure;
+        }
         return __real_pthread_setspecific(key, value);
 }
 
@@ -499,6 +516,99 @@ test_a_release_clears_the_record_in_memory(void **state)
         assert_true(drained);
 }
 
+/**
+ * @brief Locks and releases three times with the arming failing, then takes
+ *        the lock a fourth time, armed, and exits holding it
+ */
+static void *
+holder_armed_late_exits_holding(void *arg)
+{
+        int i;
+
+        (void)arg;
+        for (i = 0; i < 3; i++) {
+                lock_get();
+                lock_release();
+        }
+        lock_get();
+        __atomic_store_n(&m_holder_has, 1, __ATOMIC_RELEASE);
+        pthread_exit(NULL);
+}
+
+/**
+ * @brief How many times a text occurs in a buffer
+ */
+static int
+occurrences(const char *buf, const char *text)
+{
+        int n = 0;
+
+        while ((buf = strstr(buf, text)) != NULL) {
+                n++;
+                buf += strlen(text);
+        }
+        return n;
+}
+
+static void
+test_a_failing_arming_is_retried_and_said_once(void **state)
+{
+        char buf[1024] = "";
+        FILE *captured;
+        int saved, redirected = 0, created = -1, got_has = 0, joined = 0;
+        int put_back_ok = 0, calls, taken = -1;
+        pthread_t t;
+
+        /* The arming fails three times, once per lock: each lock tries
+         * again, so the fourth arms the record, and the thread is told once,
+         * at the first failure. Exiting with the lock held after the fourth,
+         * the thread has it given back - which is what the arming is for.
+         * Observed first, asserted last, as the cases above.
+         */
+        (void)state;
+        __atomic_store_n(&m_holder_has, 0, __ATOMIC_RELEASE);
+        captured = tmpfile();
+        assert_non_null(captured);
+        fflush(stderr);
+        saved = dup(STDERR_FILENO);
+        if (saved >= 0)
+                redirected = dup2(fileno(captured), STDERR_FILENO) >= 0;
+        calls = __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE);
+        if (redirected) {
+                __atomic_store_n(&m_setspecific_failures_left, 3,
+                                 __ATOMIC_RELEASE);
+                created = pthread_create(&t, NULL,
+                                         holder_armed_late_exits_holding, NULL);
+                if (created == 0) {
+                        got_has = wait_for(&m_holder_has, FREE_WAIT_MS);
+                        joined = joined_in_time(t, FREE_WAIT_MS);
+                }
+                fflush(stderr);
+                put_back_ok = put_back(saved, STDERR_FILENO);
+        }
+        if (saved >= 0)
+                close(saved);
+        rewind(captured);
+        (void)fread(buf, 1, sizeof(buf) - 1, captured);
+        fclose(captured);
+        calls = __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE) - calls;
+        __atomic_store_n(&m_setspecific_failures_left, 0, __ATOMIC_RELEASE);
+        if (joined)
+                taken = another_thread_takes_the_lock(FREE_WAIT_MS);
+
+        assert_true(saved >= 0);
+        assert_true(redirected);
+        assert_true(put_back_ok);
+        assert_int_equal(created, 0);
+        assert_true(got_has);
+        assert_true(joined);
+        /* three failed armings and the one that succeeded */
+        assert_int_equal(calls, 4);
+        assert_int_equal(occurrences(buf, "API lock holder not recorded"), 1);
+        /* the exit holding the lock gave it back */
+        assert_int_equal(taken, 1);
+}
+
 /** the lock module as a shared object of its own, built beside this binary;
  *  its absolute path comes from the Makefile, so the case needs no way of
  *  finding its own binary - /proc/self/exe is Linux's alone
@@ -694,7 +804,8 @@ main(void)
                 test_a_thread_that_exits_holding_the_lock_gives_it_back),
             cmocka_unit_test(test_a_cancelled_thread_gives_the_lock_back),
             cmocka_unit_test(test_a_release_clears_the_record_in_memory),
-            cmocka_unit_test(test_a_holder_that_is_not_recorded_is_reported)};
+            cmocka_unit_test(test_a_holder_that_is_not_recorded_is_reported),
+            cmocka_unit_test(test_a_failing_arming_is_retried_and_said_once)};
 
         result += cmocka_run_group_tests(tests_init, dir_setup, dir_teardown);
         result += cmocka_run_group_tests(tests, lock_setup, lock_teardown);
