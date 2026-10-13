@@ -1027,6 +1027,31 @@ test_lock_get(void **state __attribute__((unused)))
         assert_int_equal(lock_fini(), 0);
 }
 
+/* A pthread call returns its error and leaves errno alone, so a lock or a
+ * release that fails is reported with the error the call returned. errno is
+ * set to another one first, which a message naming errno would show instead.
+ */
+static void
+test_lock_error_names_the_error_returned(void **state __attribute__((unused)))
+{
+        errno = ENOENT;
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, EINVAL);
+        lock_get();
+        assert_non_null(strstr(last_stderr, "API mutex lock error"));
+        assert_non_null(strstr(last_stderr, strerror(EINVAL)));
+        assert_null(strstr(last_stderr, strerror(ENOENT)));
+
+        last_stderr[0] = '\0';
+        errno = ENOENT;
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, EPERM);
+        lock_release();
+        assert_non_null(strstr(last_stderr, "API mutex unlock error"));
+        assert_non_null(strstr(last_stderr, strerror(EPERM)));
+        assert_null(strstr(last_stderr, strerror(ENOENT)));
+}
+
 /* Every descriptor this file opens closes on exec
  *
  * fopen() does not do that, and three of these opens replaced a fopen(): the
@@ -2504,6 +2529,7 @@ main(void)
             LOCK_CASE(test_lock_init_error),
             LOCK_CASE(test_lock_init_exit),
             LOCK_CASE(test_lock_get),
+            LOCK_CASE(test_lock_error_names_the_error_returned),
             LOCK_CASE(test_lock_opens_close_on_exec),
             LOCK_CASE(test_lock_probe_file_cannot_be_pre_created),
 #ifdef __linux__

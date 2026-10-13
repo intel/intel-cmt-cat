@@ -1325,8 +1325,17 @@ lock_fini(void)
 void
 lock_get(void)
 {
-        if (pthread_mutex_lock(&m_apilock_mutex) != 0) {
-                fprintf(stderr, "API mutex lock error: %s\n", strerror(errno));
+        int err = pthread_mutex_lock(&m_apilock_mutex);
+
+        /* pthread functions return the error and leave errno alone, so the
+         * error is the return value, not errno - which would name whatever an
+         * earlier call left there, "Success" as often as not. A lock that
+         * fails leaves the caller to go on unlocked, and its lock_release()
+         * then unlocks a mutex this thread does not hold: known, and as it
+         * has always been - lock_get() has no return value to refuse with.
+         */
+        if (err != 0) {
+                fprintf(stderr, "API mutex lock error: %s\n", strerror(err));
                 return;
         }
 
@@ -1342,9 +1351,7 @@ lock_get(void)
                  * unanswered. Each lock tries again until one succeeds, and
                  * the thread is told once, at the first failure.
                  */
-                const int err =
-                    pthread_setspecific(m_apilock_held, &m_apilock_record);
-
+                err = pthread_setspecific(m_apilock_held, &m_apilock_record);
                 if (err != 0 && !m_apilock_said) {
                         m_apilock_said = 1;
                         fprintf(stderr,
@@ -1359,14 +1366,16 @@ lock_get(void)
 void
 lock_release(void)
 {
+        int err;
+
         /* cleared before the unlock, in this thread's own storage, so it
          * cannot fail and cannot be seen as held once the lock is another's
          */
         m_apilock_record.held = 0;
 
-        if (pthread_mutex_unlock(&m_apilock_mutex) != 0)
-                fprintf(stderr, "API mutex unlock error: %s\n",
-                        strerror(errno));
+        err = pthread_mutex_unlock(&m_apilock_mutex);
+        if (err != 0)
+                fprintf(stderr, "API mutex unlock error: %s\n", strerror(err));
 }
 
 #endif /* UNLOCK_CUSTOM */
