@@ -602,16 +602,29 @@ test_a_key_that_cannot_be_created_fails_init(void **state)
         pid = fork();
         assert_true(pid >= 0);
         if (pid == 0) {
-                int refused, retried;
+                char buf[256] = "";
+                FILE *captured = tmpfile();
+                int refused, retried, said = 0;
 
+                /* the message the refusal prints is part of what the case
+                 * claims, and is kept off the suite's own stderr, where it
+                 * read as a failure on every passing run
+                 */
+                if (captured == NULL ||
+                    dup2(fileno(captured), STDERR_FILENO) < 0)
+                        _exit(2);
                 m_key_create_error = EAGAIN;
                 /* refused, and before the lock file was made */
                 refused = lock_init() == -1 && access(LOCKFILE, F_OK) != 0;
+                fflush(stderr);
+                rewind(captured);
+                (void)fread(buf, 1, sizeof(buf) - 1, captured);
+                said = strstr(buf, "Couldn't create the API lock key") != NULL;
                 m_key_create_error = 0;
                 retried = lock_init() == 0 && access(LOCKFILE, F_OK) == 0;
                 if (retried)
                         lock_fini();
-                _exit(refused && retried ? 0 : 1);
+                _exit(refused && said && retried ? 0 : 1);
         }
 
         assert_int_equal(waitpid(pid, &status, 0), pid);
