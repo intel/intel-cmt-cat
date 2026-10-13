@@ -1022,6 +1022,14 @@ remove_the_lockfile(void)
  * the mutex and the record, so a deferred cancellation cannot land between
  * them.
  *
+ * The key is deleted when the library is unloaded. A key outlives the library
+ * that made it: after a dlclose() every thread that ever took the lock still
+ * carries its value, and the thread's exit would call the destructor's
+ * address - unmapped by then. The records are the threads' own storage and
+ * need no freeing; what the deletion gives up is the giving back of the lock
+ * by a thread that exits after the library is gone, which has no lock left to
+ * give back.
+ *
  * The key is created once per process, by the first lock_init(), which can
  * fail and say so: a key that could not be created fails the initialisation,
  * this one and every later one, rather than leaving a lock without the record
@@ -1057,6 +1065,19 @@ lock_held_destructor(void *value)
 
         if (record->held)
                 pthread_mutex_unlock(&m_apilock_mutex);
+}
+
+/**
+ * @brief Deletes the key when the library is unloaded, so that no thread's
+ *        exit calls into it afterwards
+ */
+__attribute__((destructor)) static void
+lock_held_key_unload(void)
+{
+        if (m_apilock_held_valid) {
+                (void)pthread_key_delete(m_apilock_held);
+                m_apilock_held_valid = 0;
+        }
 }
 
 /**

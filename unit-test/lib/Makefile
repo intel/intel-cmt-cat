@@ -119,7 +119,7 @@ $(LIB_DEPS) $(TESTS_DEPS): Makefile $(FLAGS_STAMP)
 # written down. Included here rather than at the top so that the default goal is
 # still "all".
 DEPFILES_TO_READ = $(LIB_DEPS) $(TESTS_DEPS) $(OBJ_DIR)/cxl_fixture.d \
-	$(OBJ_DIR)/lock_fixture.d
+	$(OBJ_DIR)/lock_fixture.d $(OBJ_DIR)/liblock_probe.d
 include ../depfiles.mk
 
 
@@ -290,6 +290,13 @@ $(OBJ_DIR)/lock_fixture.d: $(LIB_DIR)/lock.c Makefile $(FLAGS_STAMP)
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MT $(@:.d=.o) -MT $@ -MF $@ $(CFLAGS) \
 		-ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $<
+
+# and for the lock module built as a shared object for the unload case, whose
+# target is that object and whose flags are its own
+$(OBJ_DIR)/liblock_probe.d: $(LIB_DIR)/lock.c Makefile $(FLAGS_STAMP)
+	mkdir -p $(OBJ_DIR)
+	$(CC) -MM -MP -MT $(BIN_DIR)/liblock_probe.so -MT $@ -MF $@ $(CFLAGS) \
+		-DPQOS_LOCAL= -ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $<
 
 # each binary waits for its own, which the pattern above cannot say: these rules
 # carry no recipe and only add a prerequisite.
@@ -1135,14 +1142,31 @@ $(OBJ_DIR)/lock_fixture.o: $(LIB_DIR)/lock.c $(OBJ_DIR)/lock_fixture.d Makefile
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -ULOCKFILE -DLOCKFILE=\"lock/libpqos\" -c $< -o $@
 
+# The lock module as a shared object of its own, for the case that unloads it
+# while a thread that took the lock lives on: lock.c needs nothing of the
+# library but libc and pthreads, its entry points are exported for dlsym() by
+# emptying PQOS_LOCAL, and the lock file is the fixture's relative one. Rebuilt
+# on the flags and on the headers lock.c includes, which its own .d file
+# records as the fixture's does - a removed one among them, which a wildcard of
+# the headers would lose and leave a stale object running - since it is outside
+# $(LIB_OBJS). The test is told where it is, by absolute path, so that it needs
+# no way of finding its own binary
+$(BIN_DIR)/liblock_probe.so: $(LIB_DIR)/lock.c $(OBJ_DIR)/liblock_probe.d \
+		Makefile $(FLAGS_STAMP)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -fPIC -shared -DPQOS_LOCAL= \
+		-ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $< -o $@ -lpthread
+
 $(BIN_DIR)/test_lock_threads: ./test_lock_threads.c \
-		$(filter-out $(OBJ_DIR)/lock.o,$(LIB_OBJS)) $(OBJ_DIR)/lock_fixture.o
+		$(filter-out $(OBJ_DIR)/lock.o,$(LIB_OBJS)) $(OBJ_DIR)/lock_fixture.o \
+		$(BIN_DIR)/liblock_probe.so
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) -ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $(WRAP) \
+		-DLOCK_PROBE_PATH=\"$(abspath $(BIN_DIR))/liblock_probe.so\" \
 		-Wl,--wrap=pthread_key_create \
 		-Wl,--wrap=pthread_setspecific \
 		-Wl,--start-group \
-		$(LDFLAGS) $(filter-out $(OBJ_DIR)/lock.o,$(LIB_OBJS)) \
+		$(LDFLAGS) -ldl $(filter-out $(OBJ_DIR)/lock.o,$(LIB_OBJS)) \
 		$(OBJ_DIR)/lock_fixture.o $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_log: ./test_log.c $(LIB_OBJS)

@@ -43,6 +43,7 @@
 #include "test.h"
 #include "test_lock.h"
 
+#include <dlfcn.h>
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
@@ -364,6 +365,92 @@ test_a_release_clears_the_record_in_memory(void **state)
         the_waiting_probe_gets_the_lock();
 }
 
+/** the lock module as a shared object of its own, built beside this binary;
+ *  its absolute path comes from the Makefile, so the case needs no way of
+ *  finding its own binary - /proc/self/exe is Linux's alone
+ */
+#ifndef LOCK_PROBE_PATH
+#define LOCK_PROBE_PATH "bin/liblock_probe.so"
+#endif
+
+/** the probe library's entry points, as dlsym() gives them */
+struct lock_probe {
+        int (*init)(void);
+        int (*fini)(void);
+        void (*get)(void);
+        void (*release)(void);
+};
+
+static pthread_barrier_t m_unload_barrier;
+
+/**
+ * @brief Takes and releases the lock from the probe library, then outlives it
+ *
+ * @param [in] arg the probe library's entry points
+ */
+static void *
+user_of_the_library(void *arg)
+{
+        const struct lock_probe *probe = arg;
+
+        if (probe->init() != 0)
+                _exit(3);
+        probe->get();
+        probe->release();
+        probe->fini();
+        /* the record is armed: the library may go now */
+        pthread_barrier_wait(&m_unload_barrier);
+        /* and it is gone: this thread's exit runs the key's destructors */
+        pthread_barrier_wait(&m_unload_barrier);
+        return NULL;
+}
+
+static void
+test_a_thread_outlives_the_unloaded_library(void **state)
+{
+        pid_t pid;
+        int status = -1;
+
+        /* In a child, since the failure this guards against is a crash: a
+         * thread takes the lock from the module loaded as a shared object,
+         * the object is unloaded while the thread lives, and the thread then
+         * exits. A key left behind by the unloaded module would have the
+         * exit call its destructor at an address that is no longer mapped.
+         */
+        (void)state;
+        fflush(stdout);
+        fflush(stderr);
+        pid = fork();
+        assert_true(pid >= 0);
+        if (pid == 0) {
+                struct lock_probe probe;
+                pthread_t t;
+                void *handle = dlopen(LOCK_PROBE_PATH, RTLD_NOW | RTLD_LOCAL);
+
+                if (handle == NULL)
+                        _exit(2);
+                probe.init = dlsym(handle, "lock_init");
+                probe.fini = dlsym(handle, "lock_fini");
+                probe.get = dlsym(handle, "lock_get");
+                probe.release = dlsym(handle, "lock_release");
+                if (probe.init == NULL || probe.fini == NULL ||
+                    probe.get == NULL || probe.release == NULL)
+                        _exit(2);
+                pthread_barrier_init(&m_unload_barrier, NULL, 2);
+                if (pthread_create(&t, NULL, user_of_the_library, &probe) != 0)
+                        _exit(2);
+                pthread_barrier_wait(&m_unload_barrier);
+                if (dlclose(handle) != 0)
+                        _exit(2);
+                pthread_barrier_wait(&m_unload_barrier);
+                _exit(pthread_join(t, NULL) == 0 ? 0 : 1);
+        }
+
+        assert_int_equal(waitpid(pid, &status, 0), pid);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+}
+
 static void
 test_a_key_that_cannot_be_created_fails_init(void **state)
 {
@@ -442,7 +529,8 @@ main(void)
         int result = 0;
 
         const struct CMUnitTest tests_init[] = {
-            cmocka_unit_test(test_a_key_that_cannot_be_created_fails_init)};
+            cmocka_unit_test(test_a_key_that_cannot_be_created_fails_init),
+            cmocka_unit_test(test_a_thread_outlives_the_unloaded_library)};
 
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_a_released_lock_is_not_given_back_twice),
