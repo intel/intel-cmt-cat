@@ -47,6 +47,9 @@
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
+#ifdef __FreeBSD__
+#include <pthread_np.h> /* pthread_timedjoin_np() */
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -97,6 +100,48 @@ __wrap_pthread_setspecific(pthread_key_t key, const void *value)
         return __real_pthread_setspecific(key, value);
 }
 
+/**
+ * @brief Puts a descriptor back over another, retrying an interrupted dup2()
+ *
+ * @return whether it was put back
+ */
+static int
+put_back(const int saved, const int fd)
+{
+        int ret;
+
+        do {
+                ret = dup2(saved, fd);
+        } while (ret < 0 && errno == EINTR);
+        return ret >= 0;
+}
+
+/**
+ * @brief Joins a thread, but not for ever
+ *
+ * A thread that the regression under test leaves blocked in lock_get() would
+ * hang the suite at an unconditional join, where the case that cannot join it
+ * should fail and the rest of the suite run; the thread is left for the
+ * process's exit to end.
+ *
+ * @return whether the thread was joined within the time
+ */
+static int
+joined_in_time(pthread_t t, const unsigned ms)
+{
+        struct timespec deadline;
+
+        if (clock_gettime(CLOCK_REALTIME, &deadline) != 0)
+                return 0;
+        deadline.tv_sec += ms / 1000;
+        deadline.tv_nsec += (long)(ms % 1000) * 1000000L;
+        if (deadline.tv_nsec >= 1000000000L) {
+                deadline.tv_sec++;
+                deadline.tv_nsec -= 1000000000L;
+        }
+        return pthread_timedjoin_np(t, NULL, &deadline) == 0;
+}
+
 static void
 sleep_ms(const unsigned ms)
 {
@@ -141,8 +186,8 @@ static int m_probe_waiting;
  * @brief Whether another thread takes the lock within \a ms
  *
  * The probe is joined where it got the lock. One that did not is left waiting
- * and joinable: the_waiting_probe_gets_the_lock() joins it once the case gives
- * the lock up, so no probe is still inside lock_release() when the teardown
+ * and joinable: the_waiting_probe_drained() joins it once the case gives the
+ * lock up, so no probe is still inside lock_release() when the teardown
  * destroys the mutex.
  */
 static int
@@ -154,22 +199,53 @@ another_thread_takes_the_lock(const unsigned ms)
         assert_int_equal(pthread_create(&m_probe, NULL, probe, NULL), 0);
         got = wait_for(&m_probe_got, ms);
         if (got)
-                assert_int_equal(pthread_join(m_probe, NULL), 0);
+                assert_true(joined_in_time(m_probe, FREE_WAIT_MS));
         else
                 m_probe_waiting = 1;
         return got;
 }
 
 /**
- * @brief The probe left waiting takes the lock, and is joined
+ * @brief another_thread_takes_the_lock() without asserting, for a case that
+ *        holds the lock, or has a holder to let go, while it asks
+ *
+ * @return 1 where the probe took the lock and was joined, 0 where it did not
+ *         take it within \a ms and is left waiting, as the asserting one
+ *         leaves it, and -1 where it could not be started or joined
  */
-static void
-the_waiting_probe_gets_the_lock(void)
+static int
+another_thread_tries_the_lock(const unsigned ms)
 {
-        assert_true(m_probe_waiting);
-        assert_true(wait_for(&m_probe_got, FREE_WAIT_MS));
-        assert_int_equal(pthread_join(m_probe, NULL), 0);
+        __atomic_store_n(&m_probe_got, 0, __ATOMIC_RELEASE);
+        if (pthread_create(&m_probe, NULL, probe, NULL) != 0)
+                return -1;
+        if (!wait_for(&m_probe_got, ms)) {
+                m_probe_waiting = 1;
+                return 0;
+        }
+        return joined_in_time(m_probe, FREE_WAIT_MS) ? 1 : -1;
+}
+
+/**
+ * @brief The probe left waiting takes the lock and is joined, without
+ *        asserting, for a case that has observations to assert afterwards
+ *
+ * @return whether the probe got the lock in time and was joined
+ */
+static int
+the_waiting_probe_drained(void)
+{
+        int got, joined;
+
+        if (!m_probe_waiting)
+                return 0;
+        got = wait_for(&m_probe_got, FREE_WAIT_MS);
+        /* a probe that did not get the lock is still inside lock_get(), and
+         * is not waited for: the case fails, the suite goes on
+         */
+        joined = got && joined_in_time(m_probe, FREE_WAIT_MS);
         m_probe_waiting = 0;
+        return joined;
 }
 
 static void *
@@ -250,28 +326,39 @@ static void
 test_a_released_lock_is_not_given_back_twice(void **state)
 {
         pthread_t t;
+        int got_has, joined, taken = -1, drained = 0;
 
         /* A thread that took and released the lock, and leaves while another
          * thread holds it, must not unlock that other thread's lock on the
          * way out: its record says it holds nothing. If it did, a third
          * thread would take a lock the case is still holding.
+         *
+         * Observed first and asserted last, as the cases below: an assertion
+         * while this thread holds the lock would leave it held for every
+         * later case. The case locks only once the holder has released.
          */
         (void)state;
         __atomic_store_n(&m_holder_has, 0, __ATOMIC_RELEASE);
         __atomic_store_n(&m_holder_go, 0, __ATOMIC_RELEASE);
         assert_int_equal(
             pthread_create(&t, NULL, holder_releases_then_waits, NULL), 0);
-        assert_true(wait_for(&m_holder_has, FREE_WAIT_MS));
+        got_has = wait_for(&m_holder_has, FREE_WAIT_MS);
 
-        lock_get();
+        if (got_has)
+                lock_get();
         __atomic_store_n(&m_holder_go, 1, __ATOMIC_RELEASE);
-        assert_int_equal(pthread_join(t, NULL), 0);
+        joined = joined_in_time(t, FREE_WAIT_MS);
+        if (got_has) {
+                taken = another_thread_tries_the_lock(300);
+                /* and once the case lets it go, the waiting probe gets it */
+                lock_release();
+                drained = the_waiting_probe_drained();
+        }
 
-        assert_false(another_thread_takes_the_lock(300));
-
-        /* and once the case lets it go, the waiting probe gets it */
-        lock_release();
-        the_waiting_probe_gets_the_lock();
+        assert_true(got_has);
+        assert_true(joined);
+        assert_int_equal(taken, 0);
+        assert_true(drained);
 }
 
 static void
@@ -279,14 +366,21 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
 {
         char buf[256] = "";
         FILE *captured;
-        int saved;
+        int saved, redirected = 0, created = -1, got_has = 0, taken = -1;
+        int joined = -1, put_back_ok = 0, drained = 0;
         pthread_t t;
 
-        /* The record could not be made: the call still holds the lock and
+        /* The record could not be armed: the call still holds the lock and
          * gives it back on return, and what it cannot do - give it back on a
          * thread exit - is said rather than left silent. On a thread of its
-         * own, since a record is made by a thread's first lock and this
+         * own, since a record is armed by a thread's first lock and this
          * thread has locked before.
+         *
+         * No assertion fires while stderr is redirected or while the holder
+         * holds the lock: cmocka's assertions leave the case by a longjmp,
+         * which would leave stderr pointing at the file for every later case
+         * and the holder spinning with the mutex, for lock_teardown() to
+         * destroy locked. Everything is observed first and asserted last.
          */
         (void)state;
         __atomic_store_n(&m_holder_has, 0, __ATOMIC_RELEASE);
@@ -295,26 +389,48 @@ test_a_holder_that_is_not_recorded_is_reported(void **state)
         assert_non_null(captured);
         fflush(stderr);
         saved = dup(STDERR_FILENO);
-        assert_true(saved >= 0);
-        assert_true(dup2(fileno(captured), STDERR_FILENO) >= 0);
-
-        __atomic_store_n(&m_setspecific_error, ENOMEM, __ATOMIC_RELEASE);
-        assert_int_equal(
-            pthread_create(&t, NULL, holder_holds_then_waits, NULL), 0);
-        assert_true(wait_for(&m_holder_has, FREE_WAIT_MS));
-
-        fflush(stderr);
-        assert_true(dup2(saved, STDERR_FILENO) >= 0);
-        close(saved);
+        if (saved >= 0)
+                redirected = dup2(fileno(captured), STDERR_FILENO) >= 0;
+        if (redirected) {
+                __atomic_store_n(&m_setspecific_error, ENOMEM,
+                                 __ATOMIC_RELEASE);
+                created =
+                    pthread_create(&t, NULL, holder_holds_then_waits, NULL);
+                if (created == 0)
+                        got_has = wait_for(&m_holder_has, FREE_WAIT_MS);
+                fflush(stderr);
+                put_back_ok = put_back(saved, STDERR_FILENO);
+        }
+        /* the failure is the holder's to take, by its first lock; one that
+         * was not started leaves it, and the next case's first lock would
+         */
+        __atomic_store_n(&m_setspecific_error, 0, __ATOMIC_RELEASE);
+        if (saved >= 0)
+                close(saved);
         rewind(captured);
         (void)fread(buf, 1, sizeof(buf) - 1, captured);
         fclose(captured);
-        assert_non_null(strstr(buf, "API lock holder not recorded"));
+        if (created == 0) {
+                if (got_has)
+                        taken = another_thread_tries_the_lock(300);
+                __atomic_store_n(&m_holder_go, 1, __ATOMIC_RELEASE);
+                joined = joined_in_time(t, FREE_WAIT_MS);
+                /* the holder released: the probe gets the lock and is joined
+                 * before anything is asserted, so no thread of the case is
+                 * left for the teardown to race
+                 */
+                drained = the_waiting_probe_drained();
+        }
 
-        assert_false(another_thread_takes_the_lock(300));
-        __atomic_store_n(&m_holder_go, 1, __ATOMIC_RELEASE);
-        assert_int_equal(pthread_join(t, NULL), 0);
-        the_waiting_probe_gets_the_lock();
+        assert_true(saved >= 0);
+        assert_true(redirected);
+        assert_true(put_back_ok);
+        assert_int_equal(created, 0);
+        assert_true(got_has);
+        assert_non_null(strstr(buf, "API lock holder not recorded"));
+        assert_int_equal(taken, 0);
+        assert_true(joined);
+        assert_true(drained);
 }
 
 static void *
@@ -335,7 +451,7 @@ static void
 test_a_release_clears_the_record_in_memory(void **state)
 {
         pthread_t t;
-        int calls;
+        int calls, got_has, joined, taken = -1, drained = 0;
 
         /* A thread's record is made once, by its first lock, and held and
          * released by writing to it, so a release cannot fail to clear it:
@@ -351,18 +467,36 @@ test_a_release_clears_the_record_in_memory(void **state)
         calls = __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE);
         assert_int_equal(
             pthread_create(&t, NULL, holder_locks_twice_then_waits, NULL), 0);
-        assert_true(wait_for(&m_holder_has, FREE_WAIT_MS));
-        assert_int_equal(
-            __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE) - calls, 1);
+        got_has = wait_for(&m_holder_has, FREE_WAIT_MS);
+        calls = __atomic_load_n(&m_setspecific_calls, __ATOMIC_ACQUIRE) - calls;
 
-        lock_get();
+        /* the holder is let go and joined, the probe's refusal observed, the
+         * lock released and the probe drained, all before anything is
+         * asserted: a failure then leaves no thread spinning and no mutex
+         * held for lock_teardown() to destroy.
+         *
+         * Only a holder that got through its two locks is waiting to be let
+         * go. One that did not may be stuck in its second lock_get(), on a
+         * lock a release failed to give back: this thread does not lock
+         * then, which would block it as well, and the case fails on got_has
+         * once the bounded join has given up - the stuck thread holds the
+         * mutex, and lock_teardown() fails to destroy it rather than block.
+         */
+        if (got_has)
+                lock_get();
         __atomic_store_n(&m_holder_go, 1, __ATOMIC_RELEASE);
-        assert_int_equal(pthread_join(t, NULL), 0);
+        joined = joined_in_time(t, FREE_WAIT_MS);
+        if (got_has) {
+                taken = another_thread_tries_the_lock(300);
+                lock_release();
+                drained = the_waiting_probe_drained();
+        }
 
-        assert_false(another_thread_takes_the_lock(300));
-
-        lock_release();
-        the_waiting_probe_gets_the_lock();
+        assert_true(got_has);
+        assert_int_equal(calls, 1);
+        assert_true(joined);
+        assert_int_equal(taken, 0);
+        assert_true(drained);
 }
 
 /** the lock module as a shared object of its own, built beside this binary;
