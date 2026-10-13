@@ -231,18 +231,31 @@ typedef uint32_t pqos_rmid_t;
  *
  * It must return. Not by a non-local jump - a longjmp(), or a C++ exception
  * thrown through it. pthread_exit() and a cancellation are survived, at the
- * cost of the API call they interrupt.
+ * cost of the API call they interrupt, with the limits stated below.
  *
  * What each of those costs is different, and the difference is worth stating. A
  * non-local jump keeps the reference the message holds, so the descriptor and
  * the context that message was using are held for the life of the process; and
- * a message is usually written from inside an API call that holds the
- * library's own lock, which the jump keeps too, so the next API call made by
- * any thread waits on it for ever. pthread_exit() and a cancellation give both
- * back: the emission registers a cleanup handler for the reference, and the
- * lock records the thread holding it and is released when that thread ends.
- * What neither does is finish the call - an API call left that way has done
- * part of its work, and what it was changing is left as far as it got.
+ * a message is usually written from inside an API call that holds the library's
+ * own lock, which the jump keeps too, so the next API call made by any thread
+ * waits on it for ever. pthread_exit() and a cancellation give both back: the
+ * emission registers a cleanup handler for the reference, and the lock records
+ * the thread holding it and is released when that thread ends. What neither
+ * does is finish the call - an API call left that way has done part of its
+ * work, and what it was changing is left as far as it got.
+ *
+ * The lock is given back when the thread ends, and not before. The record is
+ * the thread's own, and the giving back is armed by a thread-specific key the
+ * first time the thread takes the lock; it runs as the thread exits. A thread
+ * that catches its own cancellation with a cleanup handler of the application's
+ * and goes on running keeps the lock until it does exit, and every API call on
+ * any thread waits for it meanwhile. And the arming can fail, where
+ * pthread_setspecific() does: it is tried again at each lock until it succeeds,
+ * the first failure is reported on stderr, and until it succeeds that thread
+ * holds and releases the lock as every other does and is not covered if it
+ * leaves holding it - it must return from the callback as the first sentence
+ * asks. A library built with -DUNLOCK_CUSTOM has no lock of its own and nothing
+ * of this applies to it.
  *
  * And a cancellation means one in the deferred mode, PTHREAD_CANCEL_DEFERRED,
  * which is what a thread has unless it asks for the other one. A thread with
