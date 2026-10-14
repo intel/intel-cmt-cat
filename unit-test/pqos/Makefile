@@ -188,6 +188,7 @@ $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 		-Wl,--wrap=printf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
+		-Wl,--wrap=strdup \
 		-Wl,--wrap=pqos_l3ca_get \
 		-Wl,--wrap=pqos_l2ca_get \
 		-Wl,--wrap=pqos_mba_get \

@@ -90,11 +90,17 @@ pqos_parse_uint(const char *str, unsigned *value)
         return PQOS_RETVAL_ERROR;
 }
 
-__attribute__((noreturn)) void
-parse_error(const char *arg, const char *note)
+void
+parse_error_print(const char *arg, const char *note)
 {
         printf("Error parsing \"%s\" command line argument. %s\n",
                arg ? arg : "<null>", note ? note : "");
+}
+
+__attribute__((noreturn)) void
+parse_error(const char *arg, const char *note)
+{
+        parse_error_print(arg, note);
         exit(EXIT_FAILURE);
 }
 

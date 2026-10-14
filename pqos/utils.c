@@ -66,6 +66,8 @@
 #include <string.h>
 
 static uint64_t strtouint64_base(const char *s, int default_base);
+static int
+strtouint64_base_checked(const char *s, int default_base, uint64_t *value);
 
 /**
  * @brief Function to check if a value is already contained in a table
@@ -242,14 +244,24 @@ strtouint64(const char *s)
         return strtouint64_base(s, 10);
 }
 
+int
+strtouint64_checked(const char *s, uint64_t *value)
+{
+        return strtouint64_base_checked(s, 10, value);
+}
+
 uint64_t
 strhextouint64(const char *s)
 {
         return strtouint64_base(s, 16);
 }
 
-static uint64_t
-strtouint64_base(const char *s, int default_base)
+/**
+ * @brief The reading strtouint64() and strhextouint64() share, which says what
+ *        is wrong and returns -1 rather than ending the process
+ */
+static int
+strtouint64_base_checked(const char *s, int default_base, uint64_t *value)
 {
         const char *str = s;
         int base = default_base;
@@ -269,18 +281,30 @@ strtouint64_base(const char *s, int default_base)
         /* Check for various possible errors */
         if ((errno == ERANGE && n == ULLONG_MAX) || (errno != 0 && n == 0)) {
                 perror("strtoull");
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
         if (endptr == s) {
                 printf("No digits were found\n");
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
         if (!(*s != '\0' && *endptr == '\0')) {
                 printf("Error converting '%s' to unsigned number!\n", str);
-                exit(EXIT_FAILURE);
+                return -1;
         }
+
+        *value = n;
+        return 0;
+}
+
+static uint64_t
+strtouint64_base(const char *s, int default_base)
+{
+        uint64_t n = 0;
+
+        if (strtouint64_base_checked(s, default_base, &n) != 0)
+                exit(EXIT_FAILURE);
 
         return n;
 }
@@ -433,8 +457,8 @@ list_parse(char *s,
         return (int)count;
 }
 
-unsigned
-strlisttotab(char *s, uint64_t *tab, const unsigned max)
+int
+strlisttotab_checked(char *s, uint64_t *tab, const unsigned max)
 {
         struct list_fault fault;
         char *tmp = NULL;
@@ -449,22 +473,29 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
         tmp = strdup(s);
         if (tmp == NULL) {
                 printf("Failed to allocate memory for argument copy!\n");
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
         n = list_parse(s, tab, max, UINT64_MAX, LIST_PLUS, &fault);
         if (n == LIST_FULL) {
                 printf("Exceeded parser capacity of %u entries\n", max);
-                parse_error(tmp, "Too many groups selected.\n");
-        }
-        if (n < 0) {
+                parse_error_print(tmp, "Too many groups selected.\n");
+        } else if (n < 0)
                 printf("Error converting '%s' to unsigned number!\n",
                        fault.token != NULL ? fault.token : tmp);
-                free(tmp);
-                exit(EXIT_FAILURE);
-        }
 
         free(tmp);
+        return n < 0 ? -1 : n;
+}
+
+unsigned
+strlisttotab(char *s, uint64_t *tab, const unsigned max)
+{
+        const int n = strlisttotab_checked(s, tab, max);
+
+        if (n < 0)
+                exit(EXIT_FAILURE);
+
         return (unsigned)n;
 }
 

@@ -211,12 +211,17 @@ is_a_single_number(const char *str)
  * @param [out] scope indicates if string \a str refers to both CLOS masks
  *              or just one of them
  * @param [out] id class ID referred to in the string \a str
+ *
+ * @return 0 on success, -1 where \a str is not a class, having said why: this
+ *         is read after pqos_init(), from alloc_apply(), which has to return
+ *         to main() for the library to be finalised
  */
-static void
+static int
 parse_clos_mask_type(char *str, int *scope, unsigned *id)
 {
         size_t len = 0;
         char given[MAX_CLOS_MASK_STR_LEN];
+        uint64_t value = 0;
 
         ASSERT(str != NULL);
         ASSERT(scope != NULL);
@@ -225,7 +230,7 @@ parse_clos_mask_type(char *str, int *scope, unsigned *id)
         len = strnlen(str, (size_t)MAX_CLOS_MASK_STR_LEN);
         if (len == MAX_CLOS_MASK_STR_LEN) {
                 printf("Error converting allocation CLOS string!\n");
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
         /* kept for the message below, which quotes what was typed rather than
@@ -251,10 +256,14 @@ parse_clos_mask_type(char *str, int *scope, unsigned *id)
                        "A list or a range is accepted by --alloc-domain-id and "
                        "--alloc-mem-regions, not here.\n",
                        given);
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
-        *id = (unsigned)strtouint64(str);
+        if (strtouint64_checked(str, &value) != 0)
+                return -1;
+
+        *id = (unsigned)value;
+        return 0;
 }
 
 /**
@@ -921,8 +930,13 @@ set_allocation_clos(char *str,
         }
         *p = '\0';
 
-        parse_clos_mask_type(str, &update_scope, &class_id);
-        mask = strtouint64(p + 1);
+        /* read after pqos_init(), so a class or a mask that is not a number
+         * returns, and alloc_apply() returns to main() for pqos_fini()
+         */
+        if (parse_clos_mask_type(str, &update_scope, &class_id) != 0)
+                return -1;
+        if (strtouint64_checked(p + 1, &mask) != 0)
+                return -1;
 
         /* if MBA selected, set MBA classes */
         if (type == MBA || type == MBA_CTRL) {
@@ -1008,7 +1022,14 @@ set_allocation_class(char *str,
         const unsigned max_res_sz = 256;
         unsigned res_ids[max_res_sz], *sp = NULL, i, n = 1;
 
-        selfn_strdup(&s, str);
+        /* this runs after pqos_init(), from alloc_apply(): every failure in
+         * it returns, so that main() can still finalise the library
+         */
+        s = strdup(str);
+        if (s == NULL) {
+                printf("String duplicate error!\n");
+                return ret;
+        }
 
         p = strchr(str, ':');
         if (p == NULL) {
@@ -1025,9 +1046,16 @@ set_allocation_class(char *str,
                 /**
                  * Socket ID's selected - set up res_ids table
                  */
+                int listed;
+
                 *p = '\0';
                 *q = '\0';
-                n = strlisttotab(++q, ids, DIM(ids));
+                listed = strlisttotab_checked(++q, ids, DIM(ids));
+                if (listed < 0) {
+                        free(s);
+                        return ret;
+                }
+                n = (unsigned)listed;
                 if (n == 0) {
                         printf("No resource ID specified: %s\n", s);
                         free(s);

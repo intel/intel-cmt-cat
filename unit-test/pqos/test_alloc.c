@@ -29,6 +29,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "test_alloc.h"
+
 #include "caps_gen.h"
 #include "output.h"
 
@@ -40,6 +42,20 @@
 #include <cmocka.h>
 #include "alloc.c"
 /* clang-format on */
+
+/* strdup() fails at its m_fail_strdup'th call, counting from 1, and 0 leaves
+ * it alone. A case sets it once its own copies are made, so that the count
+ * starts in the code under test.
+ */
+static int m_fail_strdup;
+
+char *
+__wrap_strdup(const char *s)
+{
+        if (m_fail_strdup > 0 && --m_fail_strdup == 0)
+                return NULL;
+        return __real_strdup(s);
+}
 
 static void
 mock_inter_get(const enum pqos_interface inter, unsigned count)
@@ -1543,15 +1559,17 @@ test_parse_clos_mask_type_takes_one_number(void **state __attribute__((unused)))
         unsigned i;
         int scope = CAT_UPDATE_SCOPE_BOTH;
         unsigned id = 0;
+        int ret = 0;
 
         for (i = 0; i < DIM(refused); ++i) {
                 strncpy(buffer, refused[i], sizeof(buffer) - 1);
                 buffer[sizeof(buffer) - 1] = '\0';
 
-                run_void_function(parse_clos_mask_type, buffer, &scope, &id);
+                /* read after pqos_init(): refused by a return, not an exit */
+                run_function(parse_clos_mask_type, ret, buffer, &scope, &id);
 
-                assert_int_equal(output_exit_was_called(), 1);
-                assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
                 assert_true(output_has_text(
                     "a class definition takes a single number"));
                 assert_true(output_has_text(
@@ -1582,13 +1600,15 @@ test_parse_clos_mask_type_accepts_a_number(void **state __attribute__((unused)))
         for (i = 0; i < DIM(accepted); ++i) {
                 int scope = CAT_UPDATE_SCOPE_BOTH;
                 unsigned id = 0xffff;
+                int ret = -1;
 
                 strncpy(buffer, accepted[i].given, sizeof(buffer) - 1);
                 buffer[sizeof(buffer) - 1] = '\0';
 
-                run_void_function(parse_clos_mask_type, buffer, &scope, &id);
+                run_function(parse_clos_mask_type, ret, buffer, &scope, &id);
 
                 assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, 0);
                 assert_int_equal(id, accepted[i].id);
                 assert_int_equal(scope, accepted[i].scope);
         }
@@ -1611,6 +1631,101 @@ test_alloc_apply_unrecognized_alloc_type(void **state)
         assert_true(output_has_text("Unrecognized allocation type: uat"));
 
         sel_alloc_opt_num = 0;
+}
+
+/* A class definition is read by alloc_apply(), after pqos_init(), so a mask,
+ * a resource list or a class id it cannot read is a return of -1, which main()
+ * answers with pqos_fini() and EXIT_FAILURE, rather than an exit that leaves
+ * the library initialised. Each refusal says what it said before, and now
+ * also the line alloc_apply() prints for any definition it cannot apply; a
+ * list too long for the parser is told on two lines. The overflowing id is
+ * told by perror(), which the capture does not see.
+ */
+static void
+test_alloc_apply_refuses_a_bad_class_by_returning(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        static const struct {
+                const char *definition;
+                const char *said;
+                const char *also;
+        } bad[] = {
+            {"llc:1=0xfz", "Error converting '0xfz' to unsigned number!", NULL},
+            {"llc@0-x:1=0xf", "Error converting '0-x' to unsigned number!",
+             NULL},
+            {"llc:0-3=0xf", "a class definition takes a single number", NULL},
+            {"llc:1234567890123456789012=0xf",
+             "Error converting allocation CLOS string!", NULL},
+            {"llc:99999999999999999999=0xf", NULL, NULL},
+            {"llc@0-300:1=0xf", "Exceeded parser capacity of 256 entries",
+             "Error parsing \"0-300\" command line argument. Too many groups "
+             "selected."},
+        };
+        unsigned i;
+
+        for (i = 0; i < DIM(bad); ++i) {
+                int ret = 0;
+
+                sel_alloc_opt_num = 1;
+                alloc_opts[0] = strdup(bad[i].definition);
+                assert_non_null(alloc_opts[0]);
+
+                run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                             data->cap_mba, data->cap_smba, data->cpu_info,
+                             NULL);
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
+                if (bad[i].said != NULL)
+                        assert_true(output_has_text(bad[i].said));
+                if (bad[i].also != NULL)
+                        assert_true(output_has_text(bad[i].also));
+                assert_true(output_has_text("Allocation configuration error!"));
+
+                /* set_alloc() frees the definitions it read */
+                alloc_opts[0] = NULL;
+                sel_alloc_opt_num = 0;
+        }
+}
+
+/* set_allocation_class() copies the definition before it reads it, and the
+ * list of resource ids of one that has them again, for the messages about
+ * it. Either copy failing is a return of -1 like any other refusal, not an
+ * exit.
+ */
+static void
+test_alloc_apply_without_memory_for_a_copy_returns(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        static const struct {
+                int fail;
+                const char *said;
+        } copies[] = {{1, "String duplicate error!"},
+                      {2, "Failed to allocate memory for argument copy!"}};
+        unsigned i;
+
+        for (i = 0; i < DIM(copies); ++i) {
+                int ret = 0;
+
+                sel_alloc_opt_num = 1;
+                alloc_opts[0] = strdup("llc@0:1=0xf");
+                assert_non_null(alloc_opts[0]);
+
+                m_fail_strdup = copies[i].fail;
+                run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                             data->cap_mba, data->cap_smba, data->cpu_info,
+                             NULL);
+                m_fail_strdup = 0;
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
+                assert_true(output_has_text(copies[i].said));
+                assert_true(output_has_text("Allocation configuration error!"));
+
+                /* set_alloc() frees the definitions it read */
+                alloc_opts[0] = NULL;
+                sel_alloc_opt_num = 0;
+        }
 }
 
 static void
@@ -2077,6 +2192,9 @@ main(void)
             cmocka_unit_test(test_alloc_apply_l2),
             cmocka_unit_test(test_alloc_apply_l2_cdp),
             cmocka_unit_test(test_alloc_apply_unrecognized_alloc_type),
+            cmocka_unit_test(test_alloc_apply_refuses_a_bad_class_by_returning),
+            cmocka_unit_test(
+                test_alloc_apply_without_memory_for_a_copy_returns),
             cmocka_unit_test(test_parse_clos_mask_type_takes_one_number),
             cmocka_unit_test(test_parse_clos_mask_type_accepts_a_number),
             cmocka_unit_test_setup_teardown(

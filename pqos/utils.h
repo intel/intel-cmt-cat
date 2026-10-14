@@ -62,6 +62,20 @@ extern "C" {
 uint64_t strtouint64(const char *s);
 
 /**
+ * @brief strtouint64() without the exit
+ *
+ * What is wrong is printed as strtouint64() prints it, and -1 returned: for a
+ * number read after pqos_init(), which has to return to main() for the
+ * library to be finalised.
+ *
+ * @param [in] s string to be converted
+ * @param [out] value the number, where it is one
+ *
+ * @return 0 on success, -1 where \a s is not a number
+ */
+int strtouint64_checked(const char *s, uint64_t *value);
+
+/**
  * @brief Converts a string of characters into numeric value, base sixteen
  *
  * @param [in] s string to be converted
@@ -146,6 +160,21 @@ int list_parse(char *s,
  * @return Number of elements placed into \a tab
  */
 unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
+
+/**
+ * @brief strlisttotab() without the exit
+ *
+ * The same list read the same way and the same messages printed, but a list
+ * it cannot use is a return of -1: for a list read after pqos_init(), which
+ * has to return to main() for the library to be finalised.
+ *
+ * @param [in] s the list, which this modifies while parsing
+ * @param [out] tab where the numbers go
+ * @param [in] max how many \a tab holds
+ *
+ * @return how many elements were placed into \a tab, or -1
+ */
+int strlisttotab_checked(char *s, uint64_t *tab, const unsigned max);
 
 /**
  * @brief Converts a comma separated list into a table that grows to fit it

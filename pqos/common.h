@@ -80,6 +80,17 @@ extern "C" {
  */
 
 /**
+ * @brief Says what parse_error() says, and returns
+ *
+ * For a parse that runs after pqos_init(), which has to return to main() for
+ * the library to be finalised rather than end the process.
+ *
+ * @param arg string that caused error when parsing
+ * @param note context and information about encountered error
+ */
+void parse_error_print(const char *arg, const char *note);
+
+/**
  * @brief Common function to handle string parsing errors
  *
  * On error, this function causes process to exit with FAILURE code.
