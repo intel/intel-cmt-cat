@@ -284,6 +284,28 @@ $(BIN_DIR)/test_print_modes: ./test_print_modes.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/main.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
+# main.c is included, and what main() asks of the library and of the
+# monitoring on its way through a monitoring command line is wrapped
+$(BIN_DIR)/test_main_monitoring: ./test_main_monitoring.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=pqos_init \
+		-Wl,--wrap=pqos_fini \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_sysconfig_get \
+		-Wl,--wrap=pqos_cap_get_type \
+		-Wl,--wrap=alloc_apply \
+		-Wl,--wrap=monitor_setup \
+		-Wl,--wrap=monitor_loop \
+		-Wl,--wrap=monitor_stop \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/main.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_common: ./test_common.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
@@ -334,6 +356,37 @@ $(BIN_DIR)/test_output_capture: ./test_output_capture.c
 		-Wl,--start-group \
 		-L$(GRAB_OUTPUT_DIR) -lcmocka -lgraboutput \
 		$< -Wl,--end-group -o $@
+
+# monitor.c's failures after pqos_init(), each of which has to return to main()
+# for the library to be finalised: malloc() and calloc() are wrapped so that a
+# case can make the next allocation fail, and the file includes monitor.c to
+# call its static functions, as test_alloc does with alloc.c
+# the loop's timer is a timerfd on Linux, and only there do the cases that
+# make it fail wrap its making, arming and reads
+ifeq ($(shell uname), Linux)
+MONITOR_TIMER_WRAPS = -Wl,--wrap=timerfd_create -Wl,--wrap=timerfd_settime \
+	-Wl,--wrap=read
+endif
+
+# the loop's timer messages are fprintf()s of a fixed string, which the
+# compiler would otherwise make fwrite()s that the wrap of fprintf() misses
+$(BIN_DIR)/test_monitor_failures: ./test_monitor_failures.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -fno-builtin-fprintf \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=malloc \
+		-Wl,--wrap=calloc \
+		-Wl,--wrap=strdup \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=pqos_mon_poll \
+		-Wl,--wrap=monitor_utils_get_cache_size \
+		$(MONITOR_TIMER_WRAPS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_monitor_utils: ./test_monitor_utils.c
 	mkdir -p $(BIN_DIR)

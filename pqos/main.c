@@ -2525,7 +2525,8 @@ main(int argc, char **argv)
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
-        monitor_loop();
+        if (monitor_loop() != 0)
+                exit_val = EXIT_FAILURE;
         monitor_stop();
 
 allocation_exit:

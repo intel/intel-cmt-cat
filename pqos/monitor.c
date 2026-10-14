@@ -342,6 +342,26 @@ uinttostr(const unsigned val)
 }
 
 /**
+ * @brief uinttostr() without the exit, for a description made after
+ *        pqos_init(), where a failure has to return to main()
+ *
+ * @return the string, or NULL where it could not be allocated, having said
+ *         so as selfn_strdup() does
+ */
+static char *
+uinttostr_checked(const unsigned val)
+{
+        char buf[16], *str;
+
+        (void)monitor_utils_uinttostr(buf, sizeof(buf), val);
+        str = strdup(buf);
+        if (str == NULL)
+                printf("String duplicate error!\n");
+
+        return str;
+}
+
+/**
  * @brief Function to safely translate an unsigned int
  *        value to a hex string
  *
@@ -1010,7 +1030,7 @@ grp_device_to_channel(struct mon_group *grp, const struct pqos_devinfo *devinfo)
                 channels = calloc(1, sizeof(*channels));
                 if (!channels) {
                         printf("Error allocating memory\n");
-                        exit(EXIT_FAILURE);
+                        return PQOS_RETVAL_RESOURCE;
                 }
 
                 num_channels = 1;
@@ -2005,13 +2025,16 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         unsigned lcore = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
                         const struct mon_group *grp;
+                        char *desc = uinttostr_checked(lcore);
 
+                        if (desc == NULL)
+                                return -1;
                         grp = grp_add(MON_GROUP_TYPE_CORE,
                                       (enum pqos_mon_event)PQOS_MON_EVENT_ALL,
-                                      uinttostr(lcore), &core, 1);
+                                      desc, &core, 1);
                         if (grp == NULL) {
                                 printf("Core group setup error!\n");
-                                exit(EXIT_FAILURE);
+                                return -1;
                         }
                 }
 
@@ -2020,13 +2043,16 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         uint64_t socket = (uint64_t)cpu_info->cores[i].socket;
                         const struct mon_group *grp;
+                        char *desc = uinttostr_checked((unsigned)socket);
 
+                        if (desc == NULL)
+                                return -1;
                         grp = grp_add(MON_GROUP_TYPE_UNCORE,
                                       (enum pqos_mon_event)PQOS_MON_EVENT_ALL,
-                                      uinttostr(socket), &socket, 1);
+                                      desc, &socket, 1);
                         if (grp == NULL) {
                                 printf("Uncore group setup error!\n");
-                                exit(EXIT_FAILURE);
+                                return -1;
                         }
                 }
         }
@@ -3417,9 +3443,12 @@ mon_qsort_mixed_cmp_asc(const void *a, const void *b)
  * @param parray1 pointer to an array of pointers to PQoS monitoring structures
  * @param parray2 pointer to an array of pointers to PQoS monitoring structures
  *
- * @return Number of elements in each of the tables
+ * @return Number of elements in each of the tables, or -1 where they could
+ *         not be allocated, which the caller reports by its own return: the
+ *         monitoring has started, and only main() can stop it and finalise
+ *         the library
  */
-static unsigned
+static int
 get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
 {
         unsigned i;
@@ -3435,7 +3464,7 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
                 if (p2)
                         free(p2);
                 printf("Error with memory allocation");
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
         for (i = 0; i < sel_monitor_num; i++) {
@@ -3445,10 +3474,10 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
 
         *parray1 = p1;
         *parray2 = p2;
-        return sel_monitor_num;
+        return (int)sel_monitor_num;
 }
 
-void
+int
 monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
@@ -3456,6 +3485,8 @@ monitor_loop(void)
         const int istty = isatty(fileno(fp_monitor));
         unsigned cache_size;
         unsigned mon_number = 0, display_num = 0;
+        int num_arrays;
+        int failed = 0; /**< an error ended the loop, not a stop or timeout */
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
         long runtime = 0;
         int first_measurement = 1; /**< flag to skip first poll output */
@@ -3488,7 +3519,7 @@ monitor_loop(void)
         retval = pqos_inter_get(&interface);
         if (retval != PQOS_RETVAL_OK) {
                 printf("Unable to retrieve PQoS interface!\n");
-                return;
+                return -1;
         }
 
         if (strcasecmp(sel_output_type, "text") == 0) {
@@ -3525,12 +3556,12 @@ monitor_loop(void)
         } else {
                 printf("Invalid selection of output file type '%s'!\n",
                        sel_output_type);
-                return;
+                return -1;
         }
 
         if (monitor_utils_get_cache_size(&cache_size) != PQOS_RETVAL_OK) {
                 printf("Error during getting L3 cache size\n");
-                return;
+                return -1;
         }
 
 #ifdef __linux__
@@ -3547,10 +3578,19 @@ monitor_loop(void)
         if (timer_create(CLOCK_MONOTONIC, &sev, &timerid) == -1) {
 #endif
                 fprintf(stderr, "Failed to create timer\n");
-                return;
+                return -1;
         }
 
-        mon_number = get_mon_arrays(&mon_grps, &mon_data);
+        num_arrays = get_mon_arrays(&mon_grps, &mon_data);
+        if (num_arrays < 0) {
+#ifdef __linux__
+                close(tfd);
+#else
+                timer_delete(timerid);
+#endif
+                return -1;
+        }
+        mon_number = (unsigned)num_arrays;
         display_num = mon_number;
 
         if (istty) {
@@ -3580,6 +3620,7 @@ monitor_loop(void)
         if (retval == -1) {
                 fprintf(stderr, "Failed to setup timer\n");
                 __atomic_store_n(&stop_monitoring_loop, 1, __ATOMIC_RELAXED);
+                failed = 1;
         }
 
         output.begin(fp_monitor, sel_mon_mem_region.num_mem_regions,
@@ -3598,6 +3639,7 @@ monitor_loop(void)
                         continue;
                 } else if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to poll monitoring data!\n");
+                        failed = 1;
                         break;
                 }
 
@@ -3664,15 +3706,37 @@ monitor_loop(void)
                 timer_count = retval + 1;
 #endif
                 if (retval < 0 || timer_count < 1 || timer_count > 100) {
+                        /* monitoring_catch_signals() sets the stop
+                         * handlers with SA_RESTART, so an interrupted wait
+                         * goes on and a stop ends the loop at its condition;
+                         * should one cut the wait short all the same, that is
+                         * a stop too
+                         */
+                        if (__atomic_load_n(&stop_monitoring_loop,
+                                            __ATOMIC_RELAXED))
+                                break;
                         fprintf(stderr, "Failed to read timer\n");
+                        /* more intervals than are counted - the process was
+                         * stopped, or its output blocked - end the loop as
+                         * they always did, but are no failure of the run
+                         */
+                        if (retval < 0 || timer_count < 1)
+                                failed = 1;
                         break;
                 }
                 runtime += timer_count * sel_mon_interval * 100l;
         }
         output.end(fp_monitor);
 
+#ifdef __linux__
+        close(tfd);
+#else
+        timer_delete(timerid);
+#endif
         free(mon_grps);
         free(mon_data);
+
+        return failed ? -1 : 0;
 }
 
 void

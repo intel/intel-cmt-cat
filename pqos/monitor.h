@@ -263,8 +263,16 @@ void monitor_cleanup(void);
 
 /**
  * @brief Monitors resources and writes data into selected stream.
+ *
+ * @return 0 when the monitoring ran until its timeout or a stop, or until
+ *         more intervals passed between two reads of its timer than it counts
+ *         - the process was stopped, or its output blocked - which it reports
+ *         as "Failed to read timer" but is no failure of the run; -1 where it
+ *         could not start, or an error ended it, having said why. Either way
+ *         the caller stops the monitoring and finalises the library, which an
+ *         exit from in here would skip
  */
-void monitor_loop(void);
+int monitor_loop(void);
 
 /**
  * @brief Retrieve monitoring interval
