@@ -71,10 +71,13 @@ PQOS_LOCAL int resctrl_mon_fini(void);
 /**
  * @brief This function starts resctrl event counters
  *
+ * A task of the group that has ended by the time it is added is skipped.
+ *
  * @param group monitoring structure
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM none of the tasks listed for the group is left
  */
 PQOS_LOCAL int resctrl_mon_start(struct pqos_mon_data *group);
 
@@ -181,6 +184,7 @@ PQOS_LOCAL int resctrl_mon_assoc_get_pid(const pid_t task,
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM when \a task no longer exists
  */
 PQOS_LOCAL int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
 

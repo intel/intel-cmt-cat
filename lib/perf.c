@@ -36,6 +36,7 @@
 #include "pqos.h"
 #include "types.h"
 
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 
@@ -77,6 +78,11 @@ perf_setup_counter(struct perf_event_attr *attr,
                 return PQOS_RETVAL_PARAM;
 
         fd = perf_event_open(attr, pid, cpu, group_fd, flags);
+        if (fd < 0 && errno == ESRCH && pid != -1) {
+                LOG_DEBUG("Task %d ended before its perf event was opened\n",
+                          (int)pid);
+                return PQOS_RETVAL_PARAM;
+        }
         if (fd < 0) {
                 LOG_ERROR("Failed to open perf event!\n");
                 return PQOS_RETVAL_ERROR;

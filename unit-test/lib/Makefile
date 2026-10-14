@@ -705,6 +705,7 @@ $(BIN_DIR)/test_resctrl_mon_assoc: test_resctrl_mon_assoc.c $(LIB_OBJS)
 		-Wl,--wrap=resctrl_cpumask_set \
 		-Wl,--wrap=scandir \
 		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=pqos_fclose \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -1284,6 +1285,13 @@ $(BIN_DIR)/test_perf_monitoring: ./test_perf_monitoring.c $(LIB_OBJS)
 		-Wl,--wrap=pqos_fopen \
 		-Wl,--wrap=pqos_fclose \
 		-Wl,--wrap=scandir \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_perf: ./test_perf.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=syscall \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

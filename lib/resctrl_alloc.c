@@ -393,7 +393,10 @@ resctrl_alloc_schemata_write_exit:
 int
 resctrl_alloc_task_validate(const pid_t task)
 {
-        if (kill(task, 0) == 0)
+        /* EPERM is a task this process may not signal, which exists all the
+         * same: only ESRCH says that it has ended
+         */
+        if (kill(task, 0) == 0 || errno == EPERM)
                 return PQOS_RETVAL_OK;
 
         return PQOS_RETVAL_ERROR;
@@ -564,6 +567,14 @@ resctrl_alloc_task_search(unsigned *class_id,
                 }
                 if (resctrl_alloc_fclose(fd) != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
+        }
+        /* A task that ended while the files were read is in none of them */
+        if (resctrl_alloc_task_validate(task) != PQOS_RETVAL_OK) {
+                LOG_DEBUG("Task %d ended while resctrl CLOS tasks files were "
+                          "searched. Returning PQOS_RETVAL_PARAM, as for a "
+                          "task that ended before the search.\n",
+                          (int)task);
+                return PQOS_RETVAL_PARAM;
         }
         /* If not found in any CLOS group - return error */
         LOG_ERROR("Failed to get association for task %d!\n", (int)task);

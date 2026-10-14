@@ -36,6 +36,7 @@
 #include "test.h"
 
 #include <dirent.h>
+#include <errno.h>
 
 void __real_free(void *ptr);
 
@@ -115,13 +116,20 @@ __wrap_setvbuf(FILE *stream, char *buf, int type, size_t size)
         return 0;
 }
 
+/* a negative value queued is the errno the call fails with */
 int
 __wrap_kill(pid_t pid, int sig)
 {
+        int ret;
+
         check_expected(pid);
         check_expected(sig);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret >= 0)
+                return ret;
+        errno = -ret;
+        return -1;
 }
 
 FILE *
@@ -408,10 +416,26 @@ test_resctrl_alloc_task_validate_error(void **state __attribute__((unused)))
 
         expect_value(__wrap_kill, pid, task);
         expect_value(__wrap_kill, sig, 0);
-        will_return(__wrap_kill, -1);
+        will_return(__wrap_kill, -ESRCH);
 
         ret = resctrl_alloc_task_validate(task);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_resctrl_alloc_task_validate_no_permission(void **state
+                                               __attribute__((unused)))
+{
+        int ret;
+        pid_t task = 1;
+
+        /* a task this process may not signal is still there */
+        expect_value(__wrap_kill, pid, task);
+        expect_value(__wrap_kill, sig, 0);
+        will_return(__wrap_kill, -EPERM);
+
+        ret = resctrl_alloc_task_validate(task);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
 static void
@@ -430,6 +454,109 @@ test_resctrl_alloc_task_search_no_groups(void **state)
 
         ret = resctrl_alloc_task_search(&class_id, data->cap, task);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+/* what the last search_tasks_file() logged at the default verbosity */
+static unsigned search_logged;
+
+/*
+ * Searches a single CLOS tasks file holding content for task 1234, where the
+ * task is there or not when the search starts (alive_before) and when it has
+ * read every file without finding it (alive_after)
+ */
+static int
+search_tasks_file(struct test_data *data,
+                  const char *content,
+                  const int alive_before,
+                  const int alive_after,
+                  unsigned *class_id)
+{
+        const unsigned num_classes = data->cap_l3ca.num_classes;
+        const pid_t task = 1234;
+        FILE *fd = tmpfile();
+        int ret;
+
+        assert_non_null(fd);
+        fprintf(fd, "%s", content);
+        rewind(fd);
+        data->cap_l3ca.num_classes = 1;
+
+        expect_value(__wrap_kill, pid, task);
+        expect_value(__wrap_kill, sig, 0);
+        will_return(__wrap_kill, alive_before ? 0 : -ESRCH);
+        if (alive_before) {
+                expect_value(resctrl_alloc_fopen, class_id, 0);
+                expect_string(resctrl_alloc_fopen, name, "tasks");
+                expect_string(resctrl_alloc_fopen, mode, "r");
+                will_return(resctrl_alloc_fopen, fd);
+        }
+        if (alive_before && strstr(content, "1234") == NULL) {
+                expect_value(__wrap_kill, pid, task);
+                expect_value(__wrap_kill, sig, 0);
+                will_return(__wrap_kill, alive_after ? 0 : -ESRCH);
+        }
+
+        test_log_count_start();
+        ret = resctrl_alloc_task_search(class_id, data->cap, task);
+        search_logged = test_log_count_stop();
+
+        data->cap_l3ca.num_classes = num_classes;
+        fclose(fd);
+
+        return ret;
+}
+
+static void
+test_resctrl_alloc_task_search_found(void **state)
+{
+        unsigned class_id = 7;
+        int ret;
+
+        ret = search_tasks_file((struct test_data *)*state, "1\n1234\n2\n", 1,
+                                1, &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(class_id, 0);
+}
+
+static void
+test_resctrl_alloc_task_search_ended_before(void **state)
+{
+        unsigned class_id = 7;
+        int ret;
+
+        ret = search_tasks_file((struct test_data *)*state, "1\n2\n", 0, 0,
+                                &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(search_logged, 0);
+        assert_int_equal(class_id, 7);
+}
+
+static void
+test_resctrl_alloc_task_search_ended_during(void **state)
+{
+        unsigned class_id = 7;
+        int ret;
+
+        /* a task that ended while the files were read is in none of them */
+        ret = search_tasks_file((struct test_data *)*state, "1\n2\n", 1, 0,
+                                &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(search_logged, 0);
+        assert_int_equal(class_id, 7);
+}
+
+static void
+test_resctrl_alloc_task_search_not_found(void **state)
+{
+        unsigned class_id = 7;
+        int ret;
+
+        /* one that is still running and in no file is an error */
+        ret = search_tasks_file((struct test_data *)*state, "1\n2\n", 1, 1,
+                                &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(search_logged, 1);
+        assert_int_equal(class_id, 7);
 }
 
 static void
@@ -493,6 +620,10 @@ main(void)
 
         const struct CMUnitTest tests_l3ca[] = {
             cmocka_unit_test(test_resctrl_alloc_get_grps_num_l3),
+            cmocka_unit_test(test_resctrl_alloc_task_search_found),
+            cmocka_unit_test(test_resctrl_alloc_task_search_ended_before),
+            cmocka_unit_test(test_resctrl_alloc_task_search_ended_during),
+            cmocka_unit_test(test_resctrl_alloc_task_search_not_found),
             cmocka_unit_test(test_resctrl_alloc_task_search_no_groups),
             cmocka_unit_test(test_resctrl_alloc_schemata_write_l3ca)};
 
@@ -517,6 +648,7 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_schemata_write_fopen),
             cmocka_unit_test(test_resctrl_alloc_task_validate_ok),
             cmocka_unit_test(test_resctrl_alloc_task_validate_error),
+            cmocka_unit_test(test_resctrl_alloc_task_validate_no_permission),
             cmocka_unit_test(test_resctrl_alloc_get_unused_group_no_groups)};
 
         const struct CMUnitTest tests_num_closids[] = {

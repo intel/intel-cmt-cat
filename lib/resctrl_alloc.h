@@ -172,7 +172,8 @@ resctrl_alloc_schemata_write(const unsigned class_id,
  * @param task task ID to validate
  *
  * @return Operational status
- * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_OK the task exists, whether or not it may be signalled
+ * @retval PQOS_RETVAL_ERROR the task does not exist
  */
 PQOS_LOCAL int resctrl_alloc_task_validate(const pid_t task);
 
@@ -211,6 +212,7 @@ PQOS_LOCAL unsigned *resctrl_alloc_task_read(unsigned class_id,
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM the task has ended, before or during the search
  */
 PQOS_LOCAL int resctrl_alloc_task_search(unsigned *class_id,
                                          const struct pqos_cap *cap,

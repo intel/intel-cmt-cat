@@ -594,6 +594,176 @@ test_perf_mon_start_pid_param(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+/*
+ * Expects one counter to be opened for each of tids. The thread ended (every
+ * thread, for -1) has ended by then; the others get fd 0xA0 + their index
+ */
+static void
+expect_tid_counters(const pid_t *tids,
+                    const unsigned num_tids,
+                    const pid_t ended)
+{
+        unsigned i;
+
+        for (i = 0; i < num_tids; i++) {
+                expect_not_value(__wrap_perf_setup_counter, attr, 0);
+                expect_value(__wrap_perf_setup_counter, pid, tids[i]);
+                expect_value(__wrap_perf_setup_counter, cpu, -1);
+                expect_value(__wrap_perf_setup_counter, group_fd, -1);
+                expect_value(__wrap_perf_setup_counter, flags,
+                             PERF_FLAG_FD_CLOEXEC);
+                if (tids[i] == ended || ended == -1) {
+                        will_return(__wrap_perf_setup_counter,
+                                    PQOS_RETVAL_PARAM);
+                        continue;
+                }
+                will_return(__wrap_perf_setup_counter, PQOS_RETVAL_OK);
+                will_return(__wrap_perf_setup_counter, 0xA0 + i);
+        }
+}
+
+static void
+test_perf_mon_start_pid_ended_thread(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_data grp;
+        struct pqos_mon_data_internal intl;
+        pid_t tids[] = {1, 2, 3};
+        const unsigned tid_num = DIM(tids);
+        struct pqos_mon_perf_ctx ctx[tid_num];
+
+        memset(&grp, 0, sizeof(grp));
+        memset(&intl, 0, sizeof(intl));
+        memset(ctx, 0, sizeof(struct pqos_mon_perf_ctx) * tid_num);
+        grp.intl = &intl;
+        grp.tid_nr = tid_num;
+        grp.tid_map = tids;
+        grp.intl->perf.ctx = ctx;
+
+        /* the second thread has ended by the time its counter is opened */
+        expect_tid_counters(tids, tid_num, tids[1]);
+
+        ret = perf_mon_start(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(ctx[0].fd_llc_misses, 0xA0);
+        assert_int_equal(ctx[1].fd_llc_misses, -1);
+        assert_int_equal(ctx[2].fd_llc_misses, 0xA2);
+
+        /* the threads left are counted, and the one that ended is not read */
+        expect_value(__wrap_perf_read_counter, counter_fd, 0xA0);
+        will_return(__wrap_perf_read_counter, PQOS_RETVAL_OK);
+        will_return(__wrap_perf_read_counter, 10);
+        expect_value(__wrap_perf_read_counter, counter_fd, 0xA2);
+        will_return(__wrap_perf_read_counter, PQOS_RETVAL_OK);
+        will_return(__wrap_perf_read_counter, 32);
+
+        ret = perf_mon_poll(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(grp.values.llc_misses, 42);
+
+        /* nor shut down */
+        expect_value(__wrap_perf_shutdown_counter, counter_fd, 0xA0);
+        will_return(__wrap_perf_shutdown_counter, PQOS_RETVAL_OK);
+        expect_value(__wrap_perf_shutdown_counter, counter_fd, 0xA2);
+        will_return(__wrap_perf_shutdown_counter, PQOS_RETVAL_OK);
+
+        ret = perf_mon_stop(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_perf_mon_start_pid_ended_thread_next_event(void **state
+                                                __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_data grp;
+        struct pqos_mon_data_internal intl;
+        pid_t tids[] = {1, 2, 3};
+        const pid_t left[] = {1, 3};
+        const unsigned tid_num = DIM(tids);
+        struct pqos_mon_perf_ctx ctx[tid_num];
+
+        memset(&grp, 0, sizeof(grp));
+        memset(&intl, 0, sizeof(intl));
+        memset(ctx, 0, sizeof(struct pqos_mon_perf_ctx) * tid_num);
+        grp.intl = &intl;
+        grp.tid_nr = tid_num;
+        grp.tid_map = tids;
+        grp.intl->perf.ctx = ctx;
+
+        /* the second thread has ended when the first event's counters are
+         * opened
+         */
+        expect_tid_counters(tids, tid_num, tids[1]);
+        ret = perf_mon_start(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(ctx[1].untracked, 1);
+
+        /* and the next event's start does not try it again: its ID may be
+         * another task's by then
+         */
+        expect_tid_counters(left, DIM(left), 0);
+        ret = perf_mon_start(&grp, PQOS_PERF_EVENT_LLC_REF);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(ctx[0].fd_llc_references, 0xA0);
+        assert_int_equal(ctx[1].fd_llc_references, -1);
+        assert_int_equal(ctx[2].fd_llc_references, 0xA1);
+}
+
+static void
+test_perf_mon_start_pid_every_thread_ended(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_data grp;
+        struct pqos_mon_data_internal intl;
+        pid_t tids[] = {1, 2};
+        const unsigned tid_num = DIM(tids);
+        struct pqos_mon_perf_ctx ctx[tid_num];
+
+        memset(&grp, 0, sizeof(grp));
+        memset(&intl, 0, sizeof(intl));
+        memset(ctx, 0, sizeof(struct pqos_mon_perf_ctx) * tid_num);
+        grp.intl = &intl;
+        grp.tid_nr = tid_num;
+        grp.tid_map = tids;
+        grp.intl->perf.ctx = ctx;
+
+        expect_tid_counters(tids, tid_num, -1);
+
+        ret = perf_mon_start(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_perf_mon_start_core_failure(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_data grp;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {1};
+        const unsigned cores_num = DIM(cores);
+        struct pqos_mon_perf_ctx ctx[cores_num];
+
+        memset(&grp, 0, sizeof(grp));
+        memset(&intl, 0, sizeof(intl));
+        memset(ctx, 0, sizeof(struct pqos_mon_perf_ctx) * cores_num);
+        grp.intl = &intl;
+        grp.num_cores = cores_num;
+        grp.cores = cores;
+        grp.intl->perf.ctx = ctx;
+
+        /* a core does not end, so a counter it cannot have fails the start */
+        expect_not_value(__wrap_perf_setup_counter, attr, 0);
+        expect_value(__wrap_perf_setup_counter, pid, -1);
+        expect_value(__wrap_perf_setup_counter, cpu, cores[0]);
+        expect_value(__wrap_perf_setup_counter, group_fd, -1);
+        expect_value(__wrap_perf_setup_counter, flags, PERF_FLAG_FD_CLOEXEC);
+        will_return(__wrap_perf_setup_counter, PQOS_RETVAL_PARAM);
+
+        ret = perf_mon_start(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
 /* ======== perf_mon_stop ======== */
 
 static void
@@ -791,6 +961,7 @@ main(void)
             cmocka_unit_test(test_perf_mon_start_param),
             cmocka_unit_test(test_perf_mon_start_core),
             cmocka_unit_test(test_perf_mon_start_core_param),
+            cmocka_unit_test(test_perf_mon_start_core_failure),
             cmocka_unit_test(test_perf_mon_stop_param),
             cmocka_unit_test(test_perf_mon_poll_core),
             cmocka_unit_test(test_perf_mon_poll_param),
@@ -799,6 +970,9 @@ main(void)
         const struct CMUnitTest tests_pid[] = {
             cmocka_unit_test(test_perf_mon_start_pid),
             cmocka_unit_test(test_perf_mon_start_pid_param),
+            cmocka_unit_test(test_perf_mon_start_pid_ended_thread),
+            cmocka_unit_test(test_perf_mon_start_pid_ended_thread_next_event),
+            cmocka_unit_test(test_perf_mon_start_pid_every_thread_ended),
             cmocka_unit_test(test_perf_mon_stop_pid_param),
             cmocka_unit_test(test_perf_mon_poll_pid_param),
         };

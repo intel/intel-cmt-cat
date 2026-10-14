@@ -53,9 +53,10 @@ extern "C" {
  * @param flags perf event flags
  * @param counter_fd pointer to counter fd variable to be set
  *
- * @return fd used to read specified perf event counter
- * @retval positive number on success
- * @retval negative number on error
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success, with the fd in \a counter_fd
+ * @retval PQOS_RETVAL_PARAM invalid parameters, or task \a pid has ended
+ * @retval PQOS_RETVAL_ERROR on error
  */
 PQOS_LOCAL int perf_setup_counter(struct perf_event_attr *attr,
                                   const pid_t pid,

@@ -1161,7 +1161,18 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
 
         fprintf(fd, "%d\n", task);
 
+        /* the write is made by the close, and the kernel refuses to move a
+         * task that has ended since the caller found it, with ESRCH: the
+         * answer resctrl_alloc_task_write() gives for its own write
+         */
+        errno = 0;
         if (pqos_fclose(fd) != 0) {
+                if (errno == ESRCH) {
+                        LOG_DEBUG("TID %d ended before it could be assigned "
+                                  "to resctrl monitoring group\n",
+                                  task);
+                        return PQOS_RETVAL_PARAM;
+                }
                 LOG_ERROR("Could not assign TID %d to resctrl monitoring "
                           "group\n",
                           task);
@@ -1470,6 +1481,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
         char *resctrl_group = NULL;
         int ret = PQOS_RETVAL_OK;
         unsigned i;
+        unsigned num_tids = 0;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(group != NULL);
@@ -1516,12 +1528,46 @@ resctrl_mon_start(struct pqos_mon_data *group)
 
         /**
          * Add pids to the resctrl group
+         *
+         * A thread that ended after the process's threads were listed has
+         * nothing left to monitor. It is skipped, and marked so that the stop
+         * passes over it as well, and the start fails only when none of the
+         * listed threads is left.
          */
         for (i = 0; i < group->tid_nr; i++) {
-                ret =
-                    resctrl_mon_assoc_set_pid(group->tid_map[i], resctrl_group);
-                if (ret != PQOS_RETVAL_OK)
+                const pid_t tid = group->tid_map[i];
+                struct pqos_mon_perf_ctx *ctx = group->intl->perf.ctx != NULL
+                                                    ? &group->intl->perf.ctx[i]
+                                                    : NULL;
+
+                /* a perf start before this one found it ended: its ID may be
+                 * another task's by now, which is not to be moved in here
+                 */
+                if (ctx != NULL && ctx->untracked)
+                        continue;
+
+                ret = resctrl_mon_assoc_set_pid(tid, resctrl_group);
+                if (ret == PQOS_RETVAL_OK) {
+                        num_tids++;
+                        continue;
+                }
+                /* PARAM is a task that no longer exists, the kernel's ESRCH
+                 * included. A kernel that moves tasks through task_work gives
+                 * that for a leader that has exited beside running threads,
+                 * which kill() still finds, so only another failure is checked
+                 */
+                if (ret != PQOS_RETVAL_PARAM &&
+                    resctrl_alloc_task_validate(tid) == PQOS_RETVAL_OK)
                         goto resctrl_mon_start_exit;
+                LOG_DEBUG("resctrl_mon_start: Skipping ended TID: %d\n", tid);
+                if (ctx != NULL)
+                        ctx->untracked = 1;
+                ret = PQOS_RETVAL_OK;
+        }
+        if (group->tid_nr > 0 && num_tids == 0) {
+                /* none of the threads listed for the group is left */
+                ret = PQOS_RETVAL_PARAM;
+                goto resctrl_mon_start_exit;
         }
 
         /**
@@ -1752,6 +1798,13 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 for (i = 0; i < group->tid_nr; i++) {
                         const pid_t tid = group->tid_map[i];
 
+                        /* never added to the group: its ID may be another
+                         * task's by now, which is not to be moved out of its
+                         * own
+                         */
+                        if (group->intl->perf.ctx != NULL &&
+                            group->intl->perf.ctx[i].untracked)
+                                continue;
                         if (resctrl_alloc_task_validate(tid) !=
                             PQOS_RETVAL_OK) {
                                 LOG_DEBUG("resctrl_mon_stop: Skipping "
@@ -1760,6 +1813,11 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                                 continue;
                         }
                         ret = resctrl_mon_assoc_set_pid(tid, NULL);
+                        if (ret == PQOS_RETVAL_PARAM) {
+                                /* ended after the check above */
+                                ret = PQOS_RETVAL_OK;
+                                continue;
+                        }
                         if (ret != PQOS_RETVAL_OK)
                                 goto resctrl_mon_stop_exit;
                 }

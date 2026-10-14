@@ -81,13 +81,15 @@ PQOS_LOCAL int perf_mon_fini(void);
  * @brief This function starts Perf pqos event counters
  *
  * Used to start pqos counters and request file
- * descriptors used to read the counters
+ * descriptors used to read the counters. A task of the group that has ended
+ * by the time its counter is opened is left without one.
  *
  * @param group monitoring structure
  * @param event PQoS event type
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM none of the tasks listed for the group is left
  */
 PQOS_LOCAL int perf_mon_start(struct pqos_mon_data *group,
                               const enum pqos_mon_event event);

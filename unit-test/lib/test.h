@@ -81,6 +81,46 @@ test_log_init_silent(void)
         (void)log_init(-1, NULL, NULL, LOG_VER_SILENT);
 }
 
+/* Counts what the library logs at the verbosity a run has by default
+ *
+ * That is its warnings and errors, what a user of the tool sees. A case that
+ * means a path to be quiet - a race the library takes in its stride, say -
+ * asserts that nothing was logged, which the silent log above cannot show: an
+ * error put back in such a path would pass. test_log_count_stop() silences the
+ * log again and says how many messages there were.
+ */
+static inline unsigned *
+test_log_count(void)
+{
+        static unsigned count;
+
+        return &count;
+}
+
+static inline void
+test_log_count_message(void *context, const size_t size, const char *message)
+{
+        (void)context;
+        (void)size;
+        (void)message;
+        (*test_log_count())++;
+}
+
+static inline void
+test_log_count_start(void)
+{
+        *test_log_count() = 0;
+        (void)log_init(-1, test_log_count_message, NULL, LOG_VER_DEFAULT);
+}
+
+static inline unsigned
+test_log_count_stop(void)
+{
+        test_log_init_silent();
+
+        return *test_log_count();
+}
+
 #ifndef TEST_NO_LOG_CONSTRUCTOR
 static void __attribute__((constructor))
 test_log_init_at_start(void)

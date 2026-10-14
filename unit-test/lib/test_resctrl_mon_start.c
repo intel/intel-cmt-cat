@@ -321,12 +321,289 @@ test_resctrl_mon_start_pid_cleanup_on_error(void **state)
         expect_value(__wrap_resctrl_mon_assoc_set_pid, task, pids[0]);
         expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
         will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_BUSY);
+        /* the thread is still there, so the failure stands */
+        expect_value(__wrap_resctrl_alloc_task_validate, task, pids[0]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
         expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
         expect_string(__wrap_resctrl_mon_rmdir, name, "test");
         will_return(__wrap_resctrl_mon_rmdir, 0);
 
         ret = resctrl_mon_start(&group);
         assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        assert_null(intl.resctrl.mon_group);
+}
+
+/*
+ * Sets up a group of one process and its threads, as os_mon_start_pids()
+ * passes it on
+ */
+static void
+pid_group(struct pqos_mon_data *group,
+          struct pqos_mon_data_internal *intl,
+          pid_t *pid,
+          pid_t *tids,
+          const unsigned num_tids)
+{
+        memset(group, 0, sizeof(*group));
+        memset(intl, 0, sizeof(*intl));
+        group->intl = intl;
+        group->num_pids = 1;
+        group->pids = pid;
+        group->tid_map = tids;
+        group->tid_nr = num_tids;
+        group->event = PQOS_MON_EVENT_TMEM_BW;
+}
+
+static void
+test_resctrl_mon_start_pid_ended_thread(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2, 3, 4};
+        struct pqos_mon_perf_ctx ctx[DIM(tids)];
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        memset(ctx, 0, sizeof(ctx));
+        intl.perf.ctx = ctx;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        /* the second thread has ended by the time it is added, which the add
+         * says, and is skipped as it is
+         */
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[1]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_PARAM);
+        /* the add of the third fails otherwise, and it is gone as well */
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[2]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_ERROR);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[2]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[3]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+
+        test_log_count_start();
+        ret = resctrl_mon_start(&group);
+        /* a race the start takes in its stride says nothing a user sees */
+        assert_int_equal(test_log_count_stop(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "test");
+        /* and the two skipped are marked, for the stop to pass over */
+        assert_int_equal(ctx[0].untracked, 0);
+        assert_int_equal(ctx[1].untracked, 1);
+        assert_int_equal(ctx[2].untracked, 1);
+        assert_int_equal(ctx[3].untracked, 0);
+
+        free(intl.resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_start_pid_thread_perf_found_ended(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2, 3};
+        struct pqos_mon_perf_ctx ctx[DIM(tids)];
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        memset(ctx, 0, sizeof(ctx));
+        intl.perf.ctx = ctx;
+        /* a perf start found the second thread ended: its ID may be another
+         * task's by now, and that task is not to be moved into this group
+         */
+        ctx[1].untracked = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[2]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "test");
+
+        free(intl.resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_start_pid_every_thread_ended(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2};
+        unsigned i;
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        for (i = 0; i < DIM(tids); i++) {
+                expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[i]);
+                expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+                will_return(__wrap_resctrl_mon_assoc_set_pid,
+                            PQOS_RETVAL_PARAM);
+        }
+        /* nothing was added, and the group is removed again */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_null(intl.resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_start_pid_exited_leader(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 5;
+        pid_t tids[] = {5, 6};
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        /* the leader has exited and the kernel refused its write, while kill()
+         * still finds the process by its other thread: no check is made, which
+         * would find it and fail the start
+         */
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_PARAM);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[1]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "test");
+
+        free(intl.resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_stop_pid_thread_ended_at_the_write(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2};
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        intl.resctrl.mon_group = strdup("test");
+        assert_non_null(intl.resctrl.mon_group);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        /* the first thread is there when checked and gone when written */
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[0]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_any(__wrap_resctrl_mon_assoc_set_pid, name);
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_PARAM);
+        /* so the stop goes on to the next, and removes the group */
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[1]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[1]);
+        expect_any(__wrap_resctrl_mon_assoc_set_pid, name);
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_null(intl.resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_stop_pid_thread_never_added(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2};
+        struct pqos_mon_perf_ctx ctx[DIM(tids)];
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        memset(ctx, 0, sizeof(ctx));
+        intl.perf.ctx = ctx;
+        intl.resctrl.mon_group = strdup("test");
+        assert_non_null(intl.resctrl.mon_group);
+        /* the start found the first thread ended and did not add it: a task
+         * with its ID now is somebody else's, and stays in its own group
+         */
+        ctx[0].untracked = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[1]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[1]);
+        expect_any(__wrap_resctrl_mon_assoc_set_pid, name);
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_null(intl.resctrl.mon_group);
 }
 
@@ -339,6 +616,14 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_start_core),
             cmocka_unit_test(test_resctrl_mon_start_pid),
             cmocka_unit_test(test_resctrl_mon_start_pid_cleanup_on_error),
+            cmocka_unit_test(test_resctrl_mon_start_pid_ended_thread),
+            cmocka_unit_test(
+                test_resctrl_mon_start_pid_thread_perf_found_ended),
+            cmocka_unit_test(test_resctrl_mon_start_pid_every_thread_ended),
+            cmocka_unit_test(test_resctrl_mon_start_pid_exited_leader),
+            cmocka_unit_test(
+                test_resctrl_mon_stop_pid_thread_ended_at_the_write),
+            cmocka_unit_test(test_resctrl_mon_stop_pid_thread_never_added),
         };
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini);

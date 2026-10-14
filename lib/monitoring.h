@@ -69,6 +69,11 @@ struct pqos_mon_perf_ctx {
         int fd_cyc;
         int fd_llc_misses;
         int fd_llc_references;
+        int untracked; /**< a task's context: the group does not track the
+                          task - it had ended when one of the group's starts
+                          reached it, or a failed start never moved it in -
+                          so it has no counter or resctrl group, and nothing
+                          touches it again: its ID may be another task's */
 };
 
 /**

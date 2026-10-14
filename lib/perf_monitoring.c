@@ -514,6 +514,7 @@ int
 perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
         int i, num_ctrs;
+        int num_opened = 0;
         struct perf_mon_supported_event *se;
 
         ASSERT(group != NULL);
@@ -552,6 +553,13 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                 fd = perf_mon_get_fd(ctx, event);
                 if (fd == NULL)
                         return PQOS_RETVAL_ERROR;
+                /* a thread an earlier event's start found ended is not tried
+                 * again: its ID may be another task's by now
+                 */
+                if (tid != -1 && ctx->untracked) {
+                        *fd = -1;
+                        continue;
+                }
                 /*
                  * If monitoring cores, pass core list
                  * Otherwise, pass list of TID's
@@ -561,13 +569,31 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                  */
                 ret = perf_setup_counter(&se->attrs, tid, core, -1,
                                          PERF_FLAG_FD_CLOEXEC, fd);
+                /*
+                 * A thread that ended after the process's threads were listed
+                 * has nothing left to count. It is left without a counter, and
+                 * the start fails only when none of the listed threads is left
+                 */
+                if (ret == PQOS_RETVAL_PARAM && tid != -1) {
+                        ctx->untracked = 1;
+                        *fd = -1;
+                        continue;
+                }
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("Failed to start perf "
                                   "counters for %s\n",
                                   se->desc);
                         return PQOS_RETVAL_ERROR;
                 }
+                num_opened++;
         }
+
+        /* none of the threads listed for the group is left - the list was
+         * made when the group was set up, so a thread started since is not
+         * on it
+         */
+        if (num_opened == 0)
+                return PQOS_RETVAL_PARAM;
 
         return PQOS_RETVAL_OK;
 }
@@ -600,6 +626,10 @@ perf_mon_stop(struct pqos_mon_data *group, enum pqos_mon_event event)
 
                 if (fd == NULL)
                         return PQOS_RETVAL_ERROR;
+
+                /* a thread that had ended before the start has no counter */
+                if (*fd < 0)
+                        continue;
 
                 perf_shutdown_counter(*fd);
         }
@@ -656,6 +686,10 @@ perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
 
                 if (fd == NULL)
                         return PQOS_RETVAL_ERROR;
+
+                /* a thread that had ended before the start has no counter */
+                if (*fd < 0)
+                        continue;
 
                 ret = perf_read_counter(*fd, &counter_value);
                 if (ret != PQOS_RETVAL_OK)

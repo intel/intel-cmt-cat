@@ -35,6 +35,7 @@
 #include "test.h"
 
 #include <dirent.h>
+#include <errno.h>
 
 /* ======== mock ======== */
 
@@ -127,10 +128,21 @@ __wrap_pqos_fopen(const char *name, const char *mode)
         return fd;
 }
 
+/* What a close is to fail with, 0 for one that succeeds. A tasks file is
+ * written when it is closed, so this is the kernel's answer to the write
+ */
+static int fclose_errno;
+
 int
 __wrap_pqos_fclose(FILE *fd)
 {
-        return fclose(fd);
+        const int ret = fclose(fd);
+
+        if (fclose_errno == 0)
+                return ret;
+        errno = fclose_errno;
+        fclose_errno = 0;
+        return EOF;
 }
 
 /* ======== resctrl_mon_assoc_get ======== */
@@ -663,6 +675,44 @@ test_resctrl_mon_assoc_set_pid_error(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+static void
+test_resctrl_mon_assoc_set_pid_write(void **state __attribute__((unused)))
+{
+        pid_t pid = 1;
+        char name[] = "test";
+        struct pqos_cap cap;
+        const struct {
+                int err;
+                int ret;
+                unsigned logged;
+        } answer[] = {
+            /* the task ended after it was found: the caller skips it, and
+             * nothing a user would see is said
+             */
+            {ESRCH, PQOS_RETVAL_PARAM, 0},
+            /* and any other refusal is an error, which is */
+            {EINVAL, PQOS_RETVAL_ERROR, 1},
+        };
+        unsigned i;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        for (i = 0; i < DIM(answer); i++) {
+                will_return(resctrl_mon_is_supported, 1);
+                will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+                expect_value(__wrap_resctrl_mon_mkdir, class_id, 0);
+                expect_string(__wrap_resctrl_mon_mkdir, name, name);
+                will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
+                fclose_errno = answer[i].err;
+
+                test_log_count_start();
+                assert_int_equal(resctrl_mon_assoc_set_pid(pid, name),
+                                 answer[i].ret);
+                assert_int_equal(test_log_count_stop(), answer[i].logged);
+        }
+}
+
 int
 main(void)
 {
@@ -685,7 +735,8 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_error),
+            cmocka_unit_test(test_resctrl_mon_assoc_set_pid_write),
         };
 
-        cmocka_run_group_tests(tests, NULL, NULL);
+        return cmocka_run_group_tests(tests, NULL, NULL);
 }
