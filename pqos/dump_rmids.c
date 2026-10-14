@@ -205,26 +205,29 @@ dump_rmid_regs(const struct pqos_sysconfig *sys)
         unsigned num_mem_regions = 0;
         int region_idx = 0;
 
+        /* each refusal returns rather than exits: this runs after
+         * pqos_init(), and main() reaches pqos_fini() only by a return
+         */
         if (!sys || !sys->erdt) {
                 printf("ERDT info not available!\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_RESOURCE;
         }
 
         if (sel_dump_rmids.num_domain_ids == 0) {
                 printf("Missing --dump-rmid-domain-ids option\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_PARAM;
         }
 
         if (sel_dump_rmids.num_rmids == 0) {
                 printf("Missing --dump-rmids option\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_PARAM;
         }
 
         if (!sel_dump_rmids.type_selected) {
                 printf("Missing --dump-rmid-type option\n");
                 printf("Available inputs in --dump-rmid-type: mbm l3 io-l3 "
                        "io-total io-miss\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_PARAM;
         }
 
         memset(&dump_rmids, 0, sizeof(struct pqos_mmio_dump_rmids));
@@ -235,7 +238,7 @@ dump_rmid_regs(const struct pqos_sysconfig *sys)
             (uint16_t *)malloc(sizeof(uint16_t) * dump_rmids.num_domain_ids);
         if (dump_rmids.domain_ids == NULL) {
                 printf("Error with memory allocation for domain_ids!\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_RESOURCE;
         }
 
         for (idx = 0; idx < sel_dump_rmids.num_domain_ids; idx++)
@@ -289,7 +292,7 @@ dump_rmid_regs(const struct pqos_sysconfig *sys)
         if (dump_rmids.rmids == NULL) {
                 printf("Error with memory allocation for rmids!\n");
                 free(dump_rmids.domain_ids);
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_RESOURCE;
         }
 
         for (idx = 0; idx < sel_dump_rmids.num_rmids; idx++)

@@ -301,6 +301,7 @@ $(BIN_DIR)/test_dump: ./test_dump.c $(PQOS_OBJS)
 		-Wl,--wrap=printf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
+		-Wl,--wrap=malloc \
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 

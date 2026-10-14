@@ -463,21 +463,24 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
         uint32_t dm_per_socket = 0;
         enum pqos_domain_type dm_type = 0;
 
+        /* each refusal returns rather than exits: this runs after
+         * pqos_init(), and main() reaches pqos_fini() only by a return
+         */
         if (!sys || !sys->erdt) {
                 printf("ERDT info not available!\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_RESOURCE;
         }
 
         if (sel_dump.num_sockets == 0 && sel_dump.num_domain_ids == 0) {
                 printf("Provide either --socket or --dump-domain-id\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_PARAM;
         }
 
         if (sel_dump.space == MMIO_DUMP_SPACE_ERROR) {
                 printf("Provide --space\n");
                 printf("Available inputs in --space=: cmrc mmrc marc-opt "
                        "marc-min marc-max cmrd ibrd card\n");
-                exit(EXIT_FAILURE);
+                return PQOS_RETVAL_PARAM;
         }
 
         memset(&dump, 0, sizeof(struct pqos_mmio_dump));
@@ -501,7 +504,7 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                 if (dump.topology.domain_ids == NULL) {
                         printf("Error with memory allocation for "
                                "domain_ids!\n");
-                        exit(EXIT_FAILURE);
+                        return PQOS_RETVAL_RESOURCE;
                 }
 
                 for (unsigned int idx = 0; idx < sel_dump.num_domain_ids; idx++)
@@ -536,7 +539,7 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                 if (dump.topology.domain_ids == NULL) {
                         printf("Error with memory allocation for "
                                "domain_ids!\n");
-                        exit(EXIT_FAILURE);
+                        return PQOS_RETVAL_RESOURCE;
                 }
 
                 for (idx = 0, dm_idx = 0; idx < sel_dump.num_sockets; idx++) {
@@ -549,7 +552,7 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                                        "%ld\n",
                                        sel_dump.sockets[idx]);
                                 free(dump.topology.domain_ids);
-                                exit(EXIT_FAILURE);
+                                return ret;
                         }
 
                         dm_idx += dm_per_socket;

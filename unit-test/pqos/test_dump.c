@@ -29,6 +29,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "test_dump.h"
+
 #include "common.h"
 #include "dump.h"
 #include "dump_rmids.h"
@@ -50,21 +52,41 @@
  * configuration that carries one is enough to reach the option checks these
  * test cases are about. Nothing below them is reached, because every case here
  * is a command line that has to be rejected.
+ *
+ * They run after pqos_init(), so a refusal is a return: an exit would leave
+ * the library initialised, with no pqos_fini() to remove its lock file. Each
+ * case asserts the status and that the process was not ended.
  */
 static struct pqos_erdt_info test_erdt;
 static struct pqos_sysconfig test_sys = {.erdt = &test_erdt};
+
+/* malloc() fails at its m_fail_malloc'th call, counting from 1, and 0 leaves
+ * it alone. The dumps allocate their domain and RMID tables once the options
+ * are checked, so a case with a complete selection can fail each of them.
+ */
+static int m_fail_malloc;
+
+void *
+__wrap_malloc(size_t size)
+{
+        if (m_fail_malloc > 0 && --m_fail_malloc == 0)
+                return NULL;
+        return __real_malloc(size);
+}
 
 /* ======== dump_mmio_regs ======== */
 
 static void
 test_dump_mmio_regs_requires_a_domain(void **state)
 {
+        int ret = PQOS_RETVAL_OK;
+
         UNUSED_ARG(state);
 
-        run_void_function(dump_mmio_regs, &test_sys);
+        run_function(dump_mmio_regs, ret, &test_sys);
 
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
         assert_int_equal(output_has_text("Provide either --socket or "
                                          "--dump-domain-id"),
                          1);
@@ -73,19 +95,106 @@ test_dump_mmio_regs_requires_a_domain(void **state)
 static void
 test_dump_mmio_regs_requires_a_space(void **state)
 {
+        int ret = PQOS_RETVAL_OK;
+
         UNUSED_ARG(state);
 
         /* a complete selection but for --space, which used to dump CMRC and
-         * report success, because the space selector defaults to zero
+         * report success, because the space selector defaults to zero. A
+         * socket rather than a domain id, which would take its place in the
+         * case after this one
+         */
+        selfn_dump_socket("1");
+
+        run_function(dump_mmio_regs, ret, &test_sys);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(output_has_text("Provide --space"), 1);
+        assert_int_equal(output_has_text("MMIO space dump"), 0);
+}
+
+static void
+test_dump_mmio_regs_refuses_a_socket_without_agents(void **state)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        UNUSED_ARG(state);
+
+        /* the socket the case above selected, and a space now: the ERDT here
+         * lists no CPU agents, so no socket has the domains a CMRC dump reads
+         */
+        selfn_dump_space("cmrc");
+
+        run_function(dump_mmio_regs, ret, &test_sys);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(
+            output_has_text("Mismatch between socket and CPU Agents"), 1);
+        assert_int_equal(output_has_text("Unable to get domain ids for socket"),
+                         1);
+}
+
+static void
+test_dump_mmio_regs_without_memory_for_socket_domains_returns(void **state)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        UNUSED_ARG(state);
+
+        /* the socket and the space the cases above selected: the table of
+         * the socket's domains is the allocation that fails, before the
+         * ERDT is read for them
+         */
+        m_fail_malloc = 1;
+        run_function(dump_mmio_regs, ret, &test_sys);
+        m_fail_malloc = 0;
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(
+            output_has_text("Error with memory allocation for domain_ids!"), 1);
+        assert_int_equal(output_has_text("Unable to get domain ids for socket"),
+                         0);
+}
+
+static void
+test_dump_mmio_regs_without_memory_for_given_domains_returns(void **state)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        UNUSED_ARG(state);
+
+        /* a domain id now, which takes the socket's place: the table of the
+         * ids given is the allocation that fails
          */
         selfn_dump_domain_id("0");
 
-        run_void_function(dump_mmio_regs, &test_sys);
+        m_fail_malloc = 1;
+        run_function(dump_mmio_regs, ret, &test_sys);
+        m_fail_malloc = 0;
 
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
-        assert_int_equal(output_has_text("Provide --space"), 1);
-        assert_int_equal(output_has_text("MMIO space dump"), 0);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(output_has_text("--socket is ignored"), 1);
+        assert_int_equal(
+            output_has_text("Error with memory allocation for domain_ids!"), 1);
+}
+
+static void
+test_dump_mmio_regs_without_erdt_returns(void **state)
+{
+        int ret = PQOS_RETVAL_OK;
+        struct pqos_sysconfig no_erdt = {.erdt = NULL};
+
+        UNUSED_ARG(state);
+
+        run_function(dump_mmio_regs, ret, &no_erdt);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(output_has_text("ERDT info not available!"), 1);
 }
 
 /* ======== dump_rmid_regs ======== */
@@ -93,12 +202,14 @@ test_dump_mmio_regs_requires_a_space(void **state)
 static void
 test_dump_rmid_regs_requires_a_domain(void **state)
 {
+        int ret = PQOS_RETVAL_OK;
+
         UNUSED_ARG(state);
 
-        run_void_function(dump_rmid_regs, &test_sys);
+        run_function(dump_rmid_regs, ret, &test_sys);
 
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
         assert_int_equal(
             output_has_text("Missing --dump-rmid-domain-ids option"), 1);
 }
@@ -106,20 +217,24 @@ test_dump_rmid_regs_requires_a_domain(void **state)
 static void
 test_dump_rmid_regs_requires_rmids(void **state)
 {
+        int ret = PQOS_RETVAL_OK;
+
         UNUSED_ARG(state);
 
         selfn_dump_rmid_domain_ids("0");
 
-        run_void_function(dump_rmid_regs, &test_sys);
+        run_function(dump_rmid_regs, ret, &test_sys);
 
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
         assert_int_equal(output_has_text("Missing --dump-rmids option"), 1);
 }
 
 static void
 test_dump_rmid_regs_requires_a_type(void **state)
 {
+        int ret = PQOS_RETVAL_OK;
+
         UNUSED_ARG(state);
 
         /* a complete selection but for --dump-rmid-type, which used to dump the
@@ -129,12 +244,58 @@ test_dump_rmid_regs_requires_a_type(void **state)
         selfn_dump_rmid_domain_ids("0");
         selfn_dump_rmids("0");
 
-        run_void_function(dump_rmid_regs, &test_sys);
+        run_function(dump_rmid_regs, ret, &test_sys);
 
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
         assert_int_equal(output_has_text("Missing --dump-rmid-type option"), 1);
         assert_int_equal(output_has_text("RMID MBM DUMP"), 0);
+}
+
+static void
+test_dump_rmid_regs_without_memory_returns(void **state)
+{
+        static const struct {
+                int fail;
+                const char *said;
+        } tables[] = {{1, "Error with memory allocation for domain_ids!"},
+                      {2, "Error with memory allocation for rmids!"}};
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        /* a complete selection now, of a type that reads no memory regions:
+         * the first allocation the dump makes is the domain table, and the
+         * second the RMID table
+         */
+        selfn_dump_rmid_type("l3");
+
+        for (i = 0; i < DIM(tables); i++) {
+                int ret = PQOS_RETVAL_OK;
+
+                m_fail_malloc = tables[i].fail;
+                run_function(dump_rmid_regs, ret, &test_sys);
+                m_fail_malloc = 0;
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+                assert_int_equal(output_has_text(tables[i].said), 1);
+        }
+}
+
+static void
+test_dump_rmid_regs_without_erdt_returns(void **state)
+{
+        int ret = PQOS_RETVAL_OK;
+        struct pqos_sysconfig no_erdt = {.erdt = NULL};
+
+        UNUSED_ARG(state);
+
+        run_function(dump_rmid_regs, ret, &no_erdt);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(output_has_text("ERDT info not available!"), 1);
 }
 
 int
@@ -145,11 +306,20 @@ main(void)
          * the most complete one
          */
         const struct CMUnitTest tests[] = {
+            cmocka_unit_test(test_dump_mmio_regs_without_erdt_returns),
             cmocka_unit_test(test_dump_mmio_regs_requires_a_domain),
             cmocka_unit_test(test_dump_mmio_regs_requires_a_space),
+            cmocka_unit_test(
+                test_dump_mmio_regs_refuses_a_socket_without_agents),
+            cmocka_unit_test(
+                test_dump_mmio_regs_without_memory_for_socket_domains_returns),
+            cmocka_unit_test(
+                test_dump_mmio_regs_without_memory_for_given_domains_returns),
+            cmocka_unit_test(test_dump_rmid_regs_without_erdt_returns),
             cmocka_unit_test(test_dump_rmid_regs_requires_a_domain),
             cmocka_unit_test(test_dump_rmid_regs_requires_rmids),
-            cmocka_unit_test(test_dump_rmid_regs_requires_a_type)};
+            cmocka_unit_test(test_dump_rmid_regs_requires_a_type),
+            cmocka_unit_test(test_dump_rmid_regs_without_memory_returns)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -110,11 +110,18 @@ void selfn_dump_length(const char *arg);
 /**
  *  @brief Prints the values of MMIO registers provided in --dump command
  *
+ * Runs after pqos_init(), so it reports a failure by its return, never by
+ * ending the process, which would skip pqos_fini().
+ *
  * @param [in] sys PQoS system configuration struct
  *                 returned by a pqos_sysconfig_get
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM an option the dump needs is missing, or a socket
+ *         the platform does not have
+ * @retval PQOS_RETVAL_RESOURCE no ERDT information, or out of memory
+ * @retval anything else, what the library's dump returned
  */
 int dump_mmio_regs(const struct pqos_sysconfig *sys);
 
