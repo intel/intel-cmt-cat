@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
@@ -251,6 +252,114 @@ test_strlisttotabrealloc_range_ending_at_the_top(void **state)
         parsed = strlisttotabrealloc(input, &tab, &count);
         assert_int_equal(parsed, 1);
         assert_true(tab[0] == UINT64_MAX);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_range_after_a_value(void **state)
+{
+        unsigned count = 4;
+        char input[] = "0,20-1000000";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* A range after another entry, the shape of the PID lists fuzzing
+         * saved as hangs. Each of its values used to be checked by a scan of
+         * everything stored before it, which for a range this long is minutes
+         * of work; asking a set takes a fraction of a second. The alarm tells
+         * the two apart without timing the case: SIGALRM, which cmocka does
+         * not catch, ends the run and fails it, and ten seconds is far beyond
+         * what the parse takes now. The result must not change either: the
+         * single value, then the range, in order.
+         */
+        alarm(10);
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        alarm(0);
+        assert_int_equal(parsed, 1 + 999981);
+        assert_int_equal(tab[0], 0);
+        assert_int_equal(tab[1], 20);
+        assert_int_equal(tab[999981], 1000000);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_repeats_across_ranges(void **state)
+{
+        unsigned count = 4;
+        char input[] = "5,1-100000,50000-150000,7";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* the repeats that a range shares with a value before it, with a range
+         * before it and with a value after it are dropped, and the rest keep
+         * the order the list gave: 5, then 1 to 100000 without 5, then 100001
+         * to 150000
+         */
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 150000);
+        assert_int_equal(tab[0], 5);
+        assert_int_equal(tab[1], 1);
+        assert_int_equal(tab[4], 4);
+        assert_int_equal(tab[5], 6);
+        assert_int_equal(tab[99999], 100000);
+        assert_int_equal(tab[100000], 100001);
+        assert_int_equal(tab[149999], 150000);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_repeats_of_a_first_range(void **state)
+{
+        unsigned count = 4;
+        char input[] = "1-5,3,4-8";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* a first range is stored by a path of its own, with nothing before
+         * it to be a repeat of; its values are still what the tokens after it
+         * repeat
+         */
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 8);
+        assert_int_equal(tab[4], 5);
+        assert_int_equal(tab[5], 6);
+        assert_int_equal(tab[7], 8);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_repeats_of_zero_and_the_top(void **state)
+{
+        unsigned count = 2;
+        char input[] = "18446744073709551615,0,18446744073709551615,0,1-2,0";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        /* 0 and UINT64_MAX are values like any other: neither may be taken
+         * for an empty slot of whatever remembers what was stored
+         */
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 4);
+        assert_true(tab[0] == UINT64_MAX);
+        assert_int_equal(tab[1], 0);
+        assert_int_equal(tab[2], 1);
+        assert_int_equal(tab[3], 2);
 
         free(tab);
         (void)state; /* unused */
@@ -884,6 +993,11 @@ main(void)
             cmocka_unit_test(
                 test_strlisttotab_range_of_duplicates_fits_a_full_table),
             cmocka_unit_test(test_strlisttotabrealloc_range_ending_at_the_top),
+            cmocka_unit_test(test_strlisttotabrealloc_range_after_a_value),
+            cmocka_unit_test(test_strlisttotabrealloc_repeats_across_ranges),
+            cmocka_unit_test(test_strlisttotabrealloc_repeats_of_a_first_range),
+            cmocka_unit_test(
+                test_strlisttotabrealloc_repeats_of_zero_and_the_top),
             cmocka_unit_test(test_strlisttotab_range_ending_at_the_top),
             cmocka_unit_test(test_parse_uint64_formats_and_errors),
             cmocka_unit_test(test_parse_mem_regions_replaces_previous_values),

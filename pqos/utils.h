@@ -151,7 +151,13 @@ unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
  * @brief Converts a comma separated list into a table that grows to fit it
  *
  * As strlisttotab(), except that the table is grown rather than the list being
- * refused for being too long.
+ * refused for being too long. A repeat is dropped, as strlisttotab() drops it,
+ * and what is left keeps the order of the list's elements, each range in
+ * ascending order whichever way it was written. Where the list begins with a
+ * range, its values are stored as they come and each later value is first
+ * checked against its two ends; a value is otherwise looked up in a set beside
+ * the table, kept at most half full, so it costs a short probe sequence rather
+ * than a scan of everything stored before it.
  *
  * @param [in] s the list, which this modifies while parsing
  * @param [in,out] tab where the numbers go, reallocated as needed

@@ -89,6 +89,153 @@ isdup(const uint64_t *tab, const unsigned size, const uint64_t val)
         return 0;
 }
 
+/**
+ * @brief The values strlisttotabrealloc() has stored, to ask about a repeat
+ *
+ * isdup() scans the table, which is nothing for a list of a few cores and
+ * quadratic for a PID list, where one range stands for up to MAX_PID_LIST_SIZE
+ * values: every value of a range after another entry was compared with every
+ * value stored before it. This set answers the same question with one probe
+ * sequence, open-addressed and never more than half full, while the table
+ * keeps the order the list gave. Every 64-bit value is a key, 0 and
+ * UINT64_MAX among them, so whether a slot is taken is kept apart from what it
+ * holds.
+ */
+struct value_set {
+        uint64_t *value;
+        unsigned char *taken;
+        size_t size;  /**< how many slots, a power of two or 0 */
+        size_t count; /**< how many are taken */
+};
+
+/**
+ * @brief The slot a value's probe sequence starts at
+ *
+ * The SplitMix64 finaliser, so that neighbouring values, which is what a range
+ * is, start far apart rather than in one run of taken slots.
+ */
+static size_t
+value_slot(uint64_t value, const size_t size)
+{
+        value ^= value >> 30;
+        value *= UINT64_C(0xbf58476d1ce4e5b9);
+        value ^= value >> 27;
+        value *= UINT64_C(0x94d049bb133111eb);
+        value ^= value >> 31;
+
+        return (size_t)value & (size - 1);
+}
+
+/**
+ * @brief The slot that holds a value, or the free one where it would go
+ */
+static size_t
+value_find(const struct value_set *set, const uint64_t value)
+{
+        size_t i = value_slot(value, set->size);
+
+        while (set->taken[i] && set->value[i] != value)
+                i = (i + 1) & (set->size - 1);
+
+        return i;
+}
+
+/**
+ * @brief Doubles the set, or makes its first slots
+ *
+ * Out of memory, it says so and exits, as strlisttotabrealloc() does when its
+ * table cannot grow.
+ */
+static void
+value_set_grow(struct value_set *set)
+{
+        struct value_set grown = {NULL, NULL, 0, set->count};
+        size_t i;
+
+        grown.size = set->size == 0 ? 64 : set->size * 2;
+        if (grown.size < set->size || grown.size > SIZE_MAX / sizeof(uint64_t))
+                grown.size = 0;
+        if (grown.size != 0) {
+                grown.value = calloc(grown.size, sizeof(*grown.value));
+                grown.taken = calloc(grown.size, sizeof(*grown.taken));
+        }
+        if (grown.value == NULL || grown.taken == NULL) {
+                printf("Reallocation error!\n");
+                exit(EXIT_FAILURE);
+        }
+
+        for (i = 0; i < set->size; i++)
+                if (set->taken[i]) {
+                        const size_t j = value_find(&grown, set->value[i]);
+
+                        grown.taken[j] = 1;
+                        grown.value[j] = set->value[i];
+                }
+
+        free(set->value);
+        free(set->taken);
+        *set = grown;
+}
+
+/**
+ * @brief Adds a value to the set, unless it is there already
+ *
+ * @return 1 where it was added, 0 where it is a repeat
+ */
+static int
+value_set_add(struct value_set *set, const uint64_t value)
+{
+        size_t i = 0;
+
+        if (set->size != 0) {
+                i = value_find(set, value);
+                if (set->taken[i])
+                        return 0;
+        }
+
+        /* at most half full, so a probe sequence ends soon at a free slot */
+        if ((set->count + 1) * 2 > set->size) {
+                value_set_grow(set);
+                i = value_find(set, value);
+        }
+
+        set->taken[i] = 1;
+        set->value[i] = value;
+        set->count++;
+        return 1;
+}
+
+/**
+ * @brief What strlisttotabrealloc() has stored of a list: the range that was
+ *        its first token, where it began with one, and a set of the rest
+ *
+ * The first range is kept as its two ends rather than value by value. Nothing
+ * before it can repeat it, and a list of one range - "1-90000" - never asks
+ * about a repeat at all, so it costs no more than the table, as it did before
+ * the set: the set is made only for the values after it.
+ */
+struct list_seen {
+        int first;             /**< whether the list began with a range */
+        uint64_t first_start;  /**< its lower end */
+        uint64_t first_end;    /**< its upper end */
+        struct value_set rest; /**< every other value stored */
+};
+
+/**
+ * @brief Whether a value is new to the list, recording it where it is
+ *
+ * @return 1 where it is new, 0 where it is a repeat
+ */
+static int
+list_seen_add(struct list_seen *seen, const uint64_t value)
+{
+        if (seen->first && seen->first_start <= value &&
+            value <= seen->first_end)
+                return 0;
+
+        return value_set_add(&seen->rest, value);
+}
+
 uint64_t
 strtouint64(const char *s)
 {
@@ -324,6 +471,7 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
 unsigned
 strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
 {
+        struct list_seen seen = {0, 0, 0, {NULL, NULL, 0, 0}};
         unsigned index = 0;
         char *saveptr = NULL;
 
@@ -380,8 +528,9 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                         if (index == 0) {
                                 /*
                                  * Fast path for the first range.
-                                 * There are no prior values, so duplicate
-                                 * checks can be skipped.
+                                 * There are no prior values, so none of its
+                                 * own is a repeat. The tokens after it ask
+                                 * about its two ends, not about a set.
                                  */
                                 uint64_t range_len;
 
@@ -426,10 +575,13 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                                         if (n == end)
                                                 break;
                                 }
+                                seen.first = 1;
+                                seen.first_start = start;
+                                seen.first_end = end;
                                 continue;
                         }
                         for (n = start;; n++) {
-                                if (!(isdup(*tab, index, n))) {
+                                if (list_seen_add(&seen, n)) {
                                         (*tab)[index] = n;
                                         index++;
                                 }
@@ -452,7 +604,7 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                          */
                         uint64_t val = strtouint64(token);
 
-                        if (!(isdup((*tab), index, val))) {
+                        if (list_seen_add(&seen, val)) {
                                 (*tab)[index] = val;
                                 index++;
                         }
@@ -467,6 +619,8 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                 }
         }
 
+        free(seen.rest.value);
+        free(seen.rest.taken);
         return index;
 }
 
