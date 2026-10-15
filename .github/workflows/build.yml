@@ -19,6 +19,19 @@ jobs:
       run: sudo apt install gcc
     - name: Build gcc
       run: make
+    - name: Rebuild on new options
+      run: |
+        test -x pqos/pqos
+        make DEBUG=y
+        nm -D --undefined-only lib/libpqos.so | grep -w __assert_fail
+        nm -D --undefined-only pqos/pqos | grep -w __assert_fail
+        make SHARED=n
+        if ldd pqos/pqos | grep -q libpqos; then
+          echo "pqos still needs libpqos after SHARED=n"
+          exit 1
+        fi
+        make
+        ldd pqos/pqos | grep -q libpqos
     - name: Install
       run: sudo make install
     - name: Build gcc debug
