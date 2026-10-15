@@ -255,5 +255,5 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_init_rmem),
         };
 
-        cmocka_run_group_tests(tests, NULL, NULL);
+        return cmocka_run_group_tests(tests, NULL, NULL);
 }

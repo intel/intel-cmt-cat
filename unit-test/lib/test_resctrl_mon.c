@@ -290,5 +290,5 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_read_counter_trailing_junk),
         };
 
-        cmocka_run_group_tests(tests, NULL, NULL);
+        return cmocka_run_group_tests(tests, NULL, NULL);
 }
