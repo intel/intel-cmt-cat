@@ -104,6 +104,14 @@ ifeq ($(UNLOCK_CUSTOM),y)
 CFLAGS += -DUNLOCK_CUSTOM
 endif
 
+# The flags above, recorded so that a different SHARED, DEBUG or EXTRA_CFLAGS on
+# the command line rebuilds what they compiled: "make SHARED=n" then "make" kept
+# the -fPIE objects and failed to link a shared object from them, and "make
+# DEBUG=y" after a plain build left ASSERT compiled out. See flags-stamp.mk.
+# After the last line that adds to them.
+FLAGS_STAMP_DIR = .
+include ../flags-stamp.mk
+
 # Build targets and dependencies
 SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)
@@ -234,13 +242,15 @@ LIBDIR_TRUSTED = ( d="$$dir"; \
 
 all: unselected-form
 
-$(LIBNAME): $(OBJS)
+# the stamp as well, for the flags only the link reads (EXTRA_LDFLAGS), and kept
+# off the link line, which takes the objects alone
+$(LIBNAME): $(OBJS) $(FLAGS_STAMP)
 ifeq ($(SHARED),y)
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(LIB).so.$(SO_VERSION) -o $(LIBNAME) $^ -lc
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(LIB).so.$(SO_VERSION) -o $(LIBNAME) $(filter %.o,$^) -lc
 	ln -f -s $(LIBNAME) $(LIB).so.$(SO_VERSION)
 	ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 else
-	$(AR) crvsD $@ $^
+	$(AR) crvsD $@ $(filter %.o,$^)
 endif
 
 # The form that was not built goes once this one is there. Consumers link with
@@ -369,6 +379,10 @@ endif
 
 DEPFILES = $(SRCS:.c=.d)
 
+# what an object is made of besides its source: the flags it was compiled with,
+# and the file that says which they are
+$(OBJS) $(DEPFILES): Makefile $(FLAGS_STAMP)
+
 %.o: %.c %.d
 
 %.d: %.c
@@ -396,11 +410,24 @@ doxy:
 	doxygen api_doxygen.cfg
 	doxygen lib_doxygen.cfg
 
+# The flags stamp goes with a clean when nothing in the same invocation builds.
+# A later build then records the options it compiles with, and an install -
+# which reads the stamp and does not write it - builds the missing objects and
+# makes the stamp for them. Left in place, it said what the objects before the
+# clean were built with: after "make DEBUG=y", "make clean" and "make install",
+# the next "make DEBUG=y" found it current and kept the install's release
+# objects. A goal that builds, as in "make clean all", wrote the stamp for its
+# own options while the Makefile was read, before clean ran, and make does not
+# look at it again, so there clean leaves it.
+ifeq ($(filter-out $(FLAGS_STAMP_READERS),$(MAKECMDGOALS)),)
+CLEAN_FLAGS_STAMP = $(FLAGS_STAMP)
+endif
+
 clean:
-	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
+	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES) $(CLEAN_FLAGS_STAMP)
 
 clobber:
-	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
+	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES) $(CLEAN_FLAGS_STAMP)
 	-rm -rf $(DOXY_DIRS)
 
 CHECKPATCH?=checkpatch.pl

@@ -92,7 +92,7 @@ all: $(TESTS)
 # The cost is that editing any of the three rebuilds everything here, which takes
 # seconds and is the answer to a question nobody should have to ask.
 FLAGS_STAMP_DIR = $(OBJ_DIR)
-include ../flags-stamp.mk
+include ../../flags-stamp.mk
 
 # and on the mock library they link. With SHARED=y that library is loaded at run
 # time and a rebuilt one is picked up by itself; with SHARED=n it is an archive

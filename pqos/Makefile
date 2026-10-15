@@ -90,6 +90,12 @@ ifeq ($(RMID_CUSTOM),y)
 CFLAGS += -DPQOS_RMID_CUSTOM
 endif
 
+# The flags above, recorded so that a different DEBUG or EXTRA_CFLAGS on the
+# command line rebuilds the objects - "make DEBUG=y" after a plain build found
+# them up to date. See flags-stamp.mk. After the last line that adds to them.
+FLAGS_STAMP_DIR = $(OBJDIR)
+include ../flags-stamp.mk
+
 # Build targets and dependencies
 APP = pqos
 MAN = pqos.8
@@ -109,8 +115,22 @@ dump:
 	echo $(SRCS)
 	echo $(OBJS)
 
-$(APP): $(OBJS)
-	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+# The library it links, too, in whichever form lib/ holds: "make SHARED=n" after
+# a shared build replaces libpqos.so with libpqos.a there, and a tool not linked
+# again still asked the loader for the .so that had gone - "error while loading
+# shared libraries: libpqos.so.7". The .so first, as -lpqos takes it where both
+# are there; not chosen by SHARED, which this Makefile does not read, and which
+# would name a file the link does not use, or one that is not there. Looked up
+# when this is read, which in a build from the top is after lib/ has been built.
+PQOS_LIB = $(firstword $(wildcard $(LIBDIR)/libpqos.so $(LIBDIR)/libpqos.a))
+
+# the stamp as well, for the flags only the link reads, and both kept off the
+# link line, which takes the objects alone and the library through LDLIBS
+$(APP): $(OBJS) $(FLAGS_STAMP) $(PQOS_LIB)
+	$(CC) $(LDFLAGS) $(filter %.o,$^) $(LDLIBS) -o $@
+
+# what an object is made of besides its source
+$(OBJS) $(DEPFILES): Makefile $(FLAGS_STAMP)
 
 $(OBJDIR)/%.o: %.c $(OBJDIR)/%.d
 	@mkdir -p $(@D)

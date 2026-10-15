@@ -31,16 +31,20 @@
 ###############################################################################
 
 # A file recording the flags the last build here used, for the objects and
-# binaries to depend on.
+# binaries to depend on. Included by lib/, pqos/ and the unit-test directories.
 #
 # Naming the Makefile as a prerequisite covers the flags written *in* the
-# Makefile. It cannot cover the ones that arrive on the command line - DEBUG in
-# unit-test/lib and unit-test/pqos, SHARED and EXTRA_CFLAGS in unit-test/mock and
-# unit-test/output - because nothing about the file changes when the command line
-# does. So `make DEBUG=y` in a tree that has already been built found everything
-# up to date and produced no debug build at all: ASSERT stayed compiled out, and
-# a case that only reaches its subject under ASSERT passed without testing it,
-# while telling the reader in a comment to build this way.
+# Makefile. It cannot cover the ones that arrive on the command line - SHARED,
+# DEBUG and EXTRA_CFLAGS in lib/, unit-test/mock and unit-test/output, DEBUG and
+# EXTRA_CFLAGS in pqos/, DEBUG in unit-test/lib, and any variable given there,
+# LDLIBS for one - because nothing about the file changes when the command line
+# does. So
+# `make DEBUG=y` in a tree that has already been built found everything up to
+# date and produced no debug build at all: ASSERT stayed compiled out, and a case
+# that only reaches its subject under ASSERT passed without testing it, while
+# telling the reader in a comment to build this way. And `make SHARED=y` after
+# `make SHARED=n` in lib/ kept the -fPIE objects and failed to link a shared
+# object from them.
 #
 # The flags themselves are the dependency, so this records them and is rewritten
 # only when they differ from what it holds. A stamp rewritten every run would
@@ -68,11 +72,11 @@ FLAGS_STAMP = $(FLAGS_STAMP_DIR)/.build-flags
 
 # every variable that decides what is produced here, in one line.
 #
-# AR as well as CC: with SHARED=n the mock and the capture library are archives,
-# and which ar builds them is as much a part of what came out as which compiler
-# did. CPPFLAGS because unit-test/mock and unit-test/output have no compilation
-# recipe of their own and fall through to make's built-in one, which is
-# "$(CC) $(CPPFLAGS) $(CFLAGS) -c" - so a macro defined there decides what is
+# AR as well as CC: with SHARED=n libpqos, the mock and the capture library are
+# archives, and which ar builds them is as much a part of what came out as which
+# compiler did. CPPFLAGS because lib/, unit-test/mock and unit-test/output have no
+# compilation recipe of their own and fall through to make's built-in one, which
+# is "$(CC) $(CPPFLAGS) $(CFLAGS) -c" - so a macro defined there decides what is
 # produced and nothing else here would notice it.
 #
 # One field per variable, named and bracketed, because a plain concatenation does
@@ -86,12 +90,31 @@ FLAGS_STAMP = $(FLAGS_STAMP_DIR)/.build-flags
 # -DX="a b" and -DX="a  b" recorded equal and the objects compiled with the first
 # were kept for the second. The brackets make that safe at the ends too: whatever
 # a variable leaves at either of its own ends is inside them.
+#
+# LDLIBS as well as LDFLAGS: pqos/ links with "$(LDFLAGS) <objects> $(LDLIBS)", so
+# a library added on the command line changes what is linked.
 FLAGS_STAMP_TEXT = CC=[$(CC)] AR=[$(AR)] CPPFLAGS=[$(CPPFLAGS)] \
-CFLAGS=[$(CFLAGS)] LDFLAGS=[$(LDFLAGS)] WRAP=[$(WRAP)]
+CFLAGS=[$(CFLAGS)] LDFLAGS=[$(LDFLAGS)] LDLIBS=[$(LDLIBS)] WRAP=[$(WRAP)]
 
+# An invocation that asks only for goals that take what is built, or remove it,
+# leaves the stamp as the build left it. "make install" after "make DEBUG=y"
+# installs that build, as it did before there was a stamp here: recording the
+# install's own flags instead rebuilt every object - as root, under sudo - and
+# installed a different build from the one that was compiled. That goes for
+# flags sudo drops from the environment as well, such as an exported CC.
+FLAGS_STAMP_READERS = install uninstall clean clobber help doxy style \
+	checkpatch clang-format codespell cppcheck
+
+ifneq ($(filter-out $(FLAGS_STAMP_READERS),$(or $(MAKECMDGOALS),all)),)
 ifneq ($(FLAGS_STAMP_TEXT),$(shell cat $(FLAGS_STAMP) 2>/dev/null))
 $(shell mkdir -p $(FLAGS_STAMP_DIR))
+# removed first: a stamp root wrote - "sudo make install" in a tree with none yet
+# - cannot be opened for writing by the user the directory belongs to, and a
+# build with other options then stopped right here, "make clean DEBUG=y" too.
+# The directory is the user's, so the file can always be replaced.
+$(shell rm -f $(FLAGS_STAMP))
 $(file >$(FLAGS_STAMP),$(FLAGS_STAMP_TEXT))
+endif
 endif
 
 # and a rule as well as the write above, for the invocation that removes it after
@@ -100,10 +123,17 @@ endif
 # prerequisite that no longer exists - "No rule to make target
 # 'obj/.build-flags'". The write above handles a change of flags; this handles the
 # file not being there.
+#
+# And not the default goal of a Makefile that includes this before its own first
+# rule: make takes the first target it reads, and a stamp in a subdirectory -
+# pqos/obj/.build-flags - is one it will take (a bare dot-file is not), so "make"
+# in pqos/ built the stamp and nothing else. The goal is put back as it was found.
+FLAGS_STAMP_GOAL := $(.DEFAULT_GOAL)
 $(FLAGS_STAMP): export FLAGS_STAMP_TEXT := $(FLAGS_STAMP_TEXT)
 $(FLAGS_STAMP):
 	@mkdir -p $(@D)
 	@printf '%s' "$$FLAGS_STAMP_TEXT" > $@
+.DEFAULT_GOAL := $(FLAGS_STAMP_GOAL)
 
 # "make clean all" asks for both in one invocation, and make does not serialize
 # goals: under -j the clean deletes what the build is writing - obj/ while a link

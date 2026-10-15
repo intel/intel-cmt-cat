@@ -98,7 +98,7 @@ all: $(TESTS)
 # links them, so a flag change left it linked against a mock the previous flags
 # built.
 FLAGS_STAMP_DIR = $(OBJ_DIR)
-include ../flags-stamp.mk
+include ../../flags-stamp.mk
 
 # and on the three libraries these binaries link - the product library, the mock
 # and the output capture.

@@ -122,7 +122,7 @@ DEPFILES = $(SRCS:.c=.d)
 # Makefile named as a prerequisite of the library would be handed to the linker as
 # an object file. Rebuilding an object relinks the library.
 FLAGS_STAMP_DIR = .
-include ../flags-stamp.mk
+include ../../flags-stamp.mk
 
 $(OBJS) $(DEPFILES): Makefile $(wildcard *.h) $(FLAGS_STAMP)
 
