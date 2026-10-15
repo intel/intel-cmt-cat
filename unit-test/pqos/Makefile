@@ -51,6 +51,11 @@ PQOS_DEPS = $(PQOS_SRCS:$(PQOS_DIR)/%.c=$(OBJ_DIR)/%.d)
 APP_MOCK_DEPS = $(APP_MOCK_SRCS:$(APP_MOCK_DIR)/%.c=$(OBJ_APP_MOCK_DIR)/%.d)
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
+# The top-pids test reads Linux's /proc - zombies, process names, a leader that
+# has exited - and needs prctl() and fopencookie(), none of which FreeBSD has
+ifeq ($(shell uname), FreeBSD)
+TESTS_SRCS := $(filter-out test_monitor_top_pids.c,$(TESTS_SRCS))
+endif
 TESTS = $(TESTS_SRCS:%.c=$(BIN_DIR)/%)
 TESTS_DEPS = $(TESTS_SRCS:%.c=$(OBJ_DIR)/%.d)
 
@@ -243,6 +248,24 @@ $(BIN_DIR)/test_cmdline: ./test_cmdline.c $(PQOS_OBJS)
 		-Wl,--wrap=exit \
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
+
+# monitor.c is included by the test rather than linked, so its object is left out
+$(BIN_DIR)/test_monitor_top_pids: ./test_monitor_top_pids.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_mon_start_pids2 \
+		-Wl,--wrap=pqos_mon_stop \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=kill \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group \
+		-lpthread -o $@
 
 # main.c is included by the test rather than linked, so its object is left out
 $(BIN_DIR)/test_print_modes: ./test_print_modes.c $(PQOS_OBJS)

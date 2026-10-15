@@ -82,9 +82,10 @@
 #define TOP_PROC_MAX (10)  /**< maximum number of top-pids to be handled */
 #define NUM_TIDS_MAX (128) /**< maximum number of TIDs */
 
-#define PID_COL_STATUS (3)  /**< col for process status letter */
-#define PID_COL_UTIME  (14) /**< col for cpu-user time in /proc/pid/stat */
-#define PID_COL_STIME  (15) /**< col for cpu-kernel time in /proc/pid/stat */
+#define PID_COL_STATUS  (3)  /**< col for process status letter */
+#define PID_COL_UTIME   (14) /**< col for cpu-user time in /proc/pid/stat */
+#define PID_COL_STIME   (15) /**< col for cpu-kernel time in /proc/pid/stat */
+#define PID_COL_THREADS (20) /**< col for number of threads */
 
 #define TIMEOUT_INFINITE ((unsigned)-1)
 
@@ -149,6 +150,10 @@ static struct mon_group {
         enum pqos_mon_event events;
         struct pqos_mon_data *data;
         unsigned started;
+        /* top-pids mode chose this process, and no selection of the user's
+         * names it as well
+         */
+        unsigned top_pid;
 
         union {
                 unsigned *cores;
@@ -206,6 +211,15 @@ static int sel_mon_interval = 10; /**< 10 = 10x100ms = 1s */
  * monitoring L3 occupancy
  */
 static int sel_mon_top_like = 0;
+
+/**
+ * Whether top-pids mode is on. The processes it chose are ones the tool did
+ * not start, picked while the options were read and started on only after the
+ * library has initialised, so one of them may have ended in between - which
+ * leaves it out rather than ending the run. Which groups those are is each
+ * group's top_pid: other -p options may name PIDs beside them.
+ */
+static int sel_mon_top_pids = 0;
 
 /**
  * Maintains monitoring time that is selected in config string for
@@ -1311,7 +1325,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
                                 char *desc;
-                                const struct mon_group *grp;
+                                struct mon_group *grp;
 
                                 if (type != MON_GROUP_TYPE_CHANNEL)
                                         desc = uinttostr((unsigned)cbuf[i]);
@@ -1323,6 +1337,10 @@ parse_monitor_group(char *str, enum mon_group_type type)
                                         free(cbuf);
                                         return -1;
                                 }
+                                /* named, so the user's, even where top-pids
+                                 * chose it as well
+                                 */
+                                grp->top_pid = 0;
 
                                 group_count++;
                         }
@@ -1336,7 +1354,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
                         char *desc = NULL;
                         unsigned element_count;
                         uint64_t invalid_pid;
-                        const struct mon_group *group;
+                        struct mon_group *group;
 
                         selfn_strdup(&desc, grp);
 
@@ -1373,6 +1391,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
                                 free(cbuf);
                                 return -1;
                         }
+                        group->top_pid = 0;
                         group_count++;
                 }
         }
@@ -1773,6 +1792,124 @@ monitor_setup_events(enum mon_group_type type,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Tells whether a process has ended
+ *
+ * Ended is gone, or exited and waiting to be reaped: a zombie still answers
+ * kill(pid, 0), and it is not there to be monitored either. A zombie counts
+ * as ended only with no thread but its leader, though: a leader that called
+ * pthread_exit() reads as one too while its other threads run.
+ *
+ * Whatever cannot be told counts as there, so that a failure is not taken for
+ * an ended process: a read of the stat file that fails or comes back cut
+ * short, and a stat file that is not there while kill() still finds the
+ * process, which is what /proc mounted hidepid shows of a process that is
+ * hidden from this one.
+ *
+ * @param [in] pid the process
+ *
+ * @return 1 where it has ended, 0 where it is there or cannot be told
+ */
+static int
+process_has_ended(const pid_t pid)
+{
+        char path[64];
+        char buf[512];
+        FILE *fp;
+        char *p;
+        char *end;
+        size_t got;
+        long threads;
+        int col;
+
+        /* EPERM is a process this one may not signal, another user's zombie
+         * among them, so the stat file is what tells
+         */
+        if (kill(pid, 0) != 0 && errno != EPERM)
+                return errno == ESRCH;
+
+        snprintf(path, sizeof(path), "/proc/%d/stat", (int)pid);
+        fp = pqos_fopen(path, "r");
+        if (fp == NULL) {
+                /* reaped since kill() found it, if it is gone for kill() now
+                 * as well
+                 */
+                if (errno != ENOENT)
+                        return 0;
+                return kill(pid, 0) != 0 && errno == ESRCH;
+        }
+        /* so that what is read after a failed read is the read's own errno */
+        errno = 0;
+        got = fread(buf, 1, sizeof(buf) - 1, fp);
+        if (ferror(fp)) {
+                const int err = errno;
+
+                pqos_fclose(fp);
+                /* a zombie reaped between the open and the read answers the
+                 * read with ESRCH before anything is read; any other failure,
+                 * and a read cut short, tells nothing
+                 */
+                return got == 0 && err == ESRCH;
+        }
+        pqos_fclose(fp);
+        buf[got] = '\0';
+
+        /* the state follows the name, which may hold anything but ends at the
+         * last ')'
+         */
+        p = strrchr(buf, ')');
+        if (p == NULL || p[1] != ' ')
+                return 0;
+        p += 2;
+        if (*p != 'Z' && *p != 'X')
+                return 0;
+
+        /* and the number of threads is further on, a whole field of digits */
+        for (col = PID_COL_STATUS; col < PID_COL_THREADS && p != NULL; col++) {
+                p = strchr(p, ' ');
+                if (p != NULL)
+                        p++;
+        }
+        if (p == NULL || !isdigit((unsigned char)*p))
+                return 0;
+        threads = strtol(p, &end, 10);
+        if (*end != ' ')
+                return 0;
+
+        return threads <= 1;
+}
+
+/**
+ * @brief Leaves out the top-pids groups whose process ended before it started
+ *
+ * @return how many groups are left
+ */
+static unsigned
+drop_ended_top_pids(void)
+{
+        unsigned i;
+        unsigned kept = 0;
+
+        /* the events the output has columns for are those of the groups left:
+         * a group left out would leave columns nothing measures
+         */
+        sel_events_max = (enum pqos_mon_event)0;
+        for (i = 0; i < sel_monitor_num; i++) {
+                struct mon_group *grp = &sel_monitor_group[i];
+
+                if (grp->type == MON_GROUP_TYPE_PID && grp->top_pid &&
+                    !grp->started) {
+                        grp_free(grp);
+                        continue;
+                }
+                sel_events_max |= grp->events;
+                sel_monitor_group[kept++] = *grp;
+        }
+        sel_monitor_num = kept;
+
+        return kept;
+}
+
 int
 monitor_setup(const struct pqos_cpuinfo *cpu_info,
               const struct pqos_capability *const cap_mon,
@@ -2027,6 +2164,25 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                             grp->num_res, grp->pids, grp->events,
                             (void *)grp->desc, &grp->data);
                         /**
+                         * A process top-pids picked that has ended since is
+                         * left out, and the others are monitored: the tool
+                         * chose it, and ending the run for it says something
+                         * failed when nothing did. A PID the user named stays
+                         * an error, beside top-pids or not, and so does any
+                         * failure but the one the library gives a process that
+                         * no longer exists - a failure of the library's own
+                         * is the run's, whatever became of the process
+                         */
+                        if (ret == PQOS_RETVAL_PARAM && grp->top_pid &&
+                            grp->num_res == 1 &&
+                            process_has_ended(grp->pids[0])) {
+                                printf("PID %s ended before its monitoring "
+                                       "could start, so it is left out\n",
+                                       grp->desc);
+                                ret = PQOS_RETVAL_OK;
+                                continue;
+                        }
+                        /**
                          * Any problem with monitoring the process?
                          */
                         if (ret != PQOS_RETVAL_OK) {
@@ -2104,6 +2260,13 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
 
                 return -1;
         }
+
+        if (sel_mon_top_pids && drop_ended_top_pids() == 0) {
+                printf("Every top-pids process ended before its monitoring "
+                       "could start\n");
+                return -1;
+        }
+
         return 0;
 }
 
@@ -3069,7 +3232,8 @@ fill_top_procs(const struct slist *pslist)
         for (i = 0; i < current_size; i++) {
                 char *desc = uinttostr((unsigned)stats[i].pid);
                 uint64_t pid = (uint64_t)stats[i].pid;
-                const struct mon_group *grp;
+                const unsigned num_groups = sel_monitor_num;
+                struct mon_group *grp;
 
                 /* finally we can add list of top-pids for LLC/MBM monitoring
                  * NOTE: list was sorted in ascending order, so in order to have
@@ -3081,6 +3245,9 @@ fill_top_procs(const struct slist *pslist)
                               &pid, 1);
                 if (grp == NULL)
                         exit(EXIT_FAILURE);
+                /* a group made for this pick, not one the user named first */
+                if (sel_monitor_num > num_groups)
+                        grp->top_pid = 1;
         }
 
         return current_size;
@@ -3101,6 +3268,7 @@ selfn_monitor_top_pids(void)
         printf("Monitoring top-pids enabled\n");
         sel_monitor_opts = 1;
         sel_mon_top_like = 1;
+        sel_mon_top_pids = 1;
 
         /* getting initial values for CPU usage for processes */
         res = get_proc_pids_stats(&pslist);
