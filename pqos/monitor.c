@@ -224,7 +224,12 @@ static char *sel_output_file = NULL;
 static char *sel_output_type = NULL;
 
 /**
- * Stop monitoring indicator for infinite monitoring loop
+ * Stop monitoring indicator for infinite monitoring loop. The handler of the
+ * signals that end monitoring sets it while the groups start or the loop runs,
+ * so it is read and written only with atomic operations. On x86, the only
+ * architecture the library builds for, those are lock-free on an int, which
+ * makes them as safe in a handler as a volatile sig_atomic_t would be; the
+ * flag is not one because checkpatch rejects volatile.
  */
 static int stop_monitoring_loop = 0;
 
@@ -1601,6 +1606,69 @@ monitor_is_aet_only(const enum pqos_mon_event events)
 }
 
 /**
+ * @brief CTRL-C handler for infinite monitoring loop
+ *
+ * @param signo signal number
+ */
+static void
+monitoring_ctrlc(int signo)
+{
+        UNUSED_ARG(signo);
+        __atomic_store_n(&stop_monitoring_loop, 1, __ATOMIC_RELAXED);
+}
+
+/**
+ * @brief Has SIGINT, SIGHUP and SIGTERM end monitoring the way Ctrl-C does
+ *
+ * Called before the first monitoring group starts. When the handlers were set
+ * only as the monitoring loop began, a signal that came between the start and
+ * the loop ended the process with its groups still running: on the MSR
+ * interface the cores stayed associated with their RMIDs, and the next session
+ * asking for one of them was refused it until a monitoring reset. From here
+ * on a signal keeps the loop from running or ends it, and the groups that
+ * started are stopped as usual.
+ *
+ * sigaction() rather than signal(), whose semantics glibc chooses by the
+ * feature macros of the build: a strict standard gets a handler that resets
+ * to the default once it has run, and then a second signal, during the stop,
+ * would end the process with its groups running after all. SA_RESTART keeps
+ * the read of the interval timer going through a signal, as signal() did.
+ *
+ * A handler that cannot be set fails the setup, before any group starts:
+ * left at its default action, that signal would end the process with its
+ * groups running, which is what setting the handlers here is for.
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 if a handler could not be set
+ */
+static int
+monitoring_catch_signals(void)
+{
+        struct sigaction sa;
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = monitoring_ctrlc;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART;
+
+        if (sigaction(SIGINT, &sa, NULL) == -1) {
+                printf("Failed to catch SIGINT!\n");
+                return -1;
+        }
+        if (sigaction(SIGHUP, &sa, NULL) == -1) {
+                printf("Failed to catch SIGHUP!\n");
+                return -1;
+        }
+        if (sigaction(SIGTERM, &sa, NULL) == -1) {
+                printf("Failed to catch SIGTERM!\n");
+                return -1;
+        }
+
+        return 0;
+}
+
+/**
  * Update list of events to be monitored
  *
  * @param [in] type monitoring group type
@@ -1886,6 +1954,9 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
 
         enum pqos_mon_event avail_evts =
             get_available_events(cap_mon, monitor_iordt_mode());
+
+        if (monitoring_catch_signals() != 0)
+                return -1;
 
         for (i = 0; i < sel_monitor_num; i++) {
                 struct mon_group *grp = &sel_monitor_group[i];
@@ -3166,18 +3237,6 @@ mon_qsort_mixed_cmp_asc(const void *a, const void *b)
 }
 
 /**
- * @brief CTRL-C handler for infinite monitoring loop
- *
- * @param signo signal number
- */
-static void
-monitoring_ctrlc(int signo)
-{
-        UNUSED_ARG(signo);
-        stop_monitoring_loop = 1;
-}
-
-/**
  * @brief Initializes two arrays with pointers to PQoS monitoring structures
  *
  * Function does the following things:
@@ -3326,16 +3385,6 @@ monitor_loop(void)
         mon_number = get_mon_arrays(&mon_grps, &mon_data);
         display_num = mon_number;
 
-        /**
-         * Capture ctrl-c to gracefully stop the loop
-         */
-        if (signal(SIGINT, monitoring_ctrlc) == SIG_ERR)
-                printf("Failed to catch SIGINT!\n");
-        if (signal(SIGHUP, monitoring_ctrlc) == SIG_ERR)
-                printf("Failed to catch SIGHUP!\n");
-        if (signal(SIGTERM, monitoring_ctrlc) == SIG_ERR)
-                printf("Failed to catch SIGTERM!\n");
-
         if (istty) {
                 struct winsize w;
                 unsigned max_lines = 0;
@@ -3362,12 +3411,12 @@ monitor_loop(void)
 
         if (retval == -1) {
                 fprintf(stderr, "Failed to setup timer\n");
-                stop_monitoring_loop = 1;
+                __atomic_store_n(&stop_monitoring_loop, 1, __ATOMIC_RELAXED);
         }
 
         output.begin(fp_monitor, sel_mon_mem_region.num_mem_regions,
                      sel_mon_mem_region.region_num);
-        while (!stop_monitoring_loop) {
+        while (!__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED)) {
                 struct tm *ptm = NULL;
                 unsigned i = 0;
                 char cb_time[64];
@@ -3431,7 +3480,7 @@ monitor_loop(void)
                 }
                 first_measurement = 0;
 
-                if (stop_monitoring_loop)
+                if (__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED))
                         break;
 
                 /* timeout */

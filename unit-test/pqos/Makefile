@@ -324,6 +324,31 @@ $(BIN_DIR)/test_monitor_xml: ./test_monitor_xml.c
 		-Wl,--start-group \
 		-lcmocka $< -Wl,--end-group -o $@
 
+# monitor.c is included by the test rather than linked, so its object is left
+# out. The library's monitoring start, poll and stop are wrapped: each case
+# raises a signal from inside one of them. The loop's timer is wrapped as well,
+# to count that the loop got as far as setting it: timerfd_settime() on Linux,
+# timer_settime() elsewhere, and a wrap of a call that is not made does nothing.
+# sigaction() is wrapped so that a case can have a handler refused.
+$(BIN_DIR)/test_monitor_signals: ./test_monitor_signals.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_cap_get \
+		-Wl,--wrap=pqos_mon_start_pids2 \
+		-Wl,--wrap=pqos_mon_poll \
+		-Wl,--wrap=pqos_mon_stop \
+		-Wl,--wrap=timerfd_settime \
+		-Wl,--wrap=timer_settime \
+		-Wl,--wrap=sigaction \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+
 .PHONY: run
 run: $(TESTS)
 	@echo "Running pqos Unit Tests"
