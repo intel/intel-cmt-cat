@@ -171,8 +171,15 @@ os_mon_start_events(struct pqos_mon_data *group)
         unsigned num_ctrs, i;
         enum pqos_mon_event events;
         enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
+        int resctrl_started = 0;
+        int borrowed;
 
         ASSERT(group != NULL);
+
+        /* a name given before the start is the group os_mon_add_pids() adds
+         * to: this start did not make it, so a failure must not remove it
+         */
+        borrowed = group->intl->resctrl.mon_group != NULL;
 
         if (group->num_cores > 0)
                 num_ctrs = group->num_cores;
@@ -243,22 +250,28 @@ os_mon_start_events(struct pqos_mon_data *group)
         started_evts |= group->intl->perf.event;
 
         if (group->intl->resctrl.event != 0) {
-                ret = resctrl_lock_exclusive();
-                if (ret != PQOS_RETVAL_OK)
-                        goto start_event_error;
-
-                ret = resctrl_mon_start(group);
-                resctrl_lock_release();
-                if (ret != PQOS_RETVAL_OK)
-                        goto start_event_error;
-
-                /* Collect package IDs for AET telemetry */
+                /* Collect package IDs for AET telemetry. Before the start, so
+                 * that the start is the last step that can fail: a failure
+                 * after it would leave the directory the start made for a
+                 * task added from another class, since a group being added to
+                 * is stopped below without its name
+                 */
                 if (group->intl->resctrl.event &
                     (PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY)) {
                         ret = resctrl_mon_collect_pkgids(group);
                         if (ret != PQOS_RETVAL_OK)
                                 goto start_event_error;
                 }
+
+                ret = resctrl_lock_exclusive();
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
+
+                ret = resctrl_mon_start(group);
+                resctrl_lock_release();
+                resctrl_started = 1;
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
         }
         started_evts |= group->intl->resctrl.event;
 
@@ -285,7 +298,28 @@ os_mon_start_events(struct pqos_mon_data *group)
 start_event_error:
         /*  Check if all selected events were started */
         if ((group->event & started_evts) != group->event) {
-                const int stop_ret = os_mon_stop_events(group);
+                int stop_ret;
+
+                /* The resctrl events are flagged as the loop finds them and
+                 * started by resctrl_mon_start() after it, so a perf event
+                 * that fails first leaves nothing of them to stop. Stopping
+                 * them anyway moved the tasks and cores, and removed the
+                 * directory of a group being added to. Once they have started,
+                 * the stop takes out the tasks this start moved in, without
+                 * the borrowed name, so that the directory stays.
+                 */
+                if (!resctrl_started) {
+                        group->intl->resctrl.event = (enum pqos_mon_event)0;
+                        /* collected for a start that did not happen */
+                        free(group->intl->resctrl.pkgids);
+                        group->intl->resctrl.pkgids = NULL;
+                        group->intl->resctrl.num_pkgids = 0;
+                }
+                if (borrowed && group->intl->resctrl.mon_group != NULL) {
+                        free(group->intl->resctrl.mon_group);
+                        group->intl->resctrl.mon_group = NULL;
+                }
+                stop_ret = os_mon_stop_events(group);
 
                 LOG_ERROR("Failed to start all selected "
                           "OS monitoring events\n");

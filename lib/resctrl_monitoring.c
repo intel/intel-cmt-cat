@@ -1358,6 +1358,57 @@ resctrl_mon_new_group(void)
 }
 
 /**
+ * @brief Which classes a monitoring group has a directory in
+ *
+ * @param [in] name group name
+ * @param [out] present for each class, whether the group's directory is
+ *                      there, to be freed by the caller; NULL for no class
+ * @param [out] num_classes number of classes
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_dirs_present(const char *name,
+                         unsigned char **present,
+                         unsigned *num_classes)
+{
+        const struct pqos_cap *cap = _pqos_get_cap();
+        unsigned max_clos;
+        unsigned clos;
+        int ret;
+
+        *present = NULL;
+        *num_classes = 0;
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_clos);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (max_clos == 0)
+                return PQOS_RETVAL_OK;
+
+        *present = calloc(max_clos, sizeof(**present));
+        if (*present == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        for (clos = 0; clos < max_clos; clos++) {
+                char path[128];
+
+                ret = resctrl_mon_group_path(clos, name, NULL, path,
+                                             sizeof(path));
+                if (ret != PQOS_RETVAL_OK) {
+                        free(*present);
+                        *present = NULL;
+                        return ret;
+                }
+                (*present)[clos] = pqos_dir_exists(path) ? 1 : 0;
+        }
+        *num_classes = max_clos;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Assigns resctrl monitoring group
  *
  * @param group monitoring structure
@@ -1482,11 +1533,21 @@ resctrl_mon_start(struct pqos_mon_data *group)
         int ret = PQOS_RETVAL_OK;
         unsigned i;
         unsigned num_tids = 0;
+        unsigned reached = 0;
+        int new_group;
+        unsigned char *present = NULL;
+        unsigned num_classes = 0;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(group != NULL);
         ASSERT(group->tid_nr == 0 || group->tid_map != NULL);
         ASSERT(group->num_cores == 0 || group->cores != NULL);
+
+        /* a group the caller names already monitors other tasks -
+         * os_mon_add_pids() adds to one - so a failure here removes only what
+         * this start made for it
+         */
+        new_group = group->intl->resctrl.mon_group == NULL;
 
         /* List l3ids */
         for (i = 0; i < group->num_cores; i++) {
@@ -1522,9 +1583,22 @@ resctrl_mon_start(struct pqos_mon_data *group)
          * Get resctrl monitoring group
          */
         resctrl_group = resctrl_mon_assign(group);
-        if (resctrl_group == NULL)
-                return PQOS_RETVAL_ERROR;
+        if (resctrl_group == NULL) {
+                ret = PQOS_RETVAL_ERROR;
+                goto resctrl_mon_start_exit;
+        }
         group->intl->resctrl.mon_group = resctrl_group;
+
+        /* the classes a group being added to has a directory in as the add
+         * begins: a thread in another class gets a directory made for it,
+         * which a failed add takes away again
+         */
+        if (!new_group && group->tid_nr > 0) {
+                ret = resctrl_mon_dirs_present(resctrl_group, &present,
+                                               &num_classes);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_start_exit;
+        }
 
         /**
          * Add pids to the resctrl group
@@ -1540,6 +1614,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
                                                     ? &group->intl->perf.ctx[i]
                                                     : NULL;
 
+                reached = i;
                 /* a perf start before this one found it ended: its ID may be
                  * another task's by now, which is not to be moved in here
                  */
@@ -1564,6 +1639,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
                         ctx->untracked = 1;
                 ret = PQOS_RETVAL_OK;
         }
+        reached = group->tid_nr;
         if (group->tid_nr > 0 && num_tids == 0) {
                 /* none of the threads listed for the group is left */
                 ret = PQOS_RETVAL_PARAM;
@@ -1581,13 +1657,22 @@ resctrl_mon_start(struct pqos_mon_data *group)
 
 resctrl_mon_start_exit:
         if (ret != PQOS_RETVAL_OK) {
+                /* The stop that rolls a failed start back takes out what the
+                 * start moved in, and only that: a thread it did not reach, or
+                 * failed to move, is in another group or none, and stays there
+                 */
+                if (group->intl->perf.ctx != NULL)
+                        for (i = reached; i < group->tid_nr; i++)
+                                group->intl->perf.ctx[i].untracked = 1;
+
                 if (group->num_pids > 0 &&
                     group->intl->resctrl.mon_group != NULL) {
                         const struct pqos_cap *cap = _pqos_get_cap();
                         unsigned max_clos;
 
-                        if (resctrl_alloc_get_grps_num(cap, &max_clos) ==
-                            PQOS_RETVAL_OK) {
+                        if (new_group &&
+                            resctrl_alloc_get_grps_num(cap, &max_clos) ==
+                                PQOS_RETVAL_OK) {
                                 unsigned clos = 0;
 
                                 do {
@@ -1595,6 +1680,14 @@ resctrl_mon_start_exit:
                                             clos,
                                             group->intl->resctrl.mon_group);
                                 } while (++clos < max_clos);
+                        } else if (present != NULL) {
+                                unsigned clos;
+
+                                for (clos = 0; clos < num_classes; clos++)
+                                        if (!present[clos])
+                                                (void)resctrl_mon_rmdir(
+                                                    clos, group->intl->resctrl
+                                                              .mon_group);
                         }
 
                         free(group->intl->resctrl.mon_group);
@@ -1602,11 +1695,14 @@ resctrl_mon_start_exit:
                         resctrl_group = NULL;
                 }
 
-                if (group->intl->resctrl.l3id != NULL)
-                        free(group->intl->resctrl.l3id);
+                /* cleared as well as freed: the stop that follows frees it */
+                free(group->intl->resctrl.l3id);
+                group->intl->resctrl.l3id = NULL;
+                group->intl->resctrl.num_l3id = 0;
                 if (group->intl->resctrl.mon_group != resctrl_group)
                         free(resctrl_group);
         }
+        free(present);
 
         return ret;
 }

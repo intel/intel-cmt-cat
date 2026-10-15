@@ -86,10 +86,13 @@ resctrl_mon_cpumask_write(const unsigned class_id,
         return __wrap_resctrl_mon_cpumask_write(class_id, resctrl_group, mask);
 }
 
+/* a name of NULL is a group that could not be named */
 char *
 resctrl_mon_new_group(void)
 {
-        return strdup(mock_type(char *));
+        const char *name = mock_type(char *);
+
+        return name != NULL ? strdup(name) : NULL;
 }
 
 int
@@ -521,6 +524,105 @@ test_resctrl_mon_start_pid_exited_leader(void **state)
         free(intl.resctrl.mon_group);
 }
 
+/*
+ * The group os_mon_add_pids() passes on: the name of the group the process's
+ * first threads are already monitored in, so its directories are not this
+ * start's to remove
+ */
+static void
+pid_group_added_to(struct pqos_mon_data *group,
+                   struct pqos_mon_data_internal *intl,
+                   pid_t *pid,
+                   pid_t *tids,
+                   const unsigned num_tids)
+{
+        pid_group(group, intl, pid, tids, num_tids);
+        intl->resctrl.mon_group = strdup("existing");
+        assert_non_null(intl->resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_start_pid_add_every_thread_ended(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 5;
+        pid_t tids[] = {5, 6};
+        unsigned i;
+        int ret;
+
+        pid_group_added_to(&group, &intl, &pid, tids, DIM(tids));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        /* the group being added to has its directory in class 0, and the
+         * threads added are in class 1, which gets one made for them
+         */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/existing");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/COS1/mon_groups/existing");
+        will_return(__wrap_pqos_dir_exists, 0);
+        for (i = 0; i < DIM(tids); i++) {
+                expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[i]);
+                expect_string(__wrap_resctrl_mon_assoc_set_pid, name,
+                              "existing");
+                will_return(__wrap_resctrl_mon_assoc_set_pid,
+                            PQOS_RETVAL_PARAM);
+        }
+        /* nothing was added: the directory made for it goes, and the
+         * group's own stays
+         */
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 1);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "existing");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_null(intl.resctrl.mon_group);
+}
+
+static void
+test_resctrl_mon_start_pid_add_failure(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 5;
+        pid_t tids[] = {5};
+        int ret;
+
+        pid_group_added_to(&group, &intl, &pid, tids, DIM(tids));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/existing");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "existing");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_BUSY);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[0]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        /* a failure of any kind leaves the group being added to standing */
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        assert_null(intl.resctrl.mon_group);
+}
+
 static void
 test_resctrl_mon_stop_pid_thread_ended_at_the_write(void **state)
 {
@@ -607,6 +709,166 @@ test_resctrl_mon_stop_pid_thread_never_added(void **state)
         assert_null(intl.resctrl.mon_group);
 }
 
+static void
+test_resctrl_mon_start_pid_add_fails_before_any_thread(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 5;
+        pid_t tids[] = {5, 6};
+        struct pqos_mon_perf_ctx ctx[DIM(tids)];
+        int ret;
+
+        pid_group_added_to(&group, &intl, &pid, tids, DIM(tids));
+        memset(ctx, 0, sizeof(ctx));
+        intl.perf.ctx = ctx;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        /* the add cannot see which classes the group has directories in, and
+         * fails before it moves a thread
+         */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_ERROR);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(intl.resctrl.mon_group);
+        /* so neither thread is this group's to move out */
+        assert_int_equal(ctx[0].untracked, 1);
+        assert_int_equal(ctx[1].untracked, 1);
+
+        /* and the stop that rolls the add back moves neither: wherever they
+         * are monitored, they stay
+         */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_resctrl_mon_start_pid_unnamed(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2};
+        struct pqos_mon_perf_ctx ctx[DIM(tids)];
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        memset(ctx, 0, sizeof(ctx));
+        intl.perf.ctx = ctx;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        /* no name for the group, so no thread is moved anywhere */
+        will_return(resctrl_mon_new_group, NULL);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(intl.resctrl.mon_group);
+        assert_int_equal(ctx[0].untracked, 1);
+        assert_int_equal(ctx[1].untracked, 1);
+}
+
+static void
+test_resctrl_mon_start_pid_fails_midway(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2, 3};
+        struct pqos_mon_perf_ctx ctx[DIM(tids)];
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        memset(ctx, 0, sizeof(ctx));
+        intl.perf.ctx = ctx;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        /* the second thread is there and cannot be moved in */
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[1]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_BUSY);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[1]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        /* the first was moved in and is for the stop to move out; the one
+         * that failed, and the one never reached, are not
+         */
+        assert_int_equal(ctx[0].untracked, 0);
+        assert_int_equal(ctx[1].untracked, 1);
+        assert_int_equal(ctx[2].untracked, 1);
+}
+
+static void
+test_resctrl_mon_start_core_failure(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {1};
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+        /* the class count, for the assign and for the core groups it parses */
+        will_return_count(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK, 1);
+        will_return_count(__wrap_resctrl_alloc_get_grps_num, 1, 1);
+        will_return_count(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK, 1);
+        will_return_count(__wrap_resctrl_alloc_get_grps_num, 1, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_ERROR);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        /* the list of L3 IDs is gone, and cleared, so that the stop that rolls
+         * the start back does not free it a second time
+         */
+        assert_null(intl.resctrl.l3id);
+        assert_int_equal(intl.resctrl.num_l3id, 0);
+
+        free(intl.resctrl.mon_group);
+}
+
 int
 main(void)
 {
@@ -621,9 +883,16 @@ main(void)
                 test_resctrl_mon_start_pid_thread_perf_found_ended),
             cmocka_unit_test(test_resctrl_mon_start_pid_every_thread_ended),
             cmocka_unit_test(test_resctrl_mon_start_pid_exited_leader),
+            cmocka_unit_test(test_resctrl_mon_start_pid_add_every_thread_ended),
+            cmocka_unit_test(test_resctrl_mon_start_pid_add_failure),
             cmocka_unit_test(
                 test_resctrl_mon_stop_pid_thread_ended_at_the_write),
             cmocka_unit_test(test_resctrl_mon_stop_pid_thread_never_added),
+            cmocka_unit_test(
+                test_resctrl_mon_start_pid_add_fails_before_any_thread),
+            cmocka_unit_test(test_resctrl_mon_start_pid_unnamed),
+            cmocka_unit_test(test_resctrl_mon_start_pid_fails_midway),
+            cmocka_unit_test(test_resctrl_mon_start_core_failure),
         };
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini);
