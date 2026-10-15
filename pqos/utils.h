@@ -66,7 +66,8 @@ uint64_t strtouint64(const char *s);
  *
  * What is wrong is printed as strtouint64() prints it, and -1 returned: for a
  * number read after pqos_init(), which has to return to main() for the
- * library to be finalised.
+ * library to be finalised, or by a helper that frees what it holds before its
+ * option handler ends the process.
  *
  * @param [in] s string to be converted
  * @param [out] value the number, where it is one
@@ -166,7 +167,8 @@ unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
  *
  * The same list read the same way and the same messages printed, but a list
  * it cannot use is a return of -1: for a list read after pqos_init(), which
- * has to return to main() for the library to be finalised.
+ * has to return to main() for the library to be finalised, or by a helper
+ * that frees what it holds before its option handler ends the process.
  *
  * @param [in] s the list, which this modifies while parsing
  * @param [out] tab where the numbers go
@@ -195,6 +197,25 @@ int strlisttotab_checked(char *s, uint64_t *tab, const unsigned max);
  * @return Number of elements placed into \a tab
  */
 unsigned strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max);
+
+/**
+ * @brief strlisttotabrealloc() without the exit
+ *
+ * The same list read the same way and the same messages printed, but a list
+ * it cannot use, or cannot store for want of memory, is a return of -1, so
+ * that its caller can free what it holds and decide: an option handler ends
+ * the process, as strlisttotabrealloc() does, while a helper returns to the
+ * handler that called it.
+ *
+ * @param [in] s the list, which this modifies while parsing
+ * @param [in,out] tab where the numbers go, reallocated as needed; still the
+ *                 caller's to free after a -1, as large as \a max says
+ * @param [in,out] max how many \a tab holds, updated when it grows; a table
+ *                 said to hold more than INT_MAX is refused untouched
+ *
+ * @return how many elements were placed into \a tab, or -1
+ */
+int strlisttotabrealloc_checked(char *s, uint64_t **tab, unsigned *max);
 
 /**
  * @brief Doubles an array, zeroing what it gains

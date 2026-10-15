@@ -31,16 +31,19 @@
  */
 
 /**
- * @brief monitor.c's failures after pqos_init(), each a return to main()
+ * @brief monitor.c's failures, each a return to the caller that decides
  *
  * The setup, the descriptions of its default groups, the conversion of a
  * device group to channels and the arrays the monitoring loop polls are all
  * made after the library is initialised, so a failure in them has to return:
  * only that way does main() reach pqos_fini(), and monitor_stop() as well once
- * the loop has run. Allocation is what fails there, so malloc(), calloc() and
- * strdup() are wrapped to fail on demand - the next call fails where a case
- * arms them - and the cases call monitor.c's static functions directly, which
- * this file includes, as test_alloc.c does with alloc.c.
+ * the loop has run. The helpers the option handlers call before pqos_init() -
+ * the parse of a group's list - return as well, and the handler ends the
+ * process, having freed what they allocated. Allocation is what fails there,
+ * so malloc(), calloc(), realloc() and strdup() are wrapped to fail on demand -
+ * the call a case names fails - and the cases call monitor.c's static
+ * functions directly, which this file includes, as test_alloc.c does with
+ * alloc.c.
  *
  * The loop's result is what main() exits with, so the loop is driven to each
  * of its ends - a poll, its arrays or the timer failing, a stop, a timeout and
@@ -57,6 +60,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <limits.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -73,6 +77,7 @@
 /** how many allocations from now the failing one is; 0 for none */
 static int m_fail_malloc;
 static int m_fail_calloc;
+static int m_fail_realloc;
 static int m_fail_strdup;
 
 void *
@@ -89,6 +94,14 @@ __wrap_calloc(size_t nmemb, size_t size)
         if (m_fail_calloc > 0 && --m_fail_calloc == 0)
                 return NULL;
         return __real_calloc(nmemb, size);
+}
+
+void *
+__wrap_realloc(void *ptr, size_t size)
+{
+        if (m_fail_realloc > 0 && --m_fail_realloc == 0)
+                return NULL;
+        return __real_realloc(ptr, size);
 }
 
 char *
@@ -577,6 +590,257 @@ test_a_monitoring_loop_that_times_out_succeeds(void **state)
         assert_int_equal(ret, 0);
 }
 
+/* What a number without digits, such as "0x", is told with. glibc leaves
+ * errno alone where strtoull() converts nothing, and the check that follows
+ * says "No digits were found"; FreeBSD's sets EINVAL, and the perror() before
+ * that check reports on stderr, which the capture does not see. Elsewhere a
+ * case asserts only the return and that the process was not ended.
+ */
+#ifdef __GLIBC__
+#define NO_DIGITS_SAID "No digits were found"
+#else
+#define NO_DIGITS_SAID NULL
+#endif
+
+static void
+test_a_group_list_that_cannot_be_used_is_refused_by_returning(void **state)
+{
+        static const struct {
+                const char *option;
+                enum mon_group_type type;
+                const char *said;
+        } bad[] = {
+            {"all:5-", MON_GROUP_TYPE_PID, "Incomplete PID range format"},
+            {"all:5-x", MON_GROUP_TYPE_PID, "Invalid PID range format"},
+            {"all:0x", MON_GROUP_TYPE_PID, NO_DIGITS_SAID},
+            /* a range whose start, or whose end, is no number */
+            {"all:x-5", MON_GROUP_TYPE_PID, NO_DIGITS_SAID},
+            {"all:5-5x", MON_GROUP_TYPE_PID,
+             "Error converting '5x' to unsigned number!"},
+            {"all:1-300000", MON_GROUP_TYPE_PID,
+             "Requested PID range expansion is too large"},
+            {"all:[5-]", MON_GROUP_TYPE_PID, "Incomplete PID range format"},
+            {"all:1-x", MON_GROUP_TYPE_CORE,
+             "Error converting '1-x' to unsigned number!"},
+            {"foo:1", MON_GROUP_TYPE_CORE,
+             "Unrecognized monitoring event type"},
+        };
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        for (i = 0; i < DIM(bad); i++) {
+                char option[64];
+                int ret = 0;
+
+                strncpy(option, bad[i].option, sizeof(option) - 1);
+                option[sizeof(option) - 1] = '\0';
+
+                run_function(parse_monitor_group, ret, option, bad[i].type);
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
+                if (bad[i].said != NULL)
+                        assert_true(output_has_text(bad[i].said));
+        }
+}
+
+static void
+test_a_group_without_memory_is_refused_by_returning(void **state)
+{
+        static const enum mon_group_type types[] = {MON_GROUP_TYPE_CORE,
+                                                    MON_GROUP_TYPE_CHANNEL};
+        /* the copy of the list kept for a message, then the description of
+         * the group, a string of its number: decimal for a core, hex for a
+         * channel
+         */
+        static const char *const said[] = {
+            "Failed to allocate memory for argument copy!",
+            "String duplicate error!"};
+        unsigned i, which;
+
+        UNUSED_ARG(state);
+
+        for (i = 0; i < DIM(types); i++)
+                for (which = 1; which <= DIM(said); which++) {
+                        char option[] = "all:1";
+                        int ret = 0;
+
+                        m_fail_strdup = (int)which;
+                        run_function(parse_monitor_group, ret, option,
+                                     types[i]);
+                        m_fail_strdup = 0;
+
+                        assert_int_equal(output_exit_was_called(), 0);
+                        assert_int_equal(ret, -1);
+                        assert_true(output_has_text(said[which - 1]));
+                }
+}
+
+static void
+test_a_group_copy_without_memory_is_refused_by_returning(void **state)
+{
+        static const struct {
+                const char *option;
+                enum mon_group_type type;
+                const char *said;
+        } copies[] = {
+            /* a bracketed group's description is a copy of its list */
+            {"all:[1]", MON_GROUP_TYPE_CORE, "String duplicate error!"},
+            /* a PID list is copied first, to see how far it expands */
+            {"all:1", MON_GROUP_TYPE_PID,
+             "Failed to allocate memory for argument copy!"},
+        };
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        for (i = 0; i < DIM(copies); i++) {
+                char option[64];
+                int ret = 0;
+
+                strncpy(option, copies[i].option, sizeof(option) - 1);
+                option[sizeof(option) - 1] = '\0';
+
+                m_fail_strdup = 1;
+                run_function(parse_monitor_group, ret, option, copies[i].type);
+                m_fail_strdup = 0;
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
+                assert_true(output_has_text(copies[i].said));
+        }
+}
+
+static void
+test_a_list_whose_value_set_cannot_grow_returns(void **state)
+{
+        /* the set of the values stored so far is two allocations, made at
+         * the first value that is not part of a leading range: a single
+         * value, or, after a leading range, a value inside a later range.
+         * Either allocation failing, on either path, refuses the list
+         */
+        static const char *const lists[] = {"1,2", "1-2,4-5"};
+        unsigned l, which;
+
+        UNUSED_ARG(state);
+
+        for (l = 0; l < DIM(lists); l++) {
+                for (which = 1; which <= 2; which++) {
+                        char list[16];
+                        unsigned max = 4;
+                        uint64_t *tab = calloc(max, sizeof(*tab));
+                        int ret = 0;
+
+                        assert_non_null(tab);
+                        strncpy(list, lists[l], sizeof(list) - 1);
+                        list[sizeof(list) - 1] = '\0';
+                        m_fail_calloc = (int)which;
+                        run_function(strlisttotabrealloc_checked, ret, list,
+                                     &tab, &max);
+                        m_fail_calloc = 0;
+
+                        assert_int_equal(output_exit_was_called(), 0);
+                        assert_int_equal(ret, -1);
+                        assert_true(output_has_text("Reallocation error!"));
+                        free(tab);
+                }
+        }
+}
+
+static void
+test_a_list_whose_table_cannot_grow_keeps_it(void **state)
+{
+        /* the three places the table grows: for a leading range longer than
+         * it, and after a value or a range that fills it
+         */
+        static const struct {
+                const char *list;
+                unsigned max;
+        } lists[] = {{"1-5", 1}, {"1,2", 1}, {"1,3-4", 2}};
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        for (i = 0; i < DIM(lists); i++) {
+                char list[16];
+                unsigned max = lists[i].max;
+                uint64_t *tab = calloc(max, sizeof(*tab));
+                const uint64_t *const given = tab;
+                int ret = 0;
+
+                assert_non_null(tab);
+                strncpy(list, lists[i].list, sizeof(list) - 1);
+                list[sizeof(list) - 1] = '\0';
+
+                m_fail_realloc = 1;
+                run_function(strlisttotabrealloc_checked, ret, list, &tab,
+                             &max);
+                m_fail_realloc = 0;
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
+                assert_true(output_has_text("Reallocation error!"));
+                /* still the caller's to free, at the size it had */
+                assert_ptr_equal(tab, given);
+                assert_int_equal(max, lists[i].max);
+                free(tab);
+        }
+}
+
+static void
+test_a_table_given_past_what_an_int_counts_is_refused(void **state)
+{
+        /* a table said to hold more than INT_MAX elements: a list that fills
+         * it would count past what the int return holds, so it is refused
+         * before anything is read or written
+         */
+        char list[] = "1";
+        unsigned max = (unsigned)INT_MAX + 1;
+        uint64_t *tab = calloc(1, sizeof(*tab));
+        const uint64_t *const given = tab;
+        int ret = 0;
+
+        UNUSED_ARG(state);
+        assert_non_null(tab);
+
+        run_function(strlisttotabrealloc_checked, ret, list, &tab, &max);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("Too large group items."));
+        assert_ptr_equal(tab, given);
+        assert_int_equal(max, (unsigned)INT_MAX + 1);
+        assert_int_equal(tab[0], 0);
+        free(tab);
+}
+
+static void
+test_a_table_past_what_an_int_counts_is_refused(void **state)
+{
+        /* a table said to hold more than INT_MAX / 2 elements, and a first
+         * range longer still: doubling it would let the count pass INT_MAX,
+         * so it is neither grown nor written, and the list is refused
+         */
+        char list[] = "0-1073741824";
+        unsigned max = (unsigned)INT_MAX / 2 + 1;
+        uint64_t *tab = calloc(1, sizeof(*tab));
+        const uint64_t *const given = tab;
+        int ret = 0;
+
+        UNUSED_ARG(state);
+        assert_non_null(tab);
+
+        run_function(strlisttotabrealloc_checked, ret, list, &tab, &max);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("Too large group items."));
+        assert_ptr_equal(tab, given);
+        assert_int_equal(max, (unsigned)INT_MAX / 2 + 1);
+        free(tab);
+}
+
 int
 main(void)
 {
@@ -597,7 +861,18 @@ main(void)
             cmocka_unit_test(
                 test_a_timer_overrun_ends_the_loop_without_failing),
 #endif
-            cmocka_unit_test(test_a_monitoring_loop_that_times_out_succeeds)};
+            cmocka_unit_test(test_a_monitoring_loop_that_times_out_succeeds),
+            cmocka_unit_test(
+                test_a_group_list_that_cannot_be_used_is_refused_by_returning),
+            cmocka_unit_test(
+                test_a_group_without_memory_is_refused_by_returning),
+            cmocka_unit_test(
+                test_a_group_copy_without_memory_is_refused_by_returning),
+            cmocka_unit_test(test_a_list_whose_value_set_cannot_grow_returns),
+            cmocka_unit_test(test_a_list_whose_table_cannot_grow_keeps_it),
+            cmocka_unit_test(
+                test_a_table_given_past_what_an_int_counts_is_refused),
+            cmocka_unit_test(test_a_table_past_what_an_int_counts_is_refused)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

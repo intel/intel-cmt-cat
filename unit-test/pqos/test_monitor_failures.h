@@ -49,9 +49,11 @@
  */
 void *__real_malloc(size_t size);
 void *__real_calloc(size_t nmemb, size_t size);
+void *__real_realloc(void *ptr, size_t size);
 char *__real_strdup(const char *s);
 void *__wrap_malloc(size_t size);
 void *__wrap_calloc(size_t nmemb, size_t size);
+void *__wrap_realloc(void *ptr, size_t size);
 char *__wrap_strdup(const char *s);
 int __wrap_pqos_inter_get(enum pqos_interface *interface);
 int __wrap_pqos_mon_poll(struct pqos_mon_data **groups,

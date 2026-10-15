@@ -83,7 +83,8 @@ extern "C" {
  * @brief Says what parse_error() says, and returns
  *
  * For a parse that runs after pqos_init(), which has to return to main() for
- * the library to be finalised rather than end the process.
+ * the library to be finalised rather than end the process, or for a helper
+ * that frees what it holds before its option handler ends the process.
  *
  * @param arg string that caused error when parsing
  * @param note context and information about encountered error

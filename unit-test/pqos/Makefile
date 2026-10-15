@@ -358,10 +358,13 @@ $(BIN_DIR)/test_output_capture: ./test_output_capture.c
 		-L$(GRAB_OUTPUT_DIR) -lcmocka -lgraboutput \
 		$< -Wl,--end-group -o $@
 
-# monitor.c's failures after pqos_init(), each of which has to return to main()
-# for the library to be finalised: malloc() and calloc() are wrapped so that a
-# case can make the next allocation fail, and the file includes monitor.c to
-# call its static functions, as test_alloc does with alloc.c
+# monitor.c's failures that have to return rather than end the process: after
+# pqos_init(), so that main() can finalise the library, and in the helpers that
+# read the monitoring options' lists, so that they can free what they hold
+# before their option handler ends it. malloc(), calloc(), realloc() and
+# strdup() are wrapped so that a case can make the Nth call fail, and the file
+# includes monitor.c to call its static functions, as test_alloc does with
+# alloc.c
 # the loop's timer is a timerfd on Linux, and only there do the cases that
 # make it fail wrap its making, arming and reads
 ifeq ($(shell uname), Linux)
@@ -380,6 +383,7 @@ $(BIN_DIR)/test_monitor_failures: ./test_monitor_failures.c $(PQOS_OBJS)
 		-Wl,--wrap=exit \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=calloc \
+		-Wl,--wrap=realloc \
 		-Wl,--wrap=strdup \
 		-Wl,--wrap=pqos_inter_get \
 		-Wl,--wrap=fprintf \

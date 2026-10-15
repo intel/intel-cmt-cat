@@ -342,8 +342,10 @@ uinttostr(const unsigned val)
 }
 
 /**
- * @brief uinttostr() without the exit, for a description made after
- *        pqos_init(), where a failure has to return to main()
+ * @brief Function to safely translate an unsigned int
+ *        value to a string, for a caller that handles a failure
+ *
+ * @param val value to be translated
  *
  * @return the string, or NULL where it could not be allocated, having said
  *         so as selfn_strdup() does
@@ -363,19 +365,22 @@ uinttostr_checked(const unsigned val)
 
 /**
  * @brief Function to safely translate an unsigned int
- *        value to a hex string
+ *        value to a hex string, for a caller that handles a failure
  *
  * @param val value to be translated
  *
- * @return Pointer to allocated string
+ * @return the string, or NULL where it could not be allocated, having said
+ *         so as selfn_strdup() does
  */
 static char *
-uinttohexstr(const unsigned val)
+uinttohexstr_checked(const unsigned val)
 {
-        char buf[16], *str = NULL;
+        char buf[16], *str;
 
         (void)monitor_utils_uinttohexstr(buf, sizeof(buf), val);
-        selfn_strdup(&str, buf);
+        str = strdup(buf);
+        if (str == NULL)
+                printf("String duplicate error!\n");
 
         return str;
 }
@@ -1063,8 +1068,11 @@ grp_device_to_channel(struct mon_group *grp, const struct pqos_devinfo *devinfo)
  *
  * @param str string of the event
  * @param evt pointer to the selected events so far
+ *
+ * @return 0 on success; -1 for an event it does not know, having said so as
+ *         parse_error() does
  */
-static void
+static int
 parse_event(const char *str, enum pqos_mon_event *evt)
 {
         ASSERT(str != NULL);
@@ -1102,8 +1110,12 @@ parse_event(const char *str, enum pqos_mon_event *evt)
                 *evt = (enum pqos_mon_event)(PQOS_MON_EVENT_CORE_ENERGY |
                                              PQOS_MON_EVENT_ACTIVITY |
                                              PQOS_MON_EVENT_POWER);
-        else
-                parse_error(str, "Unrecognized monitoring event type");
+        else {
+                parse_error_print(str, "Unrecognized monitoring event type");
+                return -1;
+        }
+
+        return 0;
 }
 
 #define PARSE_MON_GRP_BUFF_SIZE 2048
@@ -1154,6 +1166,14 @@ print_invalid_pid_message(const uint64_t pid)
                pid);
 }
 
+/**
+ * @brief Whether a PID list would expand past MAX_PID_LIST_SIZE
+ *
+ * @return 1 where it would, 0 where it would not, and -1 where a range in it
+ *         is malformed or the list could not be copied, having said why; the
+ *         caller decides what that ends. A single value is only counted here:
+ *         the parser after this reads it
+ */
 static int
 pid_list_size_exceeded(const char *pid_list)
 {
@@ -1163,7 +1183,7 @@ pid_list_size_exceeded(const char *pid_list)
         copy = strdup(pid_list);
         if (copy == NULL) {
                 printf("Failed to allocate memory for argument copy!\n");
-                exit(EXIT_FAILURE);
+                return -1;
         }
 
         for (token = strtok_r(copy, ",", &saveptr); token != NULL;
@@ -1179,17 +1199,23 @@ pid_list_size_exceeded(const char *pid_list)
                 if (sep != NULL) {
                         uint64_t start, end, range_len;
 
-                        if (*(sep + 1) == '\0')
-                                parse_error(token,
-                                            "Incomplete PID range format");
+                        if (*(sep + 1) == '\0') {
+                                parse_error_print(
+                                    token, "Incomplete PID range format");
+                                goto malformed;
+                        }
                         *sep = '\0';
-                        start = strtouint64(token);
+                        if (strtouint64_checked(token, &start) != 0)
+                                goto malformed;
 
-                        if (!(*(sep + 1) >= '0' && *(sep + 1) <= '9'))
-                                parse_error(sep + 1,
-                                            "Invalid PID range format");
+                        if (!(*(sep + 1) >= '0' && *(sep + 1) <= '9')) {
+                                parse_error_print(sep + 1,
+                                                  "Invalid PID range format");
+                                goto malformed;
+                        }
 
-                        end = strtouint64(sep + 1);
+                        if (strtouint64_checked(sep + 1, &end) != 0)
+                                goto malformed;
                         if (start > end) {
                                 uint64_t n = start;
 
@@ -1219,6 +1245,43 @@ pid_list_size_exceeded(const char *pid_list)
 
         free(copy);
         return 0;
+
+malformed:
+        free(copy);
+        return -1;
+}
+
+/**
+ * @brief Reads one list of a monitoring group into \a cbuf, without exiting
+ *
+ * A PID list is checked against MAX_PID_LIST_SIZE first and read into a
+ * table that grows; a list of any other type is read into \a cbuf as it is.
+ *
+ * @return how many values were read, or -1 where the list cannot be used,
+ *         having said why, for parse_monitor_group() to return
+ */
+static int
+read_group_list(const enum mon_group_type type,
+                char *list,
+                uint64_t **cbuf,
+                unsigned *cbuf_len)
+{
+        if (type != MON_GROUP_TYPE_PID)
+                return strlisttotab_checked(list, *cbuf, *cbuf_len);
+
+        switch (pid_list_size_exceeded(list)) {
+        case 0:
+                break;
+        case 1:
+                parse_error_print(list, "Requested PID range expansion is "
+                                        "too large. "
+                                        "Please reduce the PID range.");
+                return -1;
+        default:
+                return -1;
+        }
+
+        return strlisttotabrealloc_checked(list, cbuf, cbuf_len);
 }
 
 static int
@@ -1305,7 +1368,10 @@ parse_monitor_group(char *str, enum mon_group_type type)
                 return -1;
         }
 
-        parse_event(str, &evt);
+        if (parse_event(str, &evt) != 0) {
+                free(cbuf);
+                return -1;
+        }
         str = strchr(str, ':') + 1;
 
         while ((non_grp = strsep(&str, "[")) != NULL) {
@@ -1319,20 +1385,17 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          */
                         unsigned new_groups_count;
                         uint64_t invalid_pid;
+                        const int listed =
+                            read_group_list(type, non_grp, &cbuf, &cbuf_len);
 
-                        if (type == MON_GROUP_TYPE_PID &&
-                            pid_list_size_exceeded(non_grp))
-                                parse_error(non_grp,
-                                            "Requested PID range expansion is "
-                                            "too large. "
-                                            "Please reduce the PID range.");
-
-                        if (type == MON_GROUP_TYPE_PID)
-                                new_groups_count = strlisttotabrealloc(
-                                    non_grp, &cbuf, &cbuf_len);
-                        else
-                                new_groups_count =
-                                    strlisttotab(non_grp, cbuf, cbuf_len);
+                        /* the handler that called this ends the process on
+                         * a -1, once what was allocated here is freed
+                         */
+                        if (listed < 0) {
+                                free(cbuf);
+                                return -1;
+                        }
+                        new_groups_count = (unsigned)listed;
 
                         if (type == MON_GROUP_TYPE_PID &&
                             find_first_invalid_pid(cbuf, new_groups_count,
@@ -1348,9 +1411,15 @@ parse_monitor_group(char *str, enum mon_group_type type)
                                 struct mon_group *grp;
 
                                 if (type != MON_GROUP_TYPE_CHANNEL)
-                                        desc = uinttostr((unsigned)cbuf[i]);
+                                        desc = uinttostr_checked(
+                                            (unsigned)cbuf[i]);
                                 else
-                                        desc = uinttohexstr((unsigned)cbuf[i]);
+                                        desc = uinttohexstr_checked(
+                                            (unsigned)cbuf[i]);
+                                if (desc == NULL) {
+                                        free(cbuf);
+                                        return -1;
+                                }
 
                                 grp = grp_add(type, evt, desc, &cbuf[i], 1);
                                 if (grp == NULL) {
@@ -1375,26 +1444,26 @@ parse_monitor_group(char *str, enum mon_group_type type)
                         unsigned element_count;
                         uint64_t invalid_pid;
                         struct mon_group *group;
+                        int listed;
 
-                        selfn_strdup(&desc, grp);
+                        desc = strdup(grp);
+                        if (desc == NULL) {
+                                printf("String duplicate error!\n");
+                                free(cbuf);
+                                return -1;
+                        }
 
                         /* for grouped pids/cores, all elements are in
                          * one group so strlisttotab result is the number
                          * of elements in that one group
                          */
-                        if (type == MON_GROUP_TYPE_PID &&
-                            pid_list_size_exceeded(grp))
-                                parse_error(grp,
-                                            "Requested PID range expansion is "
-                                            "too large. "
-                                            "Please reduce the PID range.");
-
-                        if (type == MON_GROUP_TYPE_PID)
-                                element_count =
-                                    strlisttotabrealloc(grp, &cbuf, &cbuf_len);
-                        else
-                                element_count =
-                                    strlisttotab(grp, cbuf, cbuf_len);
+                        listed = read_group_list(type, grp, &cbuf, &cbuf_len);
+                        if (listed < 0) {
+                                free(desc);
+                                free(cbuf);
+                                return -1;
+                        }
+                        element_count = (unsigned)listed;
 
                         if (type == MON_GROUP_TYPE_PID &&
                             find_first_invalid_pid(cbuf, element_count,
@@ -2628,7 +2697,8 @@ parse_monitor_dev(char *str)
         char *vc_desc[PQOS_DEV_MAX_CHANNELS] = {NULL};
         size_t len = 0;
 
-        parse_event(str, &evt);
+        if (parse_event(str, &evt) != 0)
+                exit(EXIT_FAILURE);
 
         p = strchr(str, ':');
         if (p == NULL)

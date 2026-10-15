@@ -46,9 +46,15 @@
  * the duplicate check in one branch and after it in the other, refusing a
  * range a full table already held while accepting the same values singly.
  *
- * What is deliberately not touched is the error discipline: what these do on
- * bad input is print and exit the process, which is tracked separately,
- * because a change there is a change to every caller.
+ * The error discipline is split. The helpers the option handlers call
+ * before pqos_init() - strtouint64(), strlisttotab(), strlisttotabrealloc() -
+ * print what is wrong and end the process, which is all an option handler
+ * would do with a refusal. Each of them is a _checked form followed by that
+ * exit: strtouint64_checked(), strlisttotab_checked() and
+ * strlisttotabrealloc_checked() print the same and return -1, and so do the
+ * growth helpers under them, table_grow() and value_set_grow(). Those forms
+ * serve the code that has to free what it holds, or reach pqos_fini(),
+ * before the process ends.
  */
 
 #include "utils.h"
@@ -145,10 +151,10 @@ value_find(const struct value_set *set, const uint64_t value)
 /**
  * @brief Doubles the set, or makes its first slots
  *
- * Out of memory, it says so and exits, as strlisttotabrealloc() does when its
- * table cannot grow.
+ * @return 0 on success; -1 out of memory, having said so, with the set as it
+ *         was
  */
-static void
+static int
 value_set_grow(struct value_set *set)
 {
         struct value_set grown = {NULL, NULL, 0, set->count};
@@ -163,7 +169,9 @@ value_set_grow(struct value_set *set)
         }
         if (grown.value == NULL || grown.taken == NULL) {
                 printf("Reallocation error!\n");
-                exit(EXIT_FAILURE);
+                free(grown.value);
+                free(grown.taken);
+                return -1;
         }
 
         for (i = 0; i < set->size; i++)
@@ -177,12 +185,14 @@ value_set_grow(struct value_set *set)
         free(set->value);
         free(set->taken);
         *set = grown;
+        return 0;
 }
 
 /**
  * @brief Adds a value to the set, unless it is there already
  *
- * @return 1 where it was added, 0 where it is a repeat
+ * @return 1 where it was added, 0 where it is a repeat, -1 where the set could
+ *         not grow to take it, having said so
  */
 static int
 value_set_add(struct value_set *set, const uint64_t value)
@@ -197,7 +207,8 @@ value_set_add(struct value_set *set, const uint64_t value)
 
         /* at most half full, so a probe sequence ends soon at a free slot */
         if ((set->count + 1) * 2 > set->size) {
-                value_set_grow(set);
+                if (value_set_grow(set) != 0)
+                        return -1;
                 i = value_find(set, value);
         }
 
@@ -226,7 +237,8 @@ struct list_seen {
 /**
  * @brief Whether a value is new to the list, recording it where it is
  *
- * @return 1 where it is new, 0 where it is a repeat
+ * @return 1 where it is new, 0 where it is a repeat, -1 where it could not be
+ *         recorded, having said so
  */
 static int
 list_seen_add(struct list_seen *seen, const uint64_t value)
@@ -499,15 +511,54 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
         return (unsigned)n;
 }
 
-unsigned
-strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
+/**
+ * @brief Doubles the table strlisttotabrealloc_checked() fills
+ *
+ * The count of what the table holds is returned as an int, so the table is
+ * never grown past INT_MAX elements: realloc_and_init() would double one of
+ * up to UINT_MAX / 2.
+ *
+ * @return 0 on success; -1 where it could not grow, having said so, with the
+ *         table and its size as they were, for the caller to free
+ */
+static int
+table_grow(uint64_t **tab, unsigned *max)
+{
+        uint64_t *grown;
+
+        if (*max > (unsigned)INT_MAX / 2) {
+                printf("Too large group items.\n");
+                return -1;
+        }
+
+        grown = realloc_and_init(*tab, max, sizeof(**tab));
+        if (grown == NULL) {
+                printf("Reallocation error!\n");
+                return -1;
+        }
+        *tab = grown;
+        return 0;
+}
+
+int
+strlisttotabrealloc_checked(char *s, uint64_t **tab, unsigned *max)
 {
         struct list_seen seen = {0, 0, 0, {NULL, NULL, 0, 0}};
         unsigned index = 0;
         char *saveptr = NULL;
 
         if (s == NULL || (*tab) == NULL || *max == 0)
-                return index;
+                return 0;
+
+        /* the count is returned as an int, and the table only ever holds
+         * fewer elements than its size: a table given larger than INT_MAX
+         * could take a count the return turns negative, so it is refused as
+         * table_grow() refuses to grow one that far
+         */
+        if (*max > (unsigned)INT_MAX) {
+                printf("Too large group items.\n");
+                return -1;
+        }
 
         for (;;) {
                 char *p = NULL;
@@ -533,17 +584,23 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                          */
                         uint64_t n, start, end;
                         *p = '\0';
-                        start = strtouint64(token);
-                        if (*(p + 1) == '\0')
-                                parse_error(
+                        if (strtouint64_checked(token, &start) != 0)
+                                goto failed;
+                        if (*(p + 1) == '\0') {
+                                parse_error_print(
                                     token,
                                     "Incomplete cores association format");
+                                goto failed;
+                        }
 
-                        if (!(*(p + 1) >= '0' && *(p + 1) <= '9'))
-                                parse_error(p + 1,
-                                            "Invalid cores association format");
+                        if (!(*(p + 1) >= '0' && *(p + 1) <= '9')) {
+                                parse_error_print(
+                                    p + 1, "Invalid cores association format");
+                                goto failed;
+                        }
 
-                        end = strtouint64(p + 1);
+                        if (strtouint64_checked(p + 1, &end) != 0)
+                                goto failed;
                         if (start > end) {
                                 /**
                                  * no big deal just swap start with end
@@ -554,7 +611,7 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                         }
                         if (end > UINT_FAST64_MAX) {
                                 printf("Too large group items.\n");
-                                exit(EXIT_FAILURE);
+                                goto failed;
                         }
                         if (index == 0) {
                                 /*
@@ -567,7 +624,7 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
 
                                 if (start == 0 && end == UINT64_MAX) {
                                         printf("Too large group items.\n");
-                                        exit(EXIT_FAILURE);
+                                        goto failed;
                                 }
 
                                 range_len = end - start + 1;
@@ -582,16 +639,12 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                                  */
                                 if (range_len >= UINT_MAX) {
                                         printf("Too large group items.\n");
-                                        exit(EXIT_FAILURE);
+                                        goto failed;
                                 }
 
                                 while (*max <= (unsigned)range_len) {
-                                        (*tab) = realloc_and_init(
-                                            *tab, max, sizeof(**tab));
-                                        if ((*tab) == NULL) {
-                                                printf("Reallocation error!\n");
-                                                exit(EXIT_FAILURE);
-                                        }
+                                        if (table_grow(tab, max) != 0)
+                                                goto failed;
                                 }
 
                                 /* the endpoint ends the loop, as in the two
@@ -612,18 +665,16 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                                 continue;
                         }
                         for (n = start;; n++) {
-                                if (list_seen_add(&seen, n)) {
+                                const int added = list_seen_add(&seen, n);
+
+                                if (added < 0)
+                                        goto failed;
+                                if (added) {
                                         (*tab)[index] = n;
                                         index++;
                                 }
-                                if (index >= *max) {
-                                        (*tab) = realloc_and_init(
-                                            *tab, max, sizeof(**tab));
-                                        if ((*tab) == NULL) {
-                                                printf("Reallocation error!\n");
-                                                exit(EXIT_FAILURE);
-                                        }
-                                }
+                                if (index >= *max && table_grow(tab, max) != 0)
+                                        goto failed;
 
                                 if (n == end)
                                         break;
@@ -633,26 +684,44 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                          * single number provided here
                          * remove duplicates if necessary
                          */
-                        uint64_t val = strtouint64(token);
+                        uint64_t val = 0;
+                        int added;
 
-                        if (list_seen_add(&seen, val)) {
+                        if (strtouint64_checked(token, &val) != 0)
+                                goto failed;
+
+                        added = list_seen_add(&seen, val);
+                        if (added < 0)
+                                goto failed;
+                        if (added) {
                                 (*tab)[index] = val;
                                 index++;
                         }
-                        if (index >= *max) {
-                                (*tab) =
-                                    realloc_and_init(*tab, max, sizeof(**tab));
-                                if ((*tab) == NULL) {
-                                        printf("Reallocation error!\n");
-                                        exit(EXIT_FAILURE);
-                                }
-                        }
+                        if (index >= *max && table_grow(tab, max) != 0)
+                                goto failed;
                 }
         }
 
         free(seen.rest.value);
         free(seen.rest.taken);
-        return index;
+        /* below the table's size, which table_grow() keeps within an int */
+        return (int)index;
+
+failed:
+        free(seen.rest.value);
+        free(seen.rest.taken);
+        return -1;
+}
+
+unsigned
+strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
+{
+        const int n = strlisttotabrealloc_checked(s, tab, max);
+
+        if (n < 0)
+                exit(EXIT_FAILURE);
+
+        return (unsigned)n;
 }
 
 void *

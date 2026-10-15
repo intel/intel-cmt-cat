@@ -365,6 +365,94 @@ test_strlisttotabrealloc_repeats_of_zero_and_the_top(void **state)
         (void)state; /* unused */
 }
 
+/* What a number without digits, such as "0x", is told with. glibc leaves
+ * errno alone where strtoull() converts nothing, and the check that follows
+ * says "No digits were found"; FreeBSD's sets EINVAL, and the perror() before
+ * that check reports on stderr, which the capture does not see. Elsewhere a
+ * case asserts only the return and that the process was not ended.
+ */
+#ifdef __GLIBC__
+#define NO_DIGITS_SAID "No digits were found"
+#else
+#define NO_DIGITS_SAID NULL
+#endif
+
+/* lists that strlisttotabrealloc() and its checked form refuse, and what
+ * they say about each
+ */
+static const struct {
+        const char *list;
+        const char *said;
+} m_bad_lists[] = {
+    {"1-", "Incomplete cores association format"},
+    {"1-x", "Invalid cores association format"},
+    {"0x", NO_DIGITS_SAID},
+    {"5,7z", "Error converting '7z' to unsigned number!"},
+};
+
+static void
+test_strlisttotabrealloc_checked_refuses_by_returning(void **state)
+{
+        unsigned i;
+
+        /* the checked form says what the exiting one says and returns, so a
+         * helper can free what it holds and return to its option handler
+         */
+        for (i = 0; i < DIM(m_bad_lists); i++) {
+                char input[32];
+                unsigned count = 4;
+                uint64_t *tab = calloc(count, sizeof(*tab));
+                int ret = 0;
+
+                assert_non_null(tab);
+                strncpy(input, m_bad_lists[i].list, sizeof(input) - 1);
+                input[sizeof(input) - 1] = '\0';
+
+                run_function(strlisttotabrealloc_checked, ret, input, &tab,
+                             &count);
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(ret, -1);
+                if (m_bad_lists[i].said != NULL)
+                        assert_true(output_has_text(m_bad_lists[i].said));
+                free(tab);
+        }
+
+        (void)state; /* unused */
+}
+
+static void
+test_strlisttotabrealloc_ends_the_process_on_a_bad_list(void **state)
+{
+        unsigned i;
+
+        /* the exiting form is the checked one followed by the exit, for the
+         * option handlers that read a list themselves: the same message, then
+         * the end of the process, with no count returned
+         */
+        for (i = 0; i < DIM(m_bad_lists); i++) {
+                char input[32];
+                unsigned count = 4;
+                uint64_t *tab = calloc(count, sizeof(*tab));
+                unsigned parsed = 0;
+
+                assert_non_null(tab);
+                strncpy(input, m_bad_lists[i].list, sizeof(input) - 1);
+                input[sizeof(input) - 1] = '\0';
+
+                run_function(strlisttotabrealloc, parsed, input, &tab, &count);
+
+                assert_true(output_exit_was_called());
+                assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+                assert_int_equal(parsed, 0);
+                if (m_bad_lists[i].said != NULL)
+                        assert_true(output_has_text(m_bad_lists[i].said));
+                free(tab);
+        }
+
+        (void)state; /* unused */
+}
+
 static void
 test_strlisttotab_range_ending_at_the_top(void **state)
 {
@@ -877,6 +965,20 @@ test_mon_dev_names_the_element_it_cannot_read(void **state)
         (void)state; /* unused */
 }
 
+static void
+test_mon_dev_refuses_an_unknown_event(void **state)
+{
+        /* parse_event() returns for an event it does not know, and the device
+         * parser ends the process on that itself, as it always did
+         */
+        run_void_function(selfn_monitor_devs, "foo:0000:21:00.0");
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_true(output_has_text("Unrecognized monitoring event type"));
+
+        (void)state; /* unused */
+}
+
 /**
  * Where the missing class is caught is the guarantee, so this drives the
  * whole utility rather than the check on its own: the interface is named
@@ -998,6 +1100,10 @@ main(void)
             cmocka_unit_test(test_strlisttotabrealloc_repeats_of_a_first_range),
             cmocka_unit_test(
                 test_strlisttotabrealloc_repeats_of_zero_and_the_top),
+            cmocka_unit_test(
+                test_strlisttotabrealloc_checked_refuses_by_returning),
+            cmocka_unit_test(
+                test_strlisttotabrealloc_ends_the_process_on_a_bad_list),
             cmocka_unit_test(test_strlisttotab_range_ending_at_the_top),
             cmocka_unit_test(test_parse_uint64_formats_and_errors),
             cmocka_unit_test(test_parse_mem_regions_replaces_previous_values),
@@ -1024,6 +1130,7 @@ main(void)
                 test_mon_dev_refuses_a_channel_that_does_not_exist),
             cmocka_unit_test(test_mon_dev_names_the_range_that_does_not_exist),
             cmocka_unit_test(test_mon_dev_names_the_element_it_cannot_read),
+            cmocka_unit_test(test_mon_dev_refuses_an_unknown_event),
             cmocka_unit_test(test_unknown_option_returns_failure),
             /* last: its command line stays in the selection globals */
             cmocka_unit_test(test_alloc_option_without_class_returns_failure)};
