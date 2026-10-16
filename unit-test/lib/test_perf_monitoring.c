@@ -735,6 +735,51 @@ test_perf_mon_start_pid_every_thread_ended(void **state __attribute__((unused)))
 }
 
 static void
+test_perf_mon_start_pid_fails_half_way(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_data grp;
+        struct pqos_mon_data_internal intl;
+        pid_t tids[] = {1, 2, 3};
+        const unsigned tid_num = DIM(tids);
+        struct pqos_mon_perf_ctx ctx[tid_num];
+
+        memset(&grp, 0, sizeof(grp));
+        memset(&intl, 0, sizeof(intl));
+        memset(ctx, 0, sizeof(struct pqos_mon_perf_ctx) * tid_num);
+        grp.intl = &intl;
+        grp.tid_nr = tid_num;
+        grp.tid_map = tids;
+        grp.intl->perf.ctx = ctx;
+
+        /* the first thread's counter opens, the second's fails otherwise
+         * than by the thread having ended, and the third is not reached
+         */
+        expect_not_value(__wrap_perf_setup_counter, attr, 0);
+        expect_value(__wrap_perf_setup_counter, pid, tids[0]);
+        expect_value(__wrap_perf_setup_counter, cpu, -1);
+        expect_value(__wrap_perf_setup_counter, group_fd, -1);
+        expect_value(__wrap_perf_setup_counter, flags, PERF_FLAG_FD_CLOEXEC);
+        will_return(__wrap_perf_setup_counter, PQOS_RETVAL_OK);
+        will_return(__wrap_perf_setup_counter, 0xA0);
+        expect_not_value(__wrap_perf_setup_counter, attr, 0);
+        expect_value(__wrap_perf_setup_counter, pid, tids[1]);
+        expect_value(__wrap_perf_setup_counter, cpu, -1);
+        expect_value(__wrap_perf_setup_counter, group_fd, -1);
+        expect_value(__wrap_perf_setup_counter, flags, PERF_FLAG_FD_CLOEXEC);
+        will_return(__wrap_perf_setup_counter, PQOS_RETVAL_ERROR);
+        /* the counter that opened is closed: the event is not recorded as
+         * started, so no stop would close it
+         */
+        expect_value(__wrap_perf_shutdown_counter, counter_fd, 0xA0);
+        will_return(__wrap_perf_shutdown_counter, PQOS_RETVAL_OK);
+
+        ret = perf_mon_start(&grp, PQOS_PERF_EVENT_LLC_MISS);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ctx[0].fd_llc_misses, -1);
+}
+
+static void
 test_perf_mon_start_core_failure(void **state __attribute__((unused)))
 {
         int ret;
@@ -962,6 +1007,7 @@ main(void)
             cmocka_unit_test(test_perf_mon_start_core),
             cmocka_unit_test(test_perf_mon_start_core_param),
             cmocka_unit_test(test_perf_mon_start_core_failure),
+            cmocka_unit_test(test_perf_mon_start_pid_fails_half_way),
             cmocka_unit_test(test_perf_mon_stop_param),
             cmocka_unit_test(test_perf_mon_poll_core),
             cmocka_unit_test(test_perf_mon_poll_param),

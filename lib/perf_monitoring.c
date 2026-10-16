@@ -510,6 +510,34 @@ perf_mon_get_fd(struct pqos_mon_perf_ctx *ctx, const enum pqos_mon_event event)
         }
 }
 
+/**
+ * @brief Closes the counters a failed start opened for \a event
+ *
+ * The event is recorded as started only once every counter is open, so
+ * nothing stops one that failed half way: the counters it had opened stayed
+ * open for as long as the process ran.
+ *
+ * @param group monitoring structure
+ * @param event the event that failed to start
+ * @param num how many contexts the start had reached
+ */
+static void
+perf_mon_close_started(struct pqos_mon_data *group,
+                       const enum pqos_mon_event event,
+                       const int num)
+{
+        int i;
+
+        for (i = 0; i < num; i++) {
+                int *fd = perf_mon_get_fd(&group->intl->perf.ctx[i], event);
+
+                if (fd == NULL || *fd < 0)
+                        continue;
+                perf_shutdown_counter(*fd);
+                *fd = -1;
+        }
+}
+
 int
 perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
@@ -583,6 +611,7 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                         LOG_ERROR("Failed to start perf "
                                   "counters for %s\n",
                                   se->desc);
+                        perf_mon_close_started(group, event, i);
                         return PQOS_RETVAL_ERROR;
                 }
                 num_opened++;
