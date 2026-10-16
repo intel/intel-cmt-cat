@@ -33,8 +33,14 @@
 #ifndef __TEST_ALLOC_H
 #define __TEST_ALLOC_H
 
-/* The string copy test_alloc.c makes fail on demand, through --wrap, and
- * the real one it hands every other call to.
+/* The string copy test_alloc.c makes fail on demand, through --wrap. Every
+ * strdup() call in the binary goes through the wrap, the cases' own copies
+ * included, and the m_fail_strdup'th one fails, wherever it is made; while
+ * m_fail_strdup is 0 each call goes to the real strdup(). The cases arm it
+ * for the copies set_allocation_class() and strlisttotab_checked() make of a
+ * definition and its resource list, and for those
+ * selfn_allocation_class_checked() makes of its argument and of each
+ * definition.
  */
 char *__real_strdup(const char *s);
 char *__wrap_strdup(const char *s);

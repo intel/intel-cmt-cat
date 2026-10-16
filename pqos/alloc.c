@@ -1242,19 +1242,27 @@ set_alloc(const struct pqos_cpuinfo *cpu)
         return (int)sel_alloc_mod;
 }
 
-void
-selfn_allocation_class(const char *arg)
+int
+selfn_allocation_class_checked(const char *arg)
 {
         char *cp = NULL, *str = NULL;
         char *saveptr = NULL;
 
-        if (arg == NULL)
-                parse_error(arg, "NULL pointer!");
+        if (arg == NULL) {
+                parse_error_print(arg, "NULL pointer!");
+                return -1;
+        }
 
-        if (*arg == '\0')
-                parse_error(arg, "Empty string!");
+        if (*arg == '\0') {
+                parse_error_print(arg, "Empty string!");
+                return -1;
+        }
 
-        selfn_strdup(&cp, arg);
+        cp = strdup(arg);
+        if (cp == NULL) {
+                printf("String duplicate error!\n");
+                return -1;
+        }
 
         for (str = cp;; str = NULL) {
                 char *token = NULL;
@@ -1263,13 +1271,30 @@ selfn_allocation_class(const char *arg)
                 if (token == NULL)
                         break;
 
-                if (sel_alloc_opt_num >= DIM(alloc_opts))
-                        parse_error(arg, "Too many allocation options!");
+                if (sel_alloc_opt_num >= DIM(alloc_opts)) {
+                        parse_error_print(arg, "Too many allocation options!");
+                        free(cp);
+                        return -1;
+                }
 
-                selfn_strdup(&alloc_opts[sel_alloc_opt_num++], token);
+                alloc_opts[sel_alloc_opt_num] = strdup(token);
+                if (alloc_opts[sel_alloc_opt_num] == NULL) {
+                        printf("String duplicate error!\n");
+                        free(cp);
+                        return -1;
+                }
+                sel_alloc_opt_num++;
         }
 
         free(cp);
+        return 0;
+}
+
+void
+selfn_allocation_class(const char *arg)
+{
+        if (selfn_allocation_class_checked(arg) != 0)
+                exit(EXIT_FAILURE);
 }
 
 /**

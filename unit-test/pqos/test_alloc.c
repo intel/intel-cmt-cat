@@ -57,6 +57,8 @@ __wrap_strdup(const char *s)
         return __real_strdup(s);
 }
 
+static int cleanup_alloc_opts(void **state);
+
 static void
 mock_inter_get(const enum pqos_interface inter, unsigned count)
 {
@@ -349,6 +351,68 @@ test_selfn_allocation_class(void **state)
         assert_string_equal(alloc_opts[3], "mba:1=80");
         assert_string_equal(alloc_opts[4], "mba@0,1:2=64");
         assert_string_equal(alloc_opts[5], "mba@2-3:3=85");
+        (void)state; /* unused */
+}
+
+/* profile_l3ca_apply() stores a profile's classes through the checked form,
+ * after pqos_init(), so each way of refusing a definition is a return of -1
+ * with the message the handler prints, rather than an exit
+ */
+static void
+test_selfn_allocation_class_checked_refuses_by_returning(void **state)
+{
+        char full[512] = "";
+        unsigned i;
+        int ret = 0;
+
+        run_function(selfn_allocation_class_checked, ret, NULL);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_string_equal(
+            output_get(),
+            "Error parsing \"<null>\" command line argument. NULL pointer!\n");
+
+        run_function(selfn_allocation_class_checked, ret, "");
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_string_equal(
+            output_get(),
+            "Error parsing \"\" command line argument. Empty string!\n");
+
+        /* one definition more than there is room for: the first 32 are
+         * stored, and the 33rd is refused
+         */
+        for (i = 1; i <= DIM(alloc_opts) + 1; i++) {
+                char one[16];
+
+                snprintf(one, sizeof(one), "llc:%u=0x1;", i);
+                strncat(full, one, sizeof(full) - strlen(full) - 1);
+        }
+        run_function(selfn_allocation_class_checked, ret, full);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("Too many allocation options!"));
+        assert_int_equal(sel_alloc_opt_num, DIM(alloc_opts));
+        cleanup_alloc_opts(NULL);
+
+        /* the copy of the argument, then the copy of the second definition */
+        m_fail_strdup = 1;
+        run_function(selfn_allocation_class_checked, ret,
+                     "llc:1=0x1;llc:2=0x2");
+        m_fail_strdup = 0;
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("String duplicate error!"));
+        assert_int_equal(sel_alloc_opt_num, 0);
+
+        m_fail_strdup = 3;
+        run_function(selfn_allocation_class_checked, ret,
+                     "llc:1=0x1;llc:2=0x2");
+        m_fail_strdup = 0;
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("String duplicate error!"));
+        assert_int_equal(sel_alloc_opt_num, 1);
         (void)state; /* unused */
 }
 
@@ -2166,6 +2230,9 @@ main(void)
                                       cleanup_alloc_opts),
             cmocka_unit_test_teardown(test_selfn_allocation_class,
                                       cleanup_alloc_opts),
+            cmocka_unit_test_teardown(
+                test_selfn_allocation_class_checked_refuses_by_returning,
+                cleanup_alloc_opts),
             cmocka_unit_test(test_alloc_print_config_negative),
             cmocka_unit_test(test_fill_dev_tab_rejects_invalid_vc),
             cmocka_unit_test(test_fill_dev_tab_prints_the_standard_device_id),

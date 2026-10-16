@@ -52,14 +52,15 @@ extern "C" {
 void profile_l3ca_list(void);
 
 /**
- * @brief Applies selected profile via selfn_allocation_class()
+ * @brief Applies selected profile via selfn_allocation_class_checked()
  *
  * @param [in] name of the profile
  * @param [in] l3ca L3CA capability structure
  *
  * @return Operations status
  * @retval 0 OK
- * @retval -1 error
+ * @retval -1 the profile is not found or cache allocation is not supported,
+ *         or one of its classes could not be stored, having said why
  */
 int profile_l3ca_apply(const char *name,
                        const struct pqos_capability *cap_l3ca);

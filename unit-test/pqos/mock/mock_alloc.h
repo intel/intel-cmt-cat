@@ -32,6 +32,6 @@
 #ifndef __MOCK_ALLOC_H__
 #define __MOCK_ALLOC_H__
 
-void __wrap_selfn_allocation_class(const char *arg);
+int __wrap_selfn_allocation_class_checked(const char *arg);
 
 #endif /* __MOCK_ALLOC_H__ */

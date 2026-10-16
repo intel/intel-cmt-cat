@@ -212,7 +212,7 @@ $(BIN_DIR)/test_profiles: ./test_profiles.c $(PQOS_OBJS) $(APP_MOCK_OBJS)
 		-Wl,--wrap=printf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
-		-Wl,--wrap=selfn_allocation_class \
+		-Wl,--wrap=selfn_allocation_class_checked \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/profiles.o,$(PQOS_OBJS)) $(APP_MOCK_OBJS) $< -Wl,--end-group -o $@
 

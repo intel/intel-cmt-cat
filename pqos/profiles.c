@@ -376,7 +376,12 @@ profile_l3ca_apply(const char *name, const struct pqos_capability *cap_l3ca)
 
                 for (i = 0; i < cnum; i++) {
                         strncpy(cb + offset, cptr[i], sizeof(cb) - 1 - offset);
-                        selfn_allocation_class(cb);
+                        /* main() calls this after pqos_init(), so a class
+                         * that cannot be stored is a return, which it answers
+                         * with pqos_fini(), rather than an exit
+                         */
+                        if (selfn_allocation_class_checked(cb) != 0)
+                                return -1;
                 }
         } else {
                 printf("Allocation profile '%s' not found or "

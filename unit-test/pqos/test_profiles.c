@@ -106,18 +106,41 @@ test_profile_l3ca_apply(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret = 0;
 
-        // mock selfn_allocation_class
-        expect_memory(__wrap_selfn_allocation_class, arg, "llc:0=0xFFF",
+        /* each class is stored through the handler's checked form */
+        expect_memory(__wrap_selfn_allocation_class_checked, arg, "llc:0=0xFFF",
                       sizeof(char) * 11);
-        expect_memory(__wrap_selfn_allocation_class, arg, "llc:1=0xFF0",
+        will_return(__wrap_selfn_allocation_class_checked, 0);
+        expect_memory(__wrap_selfn_allocation_class_checked, arg, "llc:1=0xFF0",
                       sizeof(char) * 11);
-        expect_memory(__wrap_selfn_allocation_class, arg, "llc:2=0xF00",
+        will_return(__wrap_selfn_allocation_class_checked, 0);
+        expect_memory(__wrap_selfn_allocation_class_checked, arg, "llc:2=0xF00",
                       sizeof(char) * 11);
-        expect_memory(__wrap_selfn_allocation_class, arg, "llc:3=0xC00",
+        will_return(__wrap_selfn_allocation_class_checked, 0);
+        expect_memory(__wrap_selfn_allocation_class_checked, arg, "llc:3=0xC00",
                       sizeof(char) * 11);
+        will_return(__wrap_selfn_allocation_class_checked, 0);
 
         run_function(profile_l3ca_apply, ret, "CFG3", data->cap_l3ca);
         assert_int_equal(ret, 0);
+}
+
+static void
+test_profile_l3ca_apply_a_class_it_cannot_store_returns(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret = 0;
+
+        /* main() applies a profile after pqos_init(): a class that cannot be
+         * stored is a return of -1, not an exit, and the classes after it are
+         * not tried - cmocka fails the case on a call it did not expect
+         */
+        expect_memory(__wrap_selfn_allocation_class_checked, arg, "llc:0=0xFFF",
+                      sizeof(char) * 11);
+        will_return(__wrap_selfn_allocation_class_checked, -1);
+
+        run_function(profile_l3ca_apply, ret, "CFG3", data->cap_l3ca);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
 }
 
 static void
@@ -162,6 +185,8 @@ main(void)
 
         const struct CMUnitTest tests_need_l3_cap[] = {
             cmocka_unit_test(test_profile_l3ca_apply),
+            cmocka_unit_test(
+                test_profile_l3ca_apply_a_class_it_cannot_store_returns),
             cmocka_unit_test(test_profile_l3ca_apply_no_name),
             cmocka_unit_test(test_profile_l3ca_apply_bad_num_classes)};
 

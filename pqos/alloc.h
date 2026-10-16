@@ -49,9 +49,27 @@ extern "C" {
 /**
  * @brief Defines allocation class of service
  *
+ * Ends the process on a definition it cannot store, as the option handlers
+ * that read the command line and the config file before pqos_init() do.
+ *
  * @param [in] arg string passed to -e command line option
  */
 void selfn_allocation_class(const char *arg);
+
+/**
+ * @brief selfn_allocation_class() without the exit
+ *
+ * The same definitions stored and the same messages printed, but one it
+ * cannot store, with no room left among the definitions or no memory for a
+ * copy, is a return of -1. That is for profile_l3ca_apply(), which main()
+ * calls after pqos_init(): an exit there would skip pqos_fini().
+ *
+ * @param [in] arg one or more class definitions, separated by ';'
+ *
+ * @return 0 where every definition was stored, or -1, having said why; the
+ *         definitions stored before the refused one stay stored
+ */
+int selfn_allocation_class_checked(const char *arg);
 
 /**
  * @brief Associates cores with selected class of service

@@ -39,8 +39,9 @@
 #include <cmocka.h>
 /* clang-format on */
 
-void
-__wrap_selfn_allocation_class(const char *arg)
+int
+__wrap_selfn_allocation_class_checked(const char *arg)
 {
         check_expected(arg);
+        return mock_type(int);
 }
