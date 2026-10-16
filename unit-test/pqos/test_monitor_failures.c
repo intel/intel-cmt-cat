@@ -38,19 +38,20 @@
  * made after the library is initialised, so a failure in them has to return:
  * only that way does main() reach pqos_fini(), and monitor_stop() as well once
  * the loop has run. The helpers the option handlers call before pqos_init() -
- * the parse of a group's list - return as well, and the handler ends the
- * process, having freed what they allocated. Allocation is what fails there,
- * so malloc(), calloc(), realloc() and strdup() are wrapped to fail on demand -
- * the call a case names fails - and the cases call monitor.c's static
- * functions directly, which this file includes, as test_alloc.c does with
- * alloc.c.
+ * the parse of a group's list, the statistics the top-pids mode gathers -
+ * return as well, and the handler ends the process, having freed what they
+ * allocated. Allocation is what fails there, so malloc(), calloc(), realloc()
+ * and strdup() are wrapped to fail on demand - the call a case names fails -
+ * and the cases call monitor.c's static functions directly, which this file
+ * includes, as test_alloc.c does with alloc.c.
  *
  * The loop's result is what main() exits with, so the loop is driven to each
  * of its ends - a poll, its arrays or the timer failing, a stop, a timeout and
  * more intervals passing than it counts - through wraps of the poll and of the
  * timer's arming and reads. The timer is a timerfd on Linux and a signal
  * elsewhere, and the cases that drive it, like the count of the descriptors
- * the loop leaves open, are Linux's only.
+ * the loop leaves open, are Linux's only,
+ * as is the case that reads the processes' statistics from /proc.
  */
 
 #include "test_monitor_failures.h"
@@ -68,6 +69,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
@@ -80,12 +84,72 @@ static int m_fail_calloc;
 static int m_fail_realloc;
 static int m_fail_strdup;
 
+/** With m_track_list set, the allocations the size of a top-pids list element
+ * or of its statistics are recorded, and a free() takes one off again: what is
+ * left once the handler has ended the process is what it did not free.
+ * m_tracked_ever counts what was recorded, so that a case can tell an empty
+ * list from one that was freed.
+ */
+static int m_track_list;
+static void **m_tracked;
+static size_t m_tracked_num;
+static size_t m_tracked_max;
+static size_t m_tracked_ever;
+
+static void
+track(void *ptr)
+{
+        if (m_tracked_num == m_tracked_max) {
+                const size_t max = m_tracked_max != 0 ? 2 * m_tracked_max : 64;
+                void **grown = __real_realloc(m_tracked, max * sizeof(*grown));
+
+                assert_non_null(grown);
+                m_tracked = grown;
+                m_tracked_max = max;
+        }
+        m_tracked[m_tracked_num++] = ptr;
+        m_tracked_ever++;
+}
+
+#ifdef __linux__
+/* only the top-pids case, which reads /proc, tracks a list */
+static void
+track_done(void)
+{
+        m_track_list = 0;
+        __real_free(m_tracked);
+        m_tracked = NULL;
+        m_tracked_num = 0;
+        m_tracked_max = 0;
+        m_tracked_ever = 0;
+}
+#endif
+
 void *
 __wrap_malloc(size_t size)
 {
+        void *ptr;
+
         if (m_fail_malloc > 0 && --m_fail_malloc == 0)
                 return NULL;
-        return __real_malloc(size);
+        ptr = __real_malloc(size);
+        if (ptr != NULL && m_track_list &&
+            (size == sizeof(struct slist) || size == sizeof(struct proc_stats)))
+                track(ptr);
+        return ptr;
+}
+
+void
+__wrap_free(void *ptr)
+{
+        size_t i;
+
+        for (i = 0; m_track_list && i < m_tracked_num; i++)
+                if (m_tracked[i] == ptr) {
+                        m_tracked[i] = m_tracked[--m_tracked_num];
+                        break;
+                }
+        __real_free(ptr);
 }
 
 void *
@@ -841,6 +905,226 @@ test_a_table_past_what_an_int_counts_is_refused(void **state)
         free(tab);
 }
 
+static void
+test_a_process_entry_without_memory_leaves_the_list(void **state)
+{
+        const time_t now = time(NULL);
+        struct slist *head = NULL, *got = NULL;
+
+        UNUSED_ARG(state);
+
+        head = add_proc_cpu_stat(NULL, 1, 10, now);
+        assert_non_null(head);
+
+        /* the entry, then the list element that would carry it */
+        m_fail_malloc = 1;
+        run_function(add_proc_cpu_stat, got, head, 2, 10, now);
+        m_fail_malloc = 0;
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_null(got);
+        assert_true(output_has_text("Error with memory allocation for pstat!"));
+
+        got = head;
+        m_fail_malloc = 2;
+        run_function(add_proc_cpu_stat, got, head, 3, 10, now);
+        m_fail_malloc = 0;
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_null(got);
+        assert_true(
+            output_has_text("Error with memory allocation for slist element!"));
+
+        /* the list the caller passed is still the caller's to free */
+        free(head->data);
+        free(head);
+}
+
+#ifdef __linux__
+/* the statistics are read from /proc/<pid>/stat, which only Linux has */
+static void
+test_process_statistics_without_memory_say_so(void **state)
+{
+        struct slist *list = NULL;
+        int ret = 0;
+        int fds[2];
+        pid_t child;
+
+        UNUSED_ARG(state);
+
+        /* this process at least is listed in /proc, so an entry is made, and
+         * the first allocation wrapped here is that entry
+         */
+        m_fail_malloc = 1;
+        run_function(get_proc_pids_stats, ret, &list);
+        m_fail_malloc = 0;
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PROC_STATS_NO_MEMORY);
+        assert_null(list);
+
+        /* each entry is two allocations, itself and the element that carries
+         * it, so the third is the second entry's: by then one entry is in the
+         * list, and it is left there for the caller to free. A child that
+         * waits on a pipe is a second process for the scan to meet, even
+         * where this one is alone in its PID namespace
+         */
+        assert_int_equal(pipe(fds), 0);
+        child = fork();
+        assert_true(child >= 0);
+        if (child == 0) {
+                char c;
+
+                close(fds[1]);
+                (void)read(fds[0], &c, 1);
+                _exit(0);
+        }
+        close(fds[0]);
+
+        m_fail_malloc = 3;
+        run_function(get_proc_pids_stats, ret, &list);
+        m_fail_malloc = 0;
+
+        close(fds[1]);
+        waitpid(child, NULL, 0);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PROC_STATS_NO_MEMORY);
+        assert_non_null(list);
+        assert_null(list->next);
+        free(list->data);
+        free(list);
+}
+
+/**
+ * @brief Clears the selections selfn_monitor_top_pids() makes
+ *
+ * All but one: the handler also narrows the interface to OS, in main.c's
+ * mask, which is static there and which a case cannot reset. So the top-pids
+ * cases run after every case that calls a handler narrowing to MSR or MMIO.
+ */
+static void
+top_pids_done(void)
+{
+        sel_monitor_opts = 0;
+        sel_mon_top_like = 0;
+        sel_mon_top_pids = 0;
+}
+
+static void
+test_top_pids_without_memory_end_the_process(void **state)
+{
+        UNUSED_ARG(state);
+
+        /* the first scan of /proc runs out of memory at its first entry: the
+         * helpers return, and the handler frees what they gathered and ends
+         * the process, without the pause before the second scan
+         */
+        m_fail_malloc = 1;
+        run_void_function(selfn_monitor_top_pids);
+        m_fail_malloc = 0;
+        top_pids_done();
+
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_true(output_has_text("Error with memory allocation for pstat!"));
+}
+
+static void
+test_top_pids_whose_pick_cannot_be_made_end_the_process(void **state)
+{
+        const unsigned groups = sel_monitor_num;
+
+        UNUSED_ARG(state);
+
+        /* both scans complete, after the handler's pause, and the first pick's
+         * description, a string of its PID, is the first copy made: it
+         * failing makes fill_top_procs() return, and the handler, with the
+         * statistics freed, ends the process. Every element of the list the
+         * scans gathered, and its statistics, is to be freed by then
+         */
+        m_track_list = 1;
+        m_fail_strdup = 1;
+        run_void_function(selfn_monitor_top_pids);
+        m_fail_strdup = 0;
+        m_track_list = 0;
+        top_pids_done();
+
+        assert_true(output_exit_was_called());
+        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+        assert_true(output_has_text("String duplicate error!"));
+        assert_int_equal(sel_monitor_num, groups);
+        assert_true(m_tracked_ever > 0);
+        assert_int_equal(m_tracked_num, 0);
+        track_done();
+}
+#endif
+
+static void
+test_a_top_pid_that_overlaps_a_named_group_returns(void **state)
+{
+        const unsigned groups = sel_monitor_num;
+        const uint64_t named[] = {(uint64_t)getpid(), (uint64_t)getpid() + 1};
+        char *desc = __real_strdup("named");
+        struct slist *head;
+        int ret = 0;
+
+        UNUSED_ARG(state);
+        assert_non_null(desc);
+
+        /* a group the user named, of this process and another, and a top-pids
+         * pick of this process alone: the pick's group would partly overlap
+         * the named one, which grp_add() refuses, and fill_top_procs() returns
+         */
+        assert_non_null(grp_add(MON_GROUP_TYPE_PID,
+                                (enum pqos_mon_event)PQOS_MON_EVENT_ALL, desc,
+                                named, 2));
+        head = add_proc_cpu_stat(NULL, getpid(), 10, time(NULL));
+        assert_non_null(head);
+        ((struct proc_stats *)head->data)->valid = 1;
+
+        run_function(fill_top_procs, ret, head);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("cannot monitor same pids in different groups"));
+        assert_int_equal(sel_monitor_num, groups + 1);
+
+        /* the named group, the one this case added, is taken off again */
+        sel_monitor_num--;
+        grp_free(&sel_monitor_group[sel_monitor_num]);
+        free(head->data);
+        free(head);
+}
+
+static void
+test_a_top_pid_without_memory_for_its_description_returns(void **state)
+{
+        const unsigned groups = sel_monitor_num;
+        struct slist *head;
+        int ret = 0;
+
+        UNUSED_ARG(state);
+
+        /* one process with its statistics complete: the description of its
+         * group, a string of its PID, is the allocation made to fail
+         */
+        head = add_proc_cpu_stat(NULL, getpid(), 10, time(NULL));
+        assert_non_null(head);
+        ((struct proc_stats *)head->data)->valid = 1;
+
+        m_fail_strdup = 1;
+        run_function(fill_top_procs, ret, head);
+        m_fail_strdup = 0;
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("String duplicate error!"));
+        assert_int_equal(sel_monitor_num, groups);
+
+        free(head->data);
+        free(head);
+}
+
 int
 main(void)
 {
@@ -872,7 +1156,19 @@ main(void)
             cmocka_unit_test(test_a_list_whose_table_cannot_grow_keeps_it),
             cmocka_unit_test(
                 test_a_table_given_past_what_an_int_counts_is_refused),
-            cmocka_unit_test(test_a_table_past_what_an_int_counts_is_refused)};
+            cmocka_unit_test(test_a_table_past_what_an_int_counts_is_refused),
+            cmocka_unit_test(
+                test_a_process_entry_without_memory_leaves_the_list),
+#ifdef __linux__
+            cmocka_unit_test(test_process_statistics_without_memory_say_so),
+            cmocka_unit_test(test_top_pids_without_memory_end_the_process),
+            cmocka_unit_test(
+                test_top_pids_whose_pick_cannot_be_made_end_the_process),
+#endif
+            cmocka_unit_test(
+                test_a_top_pid_without_memory_for_its_description_returns),
+            cmocka_unit_test(
+                test_a_top_pid_that_overlaps_a_named_group_returns)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

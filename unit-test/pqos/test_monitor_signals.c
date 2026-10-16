@@ -212,10 +212,12 @@ setup(void)
         struct pqos_capability cap;
         struct pqos_cap_mon *mon;
         const uint64_t pid = (uint64_t)getpid();
+        char *desc = uinttostr_checked((unsigned)pid);
         int ret = -1;
 
+        assert_non_null(desc);
         assert_non_null(grp_add(MON_GROUP_TYPE_PID, PQOS_MON_EVENT_L3_OCCUP,
-                                uinttostr((unsigned)pid), &pid, 1));
+                                desc, &pid, 1));
 
         memset(&cpu, 0, sizeof(cpu));
         mon = calloc(1, sizeof(*mon) + sizeof(mon->events[0]));

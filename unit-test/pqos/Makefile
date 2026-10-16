@@ -360,11 +360,12 @@ $(BIN_DIR)/test_output_capture: ./test_output_capture.c
 
 # monitor.c's failures that have to return rather than end the process: after
 # pqos_init(), so that main() can finalise the library, and in the helpers that
-# read the monitoring options' lists, so that they can free what they hold
-# before their option handler ends it. malloc(), calloc(), realloc() and
-# strdup() are wrapped so that a case can make the Nth call fail, and the file
-# includes monitor.c to call its static functions, as test_alloc does with
-# alloc.c
+# read the monitoring options' lists or gather the top-pids statistics, so
+# that they can free what they hold before their option handler ends it.
+# malloc(), calloc(), realloc() and strdup() are wrapped so that a case can
+# make the Nth call fail, and free() so that a case can see what the top-pids
+# handler freed. The file includes monitor.c to call its static functions, as
+# test_alloc does with alloc.c
 # the loop's timer is a timerfd on Linux, and only there do the cases that
 # make it fail wrap its making, arming and reads
 ifeq ($(shell uname), Linux)
@@ -385,6 +386,7 @@ $(BIN_DIR)/test_monitor_failures: ./test_monitor_failures.c $(PQOS_OBJS)
 		-Wl,--wrap=calloc \
 		-Wl,--wrap=realloc \
 		-Wl,--wrap=strdup \
+		-Wl,--wrap=free \
 		-Wl,--wrap=pqos_inter_get \
 		-Wl,--wrap=fprintf \
 		-Wl,--wrap=pqos_mon_poll \

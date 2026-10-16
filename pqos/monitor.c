@@ -324,25 +324,6 @@ monitor_requested(void)
 
 /**
  * @brief Function to safely translate an unsigned int
- *        value to a string
- *
- * @param val value to be translated
- *
- * @return Pointer to allocated string
- */
-static char *
-uinttostr(const unsigned val)
-{
-        char buf[16], *str = NULL;
-
-        (void)monitor_utils_uinttostr(buf, sizeof(buf), val);
-        selfn_strdup(&str, buf);
-
-        return str;
-}
-
-/**
- * @brief Function to safely translate an unsigned int
  *        value to a string, for a caller that handles a failure
  *
  * @param val value to be translated
@@ -2922,8 +2903,9 @@ get_pid_cputicks(const char *proc_pid_dir_name, uint64_t *cputicks)
  *
  * @param data pointer to data that will be stored in list element
  *
- * @return pointer to allocated and initialized struct slist element. It has to
- *         be freed when no longer needed
+ * @return pointer to allocated and initialized struct slist element, which
+ *         has to be freed when no longer needed, or NULL where it could not
+ *         be allocated, having said so
  */
 static struct slist *
 slist_create_elem(void *data)
@@ -2932,7 +2914,7 @@ slist_create_elem(void *data)
 
         if (node == NULL) {
                 printf("Error with memory allocation for slist element!");
-                exit(EXIT_FAILURE);
+                return NULL;
         }
 
         node->data = data;
@@ -3001,7 +2983,8 @@ fill_cpu_avg_ratio(struct proc_stats *pstat, const time_t proc_start_time)
  * @param cputicks cpu ticks spent by this process
  * @param proc_start_time time of process creation(seconds since the Epoch)
  *
- * @return pointer to beginning of process statistics slist
+ * @return pointer to beginning of process statistics slist, or NULL where
+ *         memory ran out, having said so, with \a pslist left as it was
  */
 static struct slist *
 add_proc_cpu_stat(struct slist *pslist,
@@ -3014,7 +2997,7 @@ add_proc_cpu_stat(struct slist *pslist,
 
         if (pstat == NULL) {
                 printf("Error with memory allocation for pstat!");
-                exit(EXIT_FAILURE);
+                return NULL;
         }
 
         pstat->pid = pid;
@@ -3022,6 +3005,11 @@ add_proc_cpu_stat(struct slist *pslist,
         pstat->valid = 0;
         fill_cpu_avg_ratio(pstat, proc_start_time);
         struct slist *elem = slist_create_elem(pstat);
+
+        if (elem == NULL) {
+                free(pstat);
+                return NULL;
+        }
 
         if (pslist == NULL)
                 /* starting new list of proc_stats elements*/
@@ -3153,6 +3141,9 @@ get_pid_num_from_dir(DIR *proc_dir, const char *pid_dir_name, pid_t *pid)
         return 0;
 }
 
+/** what get_proc_pids_stats() returns where memory ran out */
+#define PROC_STATS_NO_MEMORY -2
+
 /**
  * @brief Fills slist of proc_stats with process cpu usage stats
  *
@@ -3167,6 +3158,8 @@ get_pid_num_from_dir(DIR *proc_dir, const char *pid_dir_name, pid_t *pid)
  * @return operation status
  * @retval 0 in case of success
  * @retval -1 in case of error
+ * @retval PROC_STATS_NO_MEMORY where memory ran out, having said so; the
+ *         entries gathered so far stay in \a pslist, for the caller to free
  */
 static int
 get_proc_pids_stats(struct slist **pslist)
@@ -3211,8 +3204,14 @@ get_proc_pids_stats(struct slist **pslist)
                                  */
                                 continue;
 
-                        *pslist = add_proc_cpu_stat(*pslist, pid, cputicks,
-                                                    start_time);
+                        struct slist *head = add_proc_cpu_stat(
+                            *pslist, pid, cputicks, start_time);
+
+                        if (head == NULL) {
+                                closedir(proc_dir);
+                                return PROC_STATS_NO_MEMORY;
+                        }
+                        *pslist = head;
                 } else
                         /* only updating proc_stats entries*/
                         update_proc_cpu_stat(*pslist, pid, cputicks);
@@ -3260,7 +3259,8 @@ proc_stats_cmp(const void *a, const void *b)
  * @param pslist list with all processes statistics (holds proc_stats)
  *
  * @return number of valid top processes in top_procs filled array (usually
- *         this will equal to max_size)
+ *         this will equal to max_size), or -1 where a group or its
+ *         description could not be made, having said why
  */
 static int
 fill_top_procs(const struct slist *pslist)
@@ -3326,10 +3326,13 @@ fill_top_procs(const struct slist *pslist)
          * Fill top_proc table
          */
         for (i = 0; i < current_size; i++) {
-                char *desc = uinttostr((unsigned)stats[i].pid);
+                char *desc = uinttostr_checked((unsigned)stats[i].pid);
                 uint64_t pid = (uint64_t)stats[i].pid;
                 const unsigned num_groups = sel_monitor_num;
                 struct mon_group *grp;
+
+                if (desc == NULL)
+                        return -1;
 
                 /* finally we can add list of top-pids for LLC/MBM monitoring
                  * NOTE: list was sorted in ascending order, so in order to have
@@ -3339,8 +3342,9 @@ fill_top_procs(const struct slist *pslist)
                 grp = grp_add(MON_GROUP_TYPE_PID,
                               (enum pqos_mon_event)PQOS_MON_EVENT_ALL, desc,
                               &pid, 1);
+                /* selfn_monitor_top_pids(), the handler, ends the process */
                 if (grp == NULL)
-                        exit(EXIT_FAILURE);
+                        return -1;
                 /* a group made for this pick, not one the user named first */
                 if (sel_monitor_num > num_groups)
                         grp->top_pid = 1;
@@ -3357,7 +3361,7 @@ fill_top_procs(const struct slist *pslist)
 void
 selfn_monitor_top_pids(void)
 {
-        int res = 0;
+        int res = 0, fatal = 0;
         struct slist *pslist = NULL, *it = NULL;
 
         narrow_iface(IFACE_OS, "-p/--mon-pid");
@@ -3368,6 +3372,10 @@ selfn_monitor_top_pids(void)
 
         /* getting initial values for CPU usage for processes */
         res = get_proc_pids_stats(&pslist);
+        if (res == PROC_STATS_NO_MEMORY) {
+                fatal = 1;
+                goto cleanup_pslist;
+        }
         if (res) {
                 printf("Getting processor usage statistic failed!");
                 goto cleanup_pslist;
@@ -3390,12 +3398,17 @@ selfn_monitor_top_pids(void)
 
         /* Getting updated CPU usage statistics*/
         res = get_proc_pids_stats(&pslist);
+        if (res == PROC_STATS_NO_MEMORY) {
+                fatal = 1;
+                goto cleanup_pslist;
+        }
         if (res) {
                 printf("Getting updated processor usage statistic failed!");
                 goto cleanup_pslist;
         }
 
-        fill_top_procs(pslist);
+        if (fill_top_procs(pslist) < 0)
+                fatal = 1;
 
 cleanup_pslist:
         /* cleaning list of all processes stats */
@@ -3407,6 +3420,15 @@ cleanup_pslist:
                 free(tmp->data);
                 free(tmp);
         }
+
+        /* the helpers above return where they failed - out of memory, or a
+         * pick that partly overlaps a group the user named - and the end of
+         * the process is decided here, the option handler, with the
+         * statistics list freed. The groups made for the picks before the one
+         * that failed stay in sel_monitor_group until the process ends
+         */
+        if (fatal)
+                exit(EXIT_FAILURE);
 }
 
 /**
