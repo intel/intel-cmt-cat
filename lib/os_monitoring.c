@@ -41,6 +41,7 @@
 #include "resctrl_monitoring.h"
 
 #include <dirent.h> /**< scandir() */
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h> /**< pid_t */
@@ -593,6 +594,7 @@ tid_add(const pid_t tid, unsigned *tid_nr, pid_t **tid_map)
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM the process has ended, its task directory gone
  */
 static int
 tid_find(const pid_t pid, unsigned *tid_nr, pid_t **tid_map)
@@ -605,7 +607,15 @@ tid_find(const pid_t pid, unsigned *tid_nr, pid_t **tid_map)
 
         snprintf(buf, sizeof(buf) - 1, "/proc/%d/task", (int)pid);
         num_tasks = scandir(buf, &namelist, filter, NULL);
-        if (num_tasks <= 0) {
+        /* a process that ends after it was found to exist takes its task
+         * directory with it: the answer is the one a task that does not exist
+         * gets, which a caller can tell from a failure to read the directory
+         */
+        if (num_tasks == 0 || (num_tasks < 0 && errno == ENOENT)) {
+                LOG_ERROR("Task %d does not exist!\n", (int)pid);
+                return PQOS_RETVAL_PARAM;
+        }
+        if (num_tasks < 0) {
                 LOG_ERROR("Failed to read proc tasks!\n");
                 return PQOS_RETVAL_ERROR;
         }

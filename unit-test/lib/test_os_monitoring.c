@@ -35,6 +35,7 @@
 #include "test.h"
 
 #include <dirent.h>
+#include <errno.h>
 
 /* ======== mock ======== */
 int
@@ -81,6 +82,10 @@ resctrl_mon_is_supported(void)
         return mock_type(int);
 }
 
+/* PIDs whose /proc/<pid>/task the scandir() mock fails to read */
+#define TASK_DIR_GONE       0xE0D
+#define TASK_DIR_UNREADABLE 0xACC
+
 int
 __wrap_scandir(const char *restrict dirp,
                struct dirent ***restrict namelist,
@@ -95,6 +100,16 @@ __wrap_scandir(const char *restrict dirp,
                 ret = sscanf(dirp, "/proc/%d/task", &pid);
                 if (ret != 1 || pid == 0 || pid == 0xDEAD)
                         return -1;
+                /* the process ended after it was found to exist */
+                if (pid == TASK_DIR_GONE) {
+                        errno = ENOENT;
+                        return -1;
+                }
+                /* or its directory cannot be read for another reason */
+                if (pid == TASK_DIR_UNREADABLE) {
+                        errno = EACCES;
+                        return -1;
+                }
 
                 *namelist = malloc(sizeof(struct dirent *));
                 *namelist[0] = malloc(sizeof(struct dirent) + 10);
@@ -474,6 +489,38 @@ test_os_mon_start_pids(void **state)
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+static void
+test_os_mon_start_pids_task_dir(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t gone = TASK_DIR_GONE;
+        pid_t unreadable = TASK_DIR_UNREADABLE;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        /* a process that ended after it was found to exist is one that does
+         * not exist, which a caller can tell from a failure
+         */
+        ret =
+            os_mon_start_pids(1, &gone, PQOS_MON_EVENT_L3_OCCUP, NULL, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_null(group.tid_map);
+
+        /* and one whose threads cannot be read stays an error */
+        ret = os_mon_start_pids(1, &unreadable, PQOS_MON_EVENT_L3_OCCUP, NULL,
+                                &group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(group.tid_map);
+}
+
 /* ======== os_mon_add_pids ======== */
 
 static void
@@ -658,6 +705,7 @@ main(void)
             cmocka_unit_test(test_os_mon_start_cores),
             cmocka_unit_test(test_os_mon_start_pids_param),
             cmocka_unit_test(test_os_mon_start_pids),
+            cmocka_unit_test(test_os_mon_start_pids_task_dir),
             cmocka_unit_test(test_os_mon_add_pids),
             cmocka_unit_test(test_os_mon_remove_pids),
         };
