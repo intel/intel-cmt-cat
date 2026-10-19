@@ -2552,10 +2552,8 @@ selfn_monitor_rmid_channels(const char *arg)
                 count =
                     strlisttotabrealloc(p + 1, &channels, &channel_list_size);
                 grp = grp_add(MON_GROUP_TYPE_CHANNEL, 0, desc, channels, count);
-                if (grp == NULL) {
-                        free(desc);
+                if (grp == NULL)
                         goto error_exit;
-                }
 
                 grp->opt.rmid.type = PQOS_RMID_TYPE_MAP;
                 grp->opt.rmid.rmid = rmid;

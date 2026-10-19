@@ -433,6 +433,29 @@ $(BIN_DIR)/test_monitor_signals: ./test_monitor_signals.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
+# monitor.c is included by the test rather than linked, as for
+# test_monitor_signals, and compiled there with PQOS_RMID_CUSTOM, which the test
+# defines: --rmid-channels and its handler exist only in that build, which no
+# other binary here makes. strdup() and free() are wrapped to count how often
+# each copy is freed, and -fno-builtin-fprintf keeps grp_add()'s refusal, an
+# fprintf() of a fixed string, a call that the wrap of fprintf() sees. The
+# groups' start calls that build makes are wrapped too: a shared libpqos built
+# without the flag hides them, and a static one defines them in its api.o.
+$(BIN_DIR)/test_monitor_rmid_custom: ./test_monitor_rmid_custom.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -fno-builtin-fprintf \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=strdup \
+		-Wl,--wrap=free \
+		-Wl,--wrap=pqos_mon_start_cores_ext \
+		-Wl,--wrap=pqos_mon_start_channels_ext \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+
 .PHONY: run
 run: $(TESTS)
 	@echo "Running pqos Unit Tests"
