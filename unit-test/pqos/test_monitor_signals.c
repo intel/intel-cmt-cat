@@ -243,7 +243,7 @@ setup(void)
  * nothing to free a second time.
  */
 static void
-stop(void)
+stop_selection(void)
 {
         run_void_function(monitor_stop);
         sel_monitor_group = NULL;
@@ -260,7 +260,7 @@ reset(void **state)
         signal(SIGTERM, SIG_DFL);
         stop_monitoring_loop = 0;
         if (sel_monitor_group != NULL)
-                stop();
+                stop_selection();
         sel_monitor_type = 0;
         /* a case that fails stops the loop at its timeout, not never */
         sel_timeout = 1;
@@ -320,7 +320,7 @@ a_signal_during_the_start(const int signo)
         assert_int_equal(g_timers_set, 1);
         assert_int_equal(g_polls, 0);
 
-        stop();
+        stop_selection();
         assert_int_equal(g_stops, 1);
 }
 
@@ -376,7 +376,7 @@ test_sigint_during_the_loop_ends_it(void **state)
         assert_int_equal(g_timers_set, 1);
         assert_int_equal(g_polls, 1);
 
-        stop();
+        stop_selection();
         assert_int_equal(g_stops, 1);
 }
 
