@@ -37,7 +37,13 @@
 
 #include <string.h>
 
-FILE *
+/*
+ * Weak, as is __wrap_pqos_fclose(). A test that needs files of its own defines
+ * one or both; linked against a static mock library, it would otherwise get
+ * this file's definitions too, along with the other wraps it uses from here.
+ * Against a shared one, the test's own definitions take precedence anyway.
+ */
+__attribute__((weak)) FILE *
 __wrap_pqos_fopen(const char *name, const char *mode)
 {
         check_expected(name);
@@ -63,7 +69,7 @@ __wrap_pqos_fopen(const char *name, const char *mode)
         return mock_ptr_type(FILE *);
 }
 
-int
+__attribute__((weak)) int
 __wrap_pqos_fclose(FILE *fd)
 {
         function_called();
