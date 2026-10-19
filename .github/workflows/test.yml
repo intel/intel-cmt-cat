@@ -21,3 +21,30 @@ jobs:
       run: make -C unit-test
     - name: Execute
       run: make -C unit-test run
+
+  unit-test-static:
+    name: Execute C unit tests with static libraries
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2.7.0
+    - name: Install Dependencies
+      run: sudo apt install gcc libcmocka-dev
+    # a symbol that a test and a library both define links against a shared
+    # library, whose copy the test's own overrides, and fails only against a
+    # static one
+    - name: Build
+      run: make -C unit-test SHARED=n
+    - name: Check that the static libraries were linked
+      run: |
+        test -f lib/libpqos.a
+        test -f unit-test/mock/libpqosmock.a
+        test -f unit-test/output/libgraboutput.a
+        test -x unit-test/pqos/bin/test_cap
+        test -x unit-test/lib/bin/test_perf_monitoring
+        if ldd unit-test/pqos/bin/test_cap unit-test/lib/bin/test_perf_monitoring |
+            grep -E 'libpqos|libgraboutput'; then
+          echo "the unit tests still need a shared library after SHARED=n"
+          exit 1
+        fi
+    - name: Execute
+      run: make -C unit-test run SHARED=n
