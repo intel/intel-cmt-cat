@@ -76,6 +76,63 @@ int pci_init(void);
 int pci_fini(void);
 
 /**
+ * Where distributions keep the PCI ID database, pci.ids, in the order the
+ * library looks for it: /usr/share/misc on Debian and the distributions built
+ * on it, /usr/share/hwdata (the hwdata package) on Fedora and RHEL, and
+ * /usr/share, pciutils' own default
+ */
+extern PQOS_LOCAL const char *const pci_ids_files[3];
+
+/**
+ * @brief Opens the first of a list of files that is a regular file
+ *
+ * A name is passed over for the next if it does not exist, if it is not a
+ * regular file - a directory, a FIFO or a symbolic link, which pqos_fopen()
+ * refuses - or if the file does not open.
+ *
+ * @param [in] files the names, in the order they are tried
+ * @param [in] num_files how many there are
+ * @param [out] unusable if not NULL, the first name passed over although it
+ *              exists, or NULL if there was none
+ *
+ * @return the stream of the first that opens, NULL if none does
+ */
+PQOS_LOCAL FILE *pci_ids_open(const char *const *files,
+                              unsigned num_files,
+                              const char **unusable);
+
+/**
+ * @brief Opens pci.ids from a list of places, saying why if it cannot
+ *
+ * The file is opened by pci_ids_open(). If none of the places has it, the
+ * error names the places. If one has something that cannot be read, such as a
+ * symbolic link, the error names that instead.
+ *
+ * @param [in] files the places, in the order they are tried
+ * @param [in] num_files how many there are
+ *
+ * @return the stream, NULL if no place gives one
+ */
+PQOS_LOCAL FILE *pci_ids_find(const char *const *files, unsigned num_files);
+
+/**
+ * @brief Fills in a device's vendor, device and subclass names from pci.ids
+ *
+ * The file is looked for in pci_ids_files by pci_ids_find(). A name it does
+ * not have is left as it was.
+ *
+ * @param [out] info the device's information, whose names are filled in
+ * @param [in] class_code the device's class code: class, subclass and
+ *             programming interface, a byte each
+ * @param [in] vendor_id the device's vendor ID
+ * @param [in] device_id the device's device ID
+ */
+PQOS_LOCAL void pci_parse_pci_ids(struct pqos_pci_info *info,
+                                  unsigned int class_code,
+                                  unsigned int vendor_id,
+                                  unsigned int device_id);
+
+/**
  * @brief Initialize PCI device
  *
  * @param [in] domain PCI domain

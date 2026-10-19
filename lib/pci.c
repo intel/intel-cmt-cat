@@ -46,12 +46,12 @@
 #include <string.h>
 #include <sys/io.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #define PCI_BASE           0x80000000
 #define PCI_CONFIG_ADDRESS 0xCFC
 #define PCI_CONFIG_DATA    0xCF8
 #define PCI_DEVICES_DIR    "/sys/bus/pci/devices"
-#define PCI_IDS_FILE       "/usr/share/misc/pci.ids"
 
 #define PCI_CONFIG_CAPABILITIES_POINTER 0x34
 
@@ -93,34 +93,103 @@ pci_fini(void)
         return PQOS_RETVAL_OK;
 }
 
-static void
+const char *const pci_ids_files[3] = {
+    "/usr/share/misc/pci.ids",
+    "/usr/share/hwdata/pci.ids",
+    "/usr/share/pci.ids",
+};
+
+FILE *
+pci_ids_open(const char *const *files,
+             unsigned num_files,
+             const char **unusable)
+{
+        unsigned i;
+
+        if (unusable != NULL)
+                *unusable = NULL;
+
+        for (i = 0; i < num_files; i++) {
+                struct stat st;
+                FILE *fd = NULL;
+
+                if (lstat(files[i], &st) != 0)
+                        continue;
+
+                /*
+                 * Only a regular file is opened. A directory would open and
+                 * read as nothing, a FIFO's open would wait for a writer,
+                 * and pqos_fopen() refuses a symbolic link with an error of
+                 * its own. A name that is there but cannot be read is passed
+                 * over for the next, and the first such name is reported.
+                 *
+                 * The check is made on the name, which pqos_fopen() looks up
+                 * again, so it guards against what is there, not against a
+                 * change in between: a link put there meanwhile is still
+                 * refused, a FIFO is not. Only root can change the places.
+                 */
+                if (S_ISREG(st.st_mode))
+                        fd = pqos_fopen(files[i], "r");
+                if (fd != NULL)
+                        return fd;
+
+                if (unusable != NULL && *unusable == NULL)
+                        *unusable = files[i];
+        }
+
+        return NULL;
+}
+
+FILE *
+pci_ids_find(const char *const *files, unsigned num_files)
+{
+        const char *unusable = NULL;
+        FILE *fd = pci_ids_open(files, num_files, &unusable);
+        char places[BUF_SIZE_512] = "";
+        unsigned i;
+
+        if (fd != NULL)
+                return fd;
+
+        if (unusable != NULL) {
+                LOG_ERROR("Unable to read %s: it is not a regular file, or it "
+                          "cannot be opened. A symbolic link is not followed: "
+                          "put the file itself there. PCI device name will "
+                          "not be displayed.\n",
+                          unusable);
+                return NULL;
+        }
+
+        for (i = 0; i < num_files; i++) {
+                size_t used = strlen(places);
+
+                snprintf(places + used, sizeof(places) - used, "%s%s",
+                         i > 0 ? ", " : "", files[i]);
+        }
+
+        LOG_ERROR("Unable to find any of %s. PCI device name will not be "
+                  "displayed.\nInstall pciutils or download the file "
+                  "manually:\n"
+                  "$ curl -o %s "
+                  "https://pci-ids.ucw.cz/v2.2/pci.ids\n",
+                  places, num_files > 0 ? files[0] : "pci.ids");
+
+        return NULL;
+}
+
+void
 pci_parse_pci_ids(struct pqos_pci_info *info,
                   unsigned int class_code,
                   unsigned int vendor_id,
                   unsigned int device_id)
 {
-        FILE *fd = NULL;
+        FILE *fd = pci_ids_find(pci_ids_files, DIM(pci_ids_files));
         char line[BUF_SIZE_512];
         int vendor_found = 0;
         unsigned int subclass = (class_code >> 8) & 0xFF;
 
-        if (!pqos_file_exists(PCI_IDS_FILE)) {
-                LOG_ERROR("Unable to find %s. PCI device name will not be "
-                          "displayed.\nInstall pciutils or download the file"
-                          " manually:\n"
-                          "$ curl -o %s "
-                          "https://pci-ids.ucw.cz/v2.2/pci.ids\n",
-                          PCI_IDS_FILE, PCI_IDS_FILE);
+        if (fd == NULL)
                 return;
-        }
-
-        fd = pqos_fopen(PCI_IDS_FILE, "r");
-        if (fd == NULL) {
-                LOG_ERROR("Unable to open %s. PCI device name will not be "
-                          "displayed. Install/update pciutils/%s.\n",
-                          PCI_IDS_FILE, PCI_IDS_FILE);
-                return;
-        }
 
         while (fgets(line, sizeof(line), fd)) {
                 if (line[0] == '#')
