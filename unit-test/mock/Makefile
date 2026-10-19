@@ -47,6 +47,11 @@ CFLAGS = -pthread -I$(LIB_DIR) -D_GNU_SOURCE \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector-strong \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels
+# cmocka 2.0 deprecates much of the 1.x API the mocks use, for typed forms
+# 1.x does not have, and warns at every use: the mocks keep to the API both
+# versions have, and cmocka's own flag for that turns the warnings off. 1.x
+# does not read it
+CFLAGS += -DCMOCKA_DISABLE_DEPRECATION_WARNINGS
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif

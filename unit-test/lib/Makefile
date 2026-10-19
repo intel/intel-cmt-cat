@@ -26,6 +26,12 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-D'PQOS_API=' \
 	-D'PQOS_STATIC=__attribute__((weak))'
 
+# cmocka 2.0 deprecates much of the 1.x API the cases use, for typed forms
+# 1.x does not have, and warns at every use: the cases keep to the API both
+# versions have, and cmocka's own flag for that turns the warnings off. 1.x
+# does not read it
+CFLAGS += -DCMOCKA_DISABLE_DEPRECATION_WARNINGS
+
 CFLAGS += -DLOCKFILE=\"/tmp/libpqos_test_lockfile\"
 # and no test reads the machine's own CXL bus: the cases that mock the file
 # helpers would otherwise walk whatever /sys/bus/cxl the host happens to have,

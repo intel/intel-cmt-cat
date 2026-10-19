@@ -67,7 +67,11 @@ CFLAGS = -I$(PQOS_DIR) -I$(LIB_DIR) -I$(MOCK_DIR) -I$(GRAB_OUTPUT_DIR) -I$(APP_M
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector-strong \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels
-
+# cmocka 2.0 deprecates much of the 1.x API the cases use, for typed forms
+# 1.x does not have, and warns at every use: the cases keep to the API both
+# versions have, and cmocka's own flag for that turns the warnings off. 1.x
+# does not read it
+CFLAGS += -DCMOCKA_DISABLE_DEPRECATION_WARNINGS
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
 IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
