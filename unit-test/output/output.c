@@ -37,6 +37,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+jmp_buf jump_buff;
+
 #define BUFFER_LENGTH 524288
 static char buffer[BUFFER_LENGTH + 1];
 static int grab_in_progress = 0;

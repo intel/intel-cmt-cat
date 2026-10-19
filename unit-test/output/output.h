@@ -50,7 +50,11 @@
                 output_stop();                                                 \
         } while (0)
 
-jmp_buf jump_buff;
+/*
+ * Set by run_void_function() and run_function(), and jumped back to by the
+ * wrapped exit(). Defined once, in the output library.
+ */
+extern jmp_buf jump_buff;
 
 void output_start(void);
 void output_stop(void);
