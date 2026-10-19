@@ -45,6 +45,8 @@ struct test_data {
         struct pqos_capability *cap_mba;
         struct pqos_capability *cap_smba;
         struct pqos_sysconfig *sys;
+        /* what sys points to: part of the fixture, nothing to allocate */
+        struct pqos_sysconfig sysconfig;
         unsigned num_socket;
 };
 
@@ -313,7 +315,7 @@ init_caps(void **state, unsigned data_to_generate)
                         return ret;
         }
 
-        data->sys = calloc(sizeof(struct pqos_sysconfig), 1);
+        data->sys = &data->sysconfig;
         data->sys->cpu = data->cpu_info;
 
         *state = data;

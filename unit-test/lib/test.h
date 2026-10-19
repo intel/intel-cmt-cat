@@ -166,6 +166,8 @@ struct test_data {
         struct pqos_hybrid_capabilities cap_hybrid;
         struct pqos_devinfo *dev;
         struct pqos_sysconfig *sys;
+        /* what sys points to: part of the fixture, like the capabilities */
+        struct pqos_sysconfig sysconfig;
         enum pqos_interface interface;
 };
 
@@ -330,12 +332,12 @@ test_dev_init(struct test_data *data)
 
         /* Populate devinfo struct with single dev */
         data->dev =
-            (struct pqos_devinfo *)calloc(sizeof(struct pqos_devinfo), 1);
+            (struct pqos_devinfo *)calloc(1, sizeof(struct pqos_devinfo));
         assert_non_null(data->dev);
 
         data->dev->num_devs = 2;
-        data->dev->devs = (struct pqos_dev *)calloc(sizeof(struct pqos_dev),
-                                                    data->dev->num_devs);
+        data->dev->devs = (struct pqos_dev *)calloc(data->dev->num_devs,
+                                                    sizeof(struct pqos_dev));
         assert_non_null(data->dev->devs);
 
         data->dev->devs[0].bdf = bdf;
@@ -391,9 +393,6 @@ test_fini(void **state)
                                 free(data->dev->devs);
                         free(data->dev);
                 }
-                if (data->sys != NULL)
-                        free(data->sys);
-
                 free(data);
         }
 
@@ -441,7 +440,7 @@ test_init(void **state, unsigned technology)
                         break;
         } while (0);
 
-        data->sys = calloc(sizeof(struct pqos_sysconfig), 1);
+        data->sys = &data->sysconfig;
         data->sys->cap = data->cap;
         data->sys->cpu = data->cpu;
         data->sys->dev = data->dev;
