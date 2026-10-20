@@ -38,8 +38,8 @@
  * cap.c, allocation.c, monitoring.c and utils.c
  */
 
-#ifndef __PQOS_H__
-#define __PQOS_H__
+#ifndef PQOS_H_
+#define PQOS_H_
 
 #include <math.h>
 #include <stdint.h>
@@ -3397,4 +3397,4 @@ int pqos_fclose(FILE *stream);
 }
 #endif
 
-#endif /* __PQOS_H__ */
+#endif /* PQOS_H_ */
