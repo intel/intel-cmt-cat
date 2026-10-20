@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PQOS_MMIO_DUMP_RMIDS_H__
-#define __PQOS_MMIO_DUMP_RMIDS_H__
+#ifndef PQOS_MMIO_DUMP_RMIDS_H_
+#define PQOS_MMIO_DUMP_RMIDS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,4 +63,4 @@ PQOS_LOCAL void uint64_to_binary(uint64_t value, char binary[65]);
 }
 #endif
 
-#endif /* __PQOS_MMIO_DUMP_RMIDS_H__ */
+#endif /* PQOS_MMIO_DUMP_RMIDS_H_ */

@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PQOS_OS_CAP_H__
-#define __PQOS_OS_CAP_H__
+#ifndef PQOS_OS_CAP_H_
+#define PQOS_OS_CAP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -174,4 +174,4 @@ PQOS_LOCAL int os_cap_mon_perf_pkg_support(const enum pqos_mon_event event,
 }
 #endif
 
-#endif /* __PQOS_OS_CAP_H__ */
+#endif /* PQOS_OS_CAP_H_ */

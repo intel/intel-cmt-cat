@@ -34,8 +34,8 @@
 /**
  * @brief Internal header file to PQoS OS monitoring module
  */
-#ifndef __PQOS_OS_MON_H__
-#define __PQOS_OS_MON_H__
+#ifndef PQOS_OS_MON_H_
+#define PQOS_OS_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -168,4 +168,4 @@ PQOS_LOCAL int os_mon_remove_pids(const unsigned num_pids,
 }
 #endif
 
-#endif /* __PQOS_OS_MON_H__ */
+#endif /* PQOS_OS_MON_H_ */

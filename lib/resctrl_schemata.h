@@ -35,8 +35,8 @@
  * @brief Internal header file for resctrl schemata
  */
 
-#ifndef __PQOS_RESCTRL_SCHEMATA_H__
-#define __PQOS_RESCTRL_SCHEMATA_H__
+#ifndef PQOS_RESCTRL_SCHEMATA_H_
+#define PQOS_RESCTRL_SCHEMATA_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -270,4 +270,4 @@ resctrl_schemata_smba_write(FILE *fd, const struct resctrl_schemata *schemata);
 }
 #endif
 
-#endif /* __PQOS_RESCTRL_SCHEMATA_H__ */
+#endif /* PQOS_RESCTRL_SCHEMATA_H_ */

@@ -35,8 +35,8 @@
  * @brief Cores to Domains matching module
  */
 
-#ifndef __PQOS_CORES_TO_DOMAINS_H__
-#define __PQOS_CORES_TO_DOMAINS_H__
+#ifndef PQOS_CORES_TO_DOMAINS_H_
+#define PQOS_CORES_TO_DOMAINS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,4 +71,4 @@ PQOS_LOCAL void cores_domains_fini(void);
 }
 #endif
 
-#endif /* __PQOS_CORES_TO_DOMAINS_H__ */
+#endif /* PQOS_CORES_TO_DOMAINS_H_ */

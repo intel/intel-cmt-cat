@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PQOS_MMIO_DUMP_H__
-#define __PQOS_MMIO_DUMP_H__
+#ifndef PQOS_MMIO_DUMP_H_
+#define PQOS_MMIO_DUMP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,4 +76,4 @@ PQOS_LOCAL int dump_mmio_range(uint64_t base,
 }
 #endif
 
-#endif /* __PQOS_MMIO_DUMP_H__ */
+#endif /* PQOS_MMIO_DUMP_H_ */

@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_MONITOR_SIGNALS_H
-#define __TEST_MONITOR_SIGNALS_H
+#ifndef TEST_MONITOR_SIGNALS_H_
+#define TEST_MONITOR_SIGNALS_H_
 
 #include "pqos.h"
 
@@ -88,4 +88,4 @@ int __real_timer_settime(timer_t timerid,
                          struct itimerspec *old_value);
 #endif
 
-#endif /* __TEST_MONITOR_SIGNALS_H */
+#endif /* TEST_MONITOR_SIGNALS_H_ */

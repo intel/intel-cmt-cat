@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __MONITOR_XML_H__
-#define __MONITOR_XML_H__
+#ifndef MONITOR_XML_H_
+#define MONITOR_XML_H_
 
 #include "pqos.h"
 
@@ -92,4 +92,4 @@ void monitor_xml_footer(FILE *fp);
  */
 void monitor_xml_end(FILE *fp);
 
-#endif /* #define __MONITOR_XML_H__ */
+#endif /* MONITOR_XML_H_ */

@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_LOCK_H
-#define __TEST_LOCK_H
+#ifndef TEST_LOCK_H_
+#define TEST_LOCK_H_
 
 #include <aio.h>
 #include <pthread.h>
@@ -49,4 +49,4 @@ int __real_pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
 int __real_pthread_setspecific(pthread_key_t key, const void *value);
 int __real_lockf(int fd, int cmd, off_t len);
 
-#endif /* __TEST_LOCK_H */
+#endif /* TEST_LOCK_H_ */

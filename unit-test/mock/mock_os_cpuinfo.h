@@ -41,4 +41,4 @@ int os_cpuinfo_cpu_socket(unsigned lcore, unsigned *socket);
 int os_cpuinfo_cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2);
 int os_cpuinfo_cpu_node(unsigned lcore, unsigned *node);
 
-#endif /* MOCK_OS_MONITORING_H_ */
+#endif /* MOCK_OS_CPUINFO_H_ */

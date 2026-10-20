@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PQOS_MMIO_H__
-#define __PQOS_MMIO_H__
+#ifndef PQOS_MMIO_H_
+#define PQOS_MMIO_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -527,4 +527,4 @@ int is_overflow_iol3_mbm_rmid(iol3_mbm_rmid_t value);
 }
 #endif
 
-#endif /* __PQOS_MMIO_H__ */
+#endif /* PQOS_MMIO_H_ */

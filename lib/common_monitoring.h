@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS common monitoring module sharing
  * common code between HW and MMIO monitoring
  */
-#ifndef __PQOS_CMN_MON_H__
-#define __PQOS_CMN_MON_H__
+#ifndef PQOS_CMN_MON_H_
+#define PQOS_CMN_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -168,4 +168,4 @@ PQOS_LOCAL int mon_reset(const struct pqos_mon_config *cfg);
 }
 #endif
 
-#endif /* __PQOS_CMN_MON_H__ */
+#endif /* PQOS_CMN_MON_H_ */

@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS monitoring initialization
  */
 
-#ifndef __PQOS_HOSTMON_H__
-#define __PQOS_HOSTMON_H__
+#ifndef PQOS_HOSTMON_H_
+#define PQOS_HOSTMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -220,4 +220,4 @@ int pqos_mon_poll_events(struct pqos_mon_data *group);
 }
 #endif
 
-#endif /* __PQOS_HOSTMON_H__ */
+#endif /* PQOS_HOSTMON_H_ */

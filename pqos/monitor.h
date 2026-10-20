@@ -39,8 +39,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifndef __MONITOR_H__
-#define __MONITOR_H__
+#ifndef MONITOR_H_
+#define MONITOR_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -300,4 +300,4 @@ enum monitor_llc_format monitor_get_llc_format(void);
 }
 #endif
 
-#endif /* __MONITOR_H__ */
+#endif /* MONITOR_H_ */

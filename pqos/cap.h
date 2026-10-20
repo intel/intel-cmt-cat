@@ -39,8 +39,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifndef __CAP_H__
-#define __CAP_H__
+#ifndef CAP_H_
+#define CAP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,4 +116,4 @@ int cap_print_io_dev(const struct pqos_sysconfig *sys);
 }
 #endif
 
-#endif /* __CAP_H__ */
+#endif /* CAP_H_ */

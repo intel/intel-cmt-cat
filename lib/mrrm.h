@@ -35,8 +35,8 @@
  * @brief Internal header file for MRRM module
  */
 
-#ifndef __PQOS_MRRM_H__
-#define __PQOS_MRRM_H__
+#ifndef PQOS_MRRM_H_
+#define PQOS_MRRM_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -125,4 +125,4 @@ PQOS_LOCAL void mrrm_fini(void);
 }
 #endif
 
-#endif /* __PQOS_MRRM_H__ */
+#endif /* PQOS_MRRM_H_ */

@@ -35,8 +35,8 @@
  * @brief Internal header file for resctrl common functions
  */
 
-#ifndef __PQOS_RESCTRL_H__
-#define __PQOS_RESCTRL_H__
+#ifndef PQOS_RESCTRL_H_
+#define PQOS_RESCTRL_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -193,4 +193,4 @@ int resctrl_is_supported(void);
 }
 #endif
 
-#endif /* __PQOS_RESCTRL_H__ */
+#endif /* PQOS_RESCTRL_H_ */

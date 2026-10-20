@@ -35,8 +35,8 @@
  * @brief Internal header file for common functions
  */
 
-#ifndef __PQOS_COMMON_H__
-#define __PQOS_COMMON_H__
+#ifndef PQOS_APP_COMMON_H_
+#define PQOS_APP_COMMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -190,4 +190,4 @@ int pqos_cpu_sort(const struct dirent **dir1, const struct dirent **dir2);
 }
 #endif
 
-#endif /* __PQOS_COMMON_H__ */
+#endif /* PQOS_APP_COMMON_H_ */

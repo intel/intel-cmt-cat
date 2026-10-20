@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS MBA allocation initialization
  */
 
-#ifndef __PQOS_ALLOC_COMMON_H__
-#define __PQOS_ALLOC_COMMON_H__
+#ifndef PQOS_ALLOC_COMMON_H_
+#define PQOS_ALLOC_COMMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,4 +106,4 @@ PQOS_LOCAL int alloc_l2ca_check_bitmasks(const struct pqos_l2ca *ca,
 }
 #endif
 
-#endif /* __PQOS_ALLOC_COMMON_H__ */
+#endif /* PQOS_ALLOC_COMMON_H_ */

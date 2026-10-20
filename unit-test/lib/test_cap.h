@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_CAP_H
-#define __TEST_CAP_H
+#ifndef TEST_CAP_H_
+#define TEST_CAP_H_
 
 #include <aio.h>
 #include <stddef.h>
@@ -39,4 +39,4 @@
 void *__real_malloc(size_t size);
 char *__real_getenv(const char *name);
 
-#endif /* __TEST_CAP_H */
+#endif /* TEST_CAP_H_ */

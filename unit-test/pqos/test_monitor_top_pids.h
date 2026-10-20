@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_MONITOR_TOP_PIDS_H
-#define __TEST_MONITOR_TOP_PIDS_H
+#ifndef TEST_MONITOR_TOP_PIDS_H_
+#define TEST_MONITOR_TOP_PIDS_H_
 
 #include "pqos.h"
 
@@ -61,4 +61,4 @@ FILE *__real_pqos_fopen(const char *name, const char *mode);
 int __wrap_kill(pid_t pid, int sig);
 int __real_kill(pid_t pid, int sig);
 
-#endif /* __TEST_MONITOR_TOP_PIDS_H */
+#endif /* TEST_MONITOR_TOP_PIDS_H_ */

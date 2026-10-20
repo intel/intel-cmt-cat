@@ -34,8 +34,8 @@
  * @brief Data pseudo locking module
  */
 
-#ifndef __DLOCK_H__
-#define __DLOCK_H__
+#ifndef DLOCK_H_
+#define DLOCK_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,4 +82,4 @@ int dlock_exit(void);
 }
 #endif
 
-#endif /* __DLOCK_H__ */
+#endif /* DLOCK_H_ */

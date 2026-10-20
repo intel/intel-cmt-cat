@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __MONITOR_UTILS_H__
-#define __MONITOR_UTILS_H__
+#ifndef MONITOR_UTILS_H_
+#define MONITOR_UTILS_H_
 
 #include "pqos.h"
 
@@ -135,4 +135,4 @@ int monitor_utils_get_pid_stat(const char *proc_pid_dir_name,
  */
 char *trim(char *str);
 
-#endif /* __MONITOR_UTILS_H__ */
+#endif /* MONITOR_UTILS_H_ */

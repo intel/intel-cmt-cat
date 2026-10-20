@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_DUMP_H
-#define __TEST_DUMP_H
+#ifndef TEST_DUMP_H_
+#define TEST_DUMP_H_
 
 #include <stddef.h>
 
@@ -41,4 +41,4 @@
 void *__real_malloc(size_t size);
 void *__wrap_malloc(size_t size);
 
-#endif /* __TEST_DUMP_H */
+#endif /* TEST_DUMP_H_ */

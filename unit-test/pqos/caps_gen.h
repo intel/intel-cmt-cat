@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __CAPS_GEN_H__
-#define __CAPS_GEN_H__
+#ifndef CAPS_GEN_H_
+#define CAPS_GEN_H_
 
 #include "pqos.h"
 
@@ -322,4 +322,4 @@ init_caps(void **state, unsigned data_to_generate)
         return ret;
 }
 
-#endif /* __CAPS_GEN_H__ */
+#endif /* CAPS_GEN_H_ */

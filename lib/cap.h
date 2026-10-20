@@ -35,8 +35,8 @@
  * and library initialization status.
  */
 
-#ifndef __PQOS_HOSTCAP_H__
-#define __PQOS_HOSTCAP_H__
+#ifndef PQOS_HOSTCAP_H_
+#define PQOS_HOSTCAP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -209,4 +209,4 @@ PQOS_LOCAL int cap_get_l2ca_non_contignous(void);
 }
 #endif
 
-#endif /* __PQOS_HOSTCAP_H__ */
+#endif /* PQOS_HOSTCAP_H_ */

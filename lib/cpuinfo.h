@@ -35,8 +35,8 @@
  * @brief CPU sockets and cores enumeration module.
  */
 
-#ifndef __PQOS_CPUINFO_H__
-#define __PQOS_CPUINFO_H__
+#ifndef PQOS_CPUINFO_H_
+#define PQOS_CPUINFO_H_
 
 #include "pqos.h"
 #include "types.h"
@@ -167,4 +167,4 @@ uint32_t cpuinfo_get_cpu_family(void);
 }
 #endif
 
-#endif /* __PQOS_CPUINFO_H__ */
+#endif /* PQOS_CPUINFO_H_ */

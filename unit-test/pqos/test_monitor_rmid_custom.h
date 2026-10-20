@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_MONITOR_RMID_CUSTOM_H
-#define __TEST_MONITOR_RMID_CUSTOM_H
+#ifndef TEST_MONITOR_RMID_CUSTOM_H_
+#define TEST_MONITOR_RMID_CUSTOM_H_
 
 #include "pqos_internal.h"
 
@@ -57,4 +57,4 @@ char *__real_strdup(const char *s);
 void __wrap_free(void *ptr);
 void __real_free(void *ptr);
 
-#endif /* __TEST_MONITOR_RMID_CUSTOM_H */
+#endif /* TEST_MONITOR_RMID_CUSTOM_H_ */

@@ -34,8 +34,8 @@
 /**
  * @brief Internal header file to PQoS HW monitoring module
  */
-#ifndef __PQOS_HW_MON_H__
-#define __PQOS_HW_MON_H__
+#ifndef PQOS_HW_MON_H_
+#define PQOS_HW_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -314,4 +314,4 @@ PQOS_LOCAL int hw_mon_poll(struct pqos_mon_data *group,
 }
 #endif
 
-#endif /* __PQOS_HW_MON_H__ */
+#endif /* PQOS_HW_MON_H_ */

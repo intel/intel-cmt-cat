@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MOCK_UNCORE_MONITORING_H__
-#define __MOCK_UNCORE_MONITORING_H__
+#ifndef MOCK_UNCORE_MONITORING_H_
+#define MOCK_UNCORE_MONITORING_H_
 
 #include "uncore_monitoring.h"
 
@@ -46,4 +46,4 @@ int __wrap_uncore_mon_poll(struct pqos_mon_data *group,
                            const enum pqos_mon_event event);
 int __wrap_uncore_mon_is_event_supported(const enum pqos_mon_event event);
 
-#endif /* __MOCK_UNCORE_MONITORING_H__ */
+#endif /* MOCK_UNCORE_MONITORING_H_ */

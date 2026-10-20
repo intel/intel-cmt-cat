@@ -30,12 +30,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_PCI_H
-#define __TEST_PCI_H
+#ifndef TEST_PCI_H_
+#define TEST_PCI_H_
 
 #include <sys/stat.h>
 
 int __wrap_lstat(const char *path, struct stat *st);
 int __real_lstat(const char *path, struct stat *st);
 
-#endif /* __TEST_PCI_H */
+#endif /* TEST_PCI_H_ */

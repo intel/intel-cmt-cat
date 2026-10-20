@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_ALLOC_H
-#define __TEST_ALLOC_H
+#ifndef TEST_ALLOC_H_
+#define TEST_ALLOC_H_
 
 /* The string copy test_alloc.c makes fail on demand, through --wrap. Every
  * strdup() call in the binary goes through the wrap, the cases' own copies
@@ -45,4 +45,4 @@
 char *__real_strdup(const char *s);
 char *__wrap_strdup(const char *s);
 
-#endif /* __TEST_ALLOC_H */
+#endif /* TEST_ALLOC_H_ */

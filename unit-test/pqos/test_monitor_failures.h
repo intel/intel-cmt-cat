@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_MONITOR_FAILURES_H
-#define __TEST_MONITOR_FAILURES_H
+#ifndef TEST_MONITOR_FAILURES_H_
+#define TEST_MONITOR_FAILURES_H_
 
 #include "pqos.h"
 
@@ -76,4 +76,4 @@ ssize_t __real_read(int fd, void *buf, size_t count);
 ssize_t __wrap_read(int fd, void *buf, size_t count);
 #endif
 
-#endif /* __TEST_MONITOR_FAILURES_H */
+#endif /* TEST_MONITOR_FAILURES_H_ */

@@ -39,8 +39,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifndef __PROFILES_H__
-#define __PROFILES_H__
+#ifndef PROFILES_H_
+#define PROFILES_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,4 +69,4 @@ int profile_l3ca_apply(const char *name,
 }
 #endif
 
-#endif /* __PROFILES_H__ */
+#endif /* PROFILES_H_ */

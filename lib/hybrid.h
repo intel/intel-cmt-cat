@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PQOS_HYBRID_H__
-#define __PQOS_HYBRID_H__
+#ifndef PQOS_HYBRID_H_
+#define PQOS_HYBRID_H_
 
 #include "pqos.h"
 #include "types.h"
@@ -110,4 +110,4 @@ hybrid_cap_rp_supported(const struct pqos_hybrid_capabilities *cap);
 PQOS_LOCAL int hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                                    const struct pqos_cpuinfo *cpu);
 
-#endif /* __PQOS_HYBRID_H__ */
+#endif /* PQOS_HYBRID_H_ */

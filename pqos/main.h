@@ -34,8 +34,8 @@
  * @brief Platform QoS utility - main module
  */
 
-#ifndef __MAIN_H__
-#define __MAIN_H__
+#ifndef MAIN_H_
+#define MAIN_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -150,4 +150,4 @@ void selfn_strdup(char **sel, const char *arg);
 }
 #endif
 
-#endif /* __MAIN_H__ */
+#endif /* MAIN_H_ */

@@ -35,8 +35,8 @@
  * @brief Internal header file for resctrl allocation
  */
 
-#ifndef __PQOS_RESCTRL_ALLOC_H__
-#define __PQOS_RESCTRL_ALLOC_H__
+#ifndef PQOS_RESCTRL_ALLOC_H_
+#define PQOS_RESCTRL_ALLOC_H_
 
 #include "pqos.h"
 #include "resctrl.h"
@@ -299,4 +299,4 @@ PQOS_LOCAL int resctrl_alloc_get_unused_group(const unsigned grps_num,
 }
 #endif
 
-#endif /* __PQOS_RESCTRL_ALLOC_H__ */
+#endif /* PQOS_RESCTRL_ALLOC_H_ */

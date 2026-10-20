@@ -35,8 +35,8 @@
  * @brief Internal header file for IORDT module
  */
 
-#ifndef __PQOS_IORDT_H__
-#define __PQOS_IORDT_H__
+#ifndef PQOS_IORDT_H_
+#define PQOS_IORDT_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -162,4 +162,4 @@ PQOS_LOCAL int iordt_assoc_reset(const struct pqos_devinfo *dev);
 }
 #endif
 
-#endif /* __PQOS_IORDT_H__ */
+#endif /* PQOS_IORDT_H_ */

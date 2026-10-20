@@ -32,8 +32,8 @@
 
 #include <stdint.h>
 
-#ifndef __TSC_H__
-#define __TSC_H__
+#ifndef TSC_H_
+#define TSC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,4 +219,4 @@ void tsc_print(struct tsc_prof *p);
 }
 #endif
 
-#endif /* __TSC_H__ */
+#endif /* TSC_H_ */

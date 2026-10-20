@@ -35,8 +35,8 @@
  * @brief Internal defines and data structure definition
  */
 
-#ifndef __CPU_REGISTERS_H__
-#define __CPU_REGISTERS_H__
+#ifndef CPU_REGISTERS_H_
+#define CPU_REGISTERS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -189,4 +189,4 @@ extern "C" {
 }
 #endif
 
-#endif /* __CPU_REGISTERS_H__ */
+#endif /* CPU_REGISTERS_H_ */

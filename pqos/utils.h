@@ -39,8 +39,8 @@
  * brought with it; utils.c says what they are.
  */
 
-#ifndef __PQOS_APP_UTILS_H__
-#define __PQOS_APP_UTILS_H__
+#ifndef PQOS_APP_UTILS_H_
+#define PQOS_APP_UTILS_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -273,4 +273,4 @@ unsigned selfn_domain_id_list(const char *arg, uint64_t *tab, unsigned max);
 }
 #endif
 
-#endif /* __PQOS_APP_UTILS_H__ */
+#endif /* PQOS_APP_UTILS_H_ */

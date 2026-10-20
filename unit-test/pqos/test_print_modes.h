@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_PRINT_MODES_H
-#define __TEST_PRINT_MODES_H
+#ifndef TEST_PRINT_MODES_H_
+#define TEST_PRINT_MODES_H_
 
 #include "pqos.h"
 
@@ -54,4 +54,4 @@ int __wrap_pqos_fini(void);
 int __wrap_pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap);
 void __wrap_pqos_hybrid_free(struct pqos_hybrid_capabilities *cap);
 
-#endif /* __TEST_PRINT_MODES_H */
+#endif /* TEST_PRINT_MODES_H_ */

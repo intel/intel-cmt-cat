@@ -35,8 +35,8 @@
  * and library initialization status.
  */
 
-#ifndef __PQOS_LOCK_H__
-#define __PQOS_LOCK_H__
+#ifndef PQOS_LOCK_H_
+#define PQOS_LOCK_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,4 +92,4 @@ PQOS_LOCAL void lock_release(void);
 }
 #endif
 
-#endif /* __PQOS_LOCK_H__ */
+#endif /* PQOS_LOCK_H_ */

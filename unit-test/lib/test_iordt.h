@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_IORDT_H
-#define __TEST_IORDT_H
+#ifndef TEST_IORDT_H_
+#define TEST_IORDT_H_
 
 #include <aio.h>
 #include <stddef.h>
@@ -42,4 +42,4 @@ struct acpi_table *__wrap_acpi_get_sig(const char *sig);
 void __wrap_acpi_print(struct acpi_table *table);
 void __wrap_acpi_free(struct acpi_table *table);
 
-#endif /* __TEST_IORDT_H */
+#endif /* TEST_IORDT_H_ */

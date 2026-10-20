@@ -34,8 +34,8 @@
  * Dump module
  */
 
-#ifndef __DUMP_RMID_H__
-#define __DUMP_RMID_H__
+#ifndef DUMP_RMID_H_
+#define DUMP_RMID_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -108,4 +108,4 @@ int dump_rmid_regs(const struct pqos_sysconfig *sys);
 }
 #endif
 
-#endif /* __DUMP_RMID_H__ */
+#endif /* DUMP_RMID_H_ */

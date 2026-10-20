@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __MONITOR_CSV_H__
-#define __MONITOR_CSV_H__
+#ifndef MONITOR_CSV_H_
+#define MONITOR_CSV_H_
 
 #include "pqos.h"
 
@@ -105,4 +105,4 @@ void monitor_csv_footer(FILE *fp);
  */
 void monitor_csv_end(FILE *fp);
 
-#endif /* #define __MONITOR_CSV_H__ */
+#endif /* MONITOR_CSV_H_ */

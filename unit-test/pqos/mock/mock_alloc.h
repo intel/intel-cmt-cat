@@ -29,9 +29,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __MOCK_ALLOC_H__
-#define __MOCK_ALLOC_H__
+#ifndef MOCK_ALLOC_H_
+#define MOCK_ALLOC_H_
 
 int __wrap_selfn_allocation_class_checked(const char *arg);
 
-#endif /* __MOCK_ALLOC_H__ */
+#endif /* MOCK_ALLOC_H_ */

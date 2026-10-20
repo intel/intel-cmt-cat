@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MOCK_API_H__
-#define __MOCK_API_H__
+#ifndef MOCK_API_H_
+#define MOCK_API_H_
 
 #include "pqos.h"
 
@@ -115,4 +115,4 @@ unsigned *__wrap_pqos_pid_get_pid_assoc(const unsigned class_id,
                                         unsigned *count);
 int __wrap_pqos_inter_get(enum pqos_interface *interface);
 
-#endif /* __MOCK_CAP_H__ */
+#endif /* MOCK_API_H_ */

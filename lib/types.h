@@ -35,8 +35,8 @@
  * @brief Miscellaneous data type definitions and macro definitions
  */
 
-#ifndef __PQOS_TYPES_H__
-#define __PQOS_TYPES_H__
+#ifndef PQOS_TYPES_H_
+#define PQOS_TYPES_H_
 
 #ifdef DEBUG
 #include <assert.h>
@@ -78,4 +78,4 @@ extern "C" {
 #define PQOS_STATIC static
 #endif
 
-#endif /* __PQOS_TYPES_H__ */
+#endif /* PQOS_TYPES_H_ */

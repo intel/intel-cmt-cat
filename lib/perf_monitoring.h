@@ -35,8 +35,8 @@
  * @brief Internal header file for perf monitoring functions
  */
 
-#ifndef __PQOS_PERF_MON_H__
-#define __PQOS_PERF_MON_H__
+#ifndef PQOS_PERF_MON_H_
+#define PQOS_PERF_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,4 +134,4 @@ PQOS_LOCAL int perf_mon_is_event_supported(const enum pqos_mon_event event);
 }
 #endif
 
-#endif /* __PQOS_PERF_MON_H__ */
+#endif /* PQOS_PERF_MON_H_ */

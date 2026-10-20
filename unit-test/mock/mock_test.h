@@ -30,12 +30,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MOCK_TEST_H__
-#define __MOCK_TEST_H__
+#ifndef MOCK_TEST_H_
+#define MOCK_TEST_H_
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
-#endif /* __MOCK_TEST_H__ */
+#endif /* MOCK_TEST_H_ */

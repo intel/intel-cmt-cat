@@ -69,8 +69,8 @@
  * numbers scaled by the wrong rule.
  */
 
-#ifndef __PQOS_MEM_REGIONS_H__
-#define __PQOS_MEM_REGIONS_H__
+#ifndef PQOS_MEM_REGIONS_H_
+#define PQOS_MEM_REGIONS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -345,4 +345,4 @@ PQOS_LOCAL int mem_regions_fini(void);
 }
 #endif
 
-#endif /* __PQOS_MEM_REGIONS_H__ */
+#endif /* PQOS_MEM_REGIONS_H_ */

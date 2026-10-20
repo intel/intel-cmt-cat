@@ -160,12 +160,19 @@ Header File Guards
 
 Headers should be protected against multiple inclusion with the usual:
 
-#ifndef _FILE_H_
-#define _FILE_H_
+#ifndef FILE_H_
+#define FILE_H_
 
 /* Code */
 
-#endif /* _FILE_H_ */
+#endif /* FILE_H_ */
+
+A guard has no leading underscore and no two underscores together: C
+reserves for the implementation every name that begins with two underscores,
+or with an underscore and a capital letter (C11 7.1.3), and C++ every name
+that has two underscores together anywhere in it ([lex.name]). Nor does it
+share its name with another header's, which would leave that header out of
+a file that includes both.
 
 
 Macros

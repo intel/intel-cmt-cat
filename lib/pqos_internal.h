@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PQOS_INTERNAL_H__
-#define __PQOS_INTERNAL_H__
+#ifndef PQOS_INTERNAL_H_
+#define PQOS_INTERNAL_H_
 
 #include "pqos.h"
 
@@ -111,4 +111,4 @@ pqos_mon_start_channels_ext(const unsigned num_channels,
                             struct pqos_mon_data **group,
                             const struct pqos_mon_options *opt);
 
-#endif /* __PQOS_INTERNAL_H__ */
+#endif /* PQOS_INTERNAL_H_ */

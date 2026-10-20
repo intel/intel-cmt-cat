@@ -29,8 +29,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __OUTPUT_H__
-#define __OUTPUT_H__
+#ifndef OUTPUT_H_
+#define OUTPUT_H_
 #include <setjmp.h>
 #include <stdio.h>
 
@@ -67,4 +67,4 @@ int __wrap_printf(const char *format_string, ...);
 int __wrap_fprintf(FILE *stream, const char *format_string, ...);
 int __wrap_puts(const char *__s);
 int __wrap_putchar(int __c);
-#endif /* __OUTPUT_H__ */
+#endif /* OUTPUT_H_ */

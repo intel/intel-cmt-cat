@@ -35,8 +35,8 @@
  * @brief Internal header file for resctrl minitoring functions
  */
 
-#ifndef __PQOS_RESCTRL_MON_H__
-#define __PQOS_RESCTRL_MON_H__
+#ifndef PQOS_RESCTRL_MON_H_
+#define PQOS_RESCTRL_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,4 +219,4 @@ PQOS_LOCAL int resctrl_mon_collect_pkgids(struct pqos_mon_data *group);
 }
 #endif
 
-#endif /* __PQOS_RESCTRL_H__ */
+#endif /* PQOS_RESCTRL_MON_H_ */

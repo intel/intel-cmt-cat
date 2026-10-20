@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PQOS_HW_CAP_H__
-#define __PQOS_HW_CAP_H__
+#ifndef PQOS_HW_CAP_H_
+#define PQOS_HW_CAP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -188,4 +188,4 @@ PQOS_LOCAL int amd_cap_smba_discover(struct pqos_cap_mba *cap,
 }
 #endif
 
-#endif /* __PQOS_HW_CAP_H__ */
+#endif /* PQOS_HW_CAP_H_ */

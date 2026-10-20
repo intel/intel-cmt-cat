@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PQOS_PERF_H__
-#define __PQOS_PERF_H__
+#ifndef PQOS_PERF_H_
+#define PQOS_PERF_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -109,4 +109,4 @@ PQOS_LOCAL int perf_read_counter(int counter_fd, uint64_t *value);
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif /* PQOS_PERF_H_ */

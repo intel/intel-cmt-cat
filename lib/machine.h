@@ -35,8 +35,8 @@
  * @brief Provides access to machine operations (CPUID, MSR read & write)
  */
 
-#ifndef __PQOS_MACHINE_H__
-#define __PQOS_MACHINE_H__
+#ifndef PQOS_MACHINE_H_
+#define PQOS_MACHINE_H_
 
 #include "types.h"
 
@@ -127,4 +127,4 @@ msr_write(const unsigned lcore, const uint32_t reg, const uint64_t value);
 }
 #endif
 
-#endif /* __PQOS_MACHINE_H__ */
+#endif /* PQOS_MACHINE_H_ */

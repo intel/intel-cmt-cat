@@ -35,8 +35,8 @@
  * @brief Internal header file for resctrl utility functions
  */
 
-#ifndef __PQOS_RESCTRL_UTILS_H__
-#define __PQOS_RESCTRL_UTILS_H__
+#ifndef PQOS_RESCTRL_UTILS_H_
+#define PQOS_RESCTRL_UTILS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,4 +65,4 @@ resctrl_utils_strtouint64(const char *s, int base, uint64_t *value);
 }
 #endif
 
-#endif /* __PQOS_RESCTRL_UTILS_H__ */
+#endif /* PQOS_RESCTRL_UTILS_H_ */

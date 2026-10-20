@@ -34,8 +34,8 @@
  * Dump module
  */
 
-#ifndef __DUMP_H__
-#define __DUMP_H__
+#ifndef DUMP_H_
+#define DUMP_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -129,4 +129,4 @@ int dump_mmio_regs(const struct pqos_sysconfig *sys);
 }
 #endif
 
-#endif /* __DUMP_H__ */
+#endif /* DUMP_H_ */

@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS MBA allocation initialization
  */
 
-#ifndef __PQOS_MMIO_ALLOC_H__
-#define __PQOS_MMIO_ALLOC_H__
+#ifndef PQOS_MMIO_ALLOC_H_
+#define PQOS_MMIO_ALLOC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -163,4 +163,4 @@ PQOS_LOCAL int mmio_alloc_reset(const struct pqos_alloc_config *cfg);
 }
 #endif
 
-#endif /* __PQOS_MMIO_ALLOC_H__ */
+#endif /* PQOS_MMIO_ALLOC_H_ */

@@ -35,8 +35,8 @@
  * @brief Platform QoS operations logger for info, warnings and errors.
  */
 
-#ifndef __PQOS_LOG_H__
-#define __PQOS_LOG_H__
+#ifndef PQOS_LOG_H_
+#define PQOS_LOG_H_
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -300,4 +300,4 @@ PQOS_LOCAL int log_is_initialized(void);
 }
 #endif
 
-#endif /* __PQOS_LOG_H__ */
+#endif /* PQOS_LOG_H_ */

@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_CAP_H
-#define __TEST_CAP_H
+#ifndef TEST_APP_CAP_H_
+#define TEST_APP_CAP_H_
 
 #include "pqos.h"
 
@@ -44,4 +44,4 @@ int __wrap_pqos_io_devs_get(struct pqos_pci_info *pci_info,
                             uint16_t segment,
                             uint16_t bdf);
 
-#endif /* __TEST_CAP_H */
+#endif /* TEST_APP_CAP_H_ */

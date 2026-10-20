@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS OS allocation module
  */
 
-#ifndef __PQOS_OS_ALLOC_H__
-#define __PQOS_OS_ALLOC_H__
+#ifndef PQOS_OS_ALLOC_H_
+#define PQOS_OS_ALLOC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -460,4 +460,4 @@ PQOS_LOCAL int os_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
 }
 #endif
 
-#endif /* __PQOS_OS_ALLOC_H__ */
+#endif /* PQOS_OS_ALLOC_H_ */

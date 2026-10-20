@@ -35,8 +35,8 @@
  * @brief Internal header for the CXL devices the operating system enumerates
  */
 
-#ifndef __PQOS_CXL_H__
-#define __PQOS_CXL_H__
+#ifndef PQOS_CXL_H_
+#define PQOS_CXL_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,4 +116,4 @@ PQOS_LOCAL void cxl_devices_free(struct pqos_cxl_device *devices);
 }
 #endif
 
-#endif /* __PQOS_CXL_H__ */
+#endif /* PQOS_CXL_H_ */

@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_MAIN_MONITORING_H
-#define __TEST_MAIN_MONITORING_H
+#ifndef TEST_MAIN_MONITORING_H_
+#define TEST_MAIN_MONITORING_H_
 
 #include "pqos.h"
 
@@ -66,4 +66,4 @@ int __wrap_monitor_setup(const struct pqos_cpuinfo *cpu_info,
 int __wrap_monitor_loop(void);
 void __wrap_monitor_stop(void);
 
-#endif /* __TEST_MAIN_MONITORING_H */
+#endif /* TEST_MAIN_MONITORING_H_ */

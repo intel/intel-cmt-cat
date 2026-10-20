@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS allocation initialization
  */
 
-#ifndef __PQOS_ALLOC_H__
-#define __PQOS_ALLOC_H__
+#ifndef PQOS_ALLOC_H_
+#define PQOS_ALLOC_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -600,4 +600,4 @@ PQOS_LOCAL int hw_smba_set_amd(const unsigned smba_id,
 }
 #endif
 
-#endif /* __PQOS_ALLOC_H__ */
+#endif /* PQOS_ALLOC_H_ */

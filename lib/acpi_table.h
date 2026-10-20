@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PQOS_ACPI_TABLE_H__
-#define __PQOS_ACPI_TABLE_H__
+#ifndef PQOS_ACPI_TABLE_H_
+#define PQOS_ACPI_TABLE_H_
 
 #include <stdint.h>
 
@@ -316,4 +316,4 @@ struct __attribute__((__packed__)) acpi_table_irdt {
         struct acpi_table_irdt_rmud rmud[0];
 };
 
-#endif /* __PQOS_ACPI_TABLE_H__ */
+#endif /* PQOS_ACPI_TABLE_H_ */

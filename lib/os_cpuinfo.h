@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PQOS_OS_CPUINFO_H__
-#define __PQOS_OS_CPUINFO_H__
+#ifndef PQOS_OS_CPUINFO_H_
+#define PQOS_OS_CPUINFO_H_
 
 #include "pqos.h"
 #include "types.h"
@@ -71,4 +71,4 @@ PQOS_LOCAL int os_cpuinfo_get_socket_num(void);
 }
 #endif
 
-#endif /* __PQOS_OS_CPUINFO_H__ */
+#endif /* PQOS_OS_CPUINFO_H_ */

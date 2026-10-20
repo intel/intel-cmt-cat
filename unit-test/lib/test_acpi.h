@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_ACPI_H
-#define __TEST_ACPI_H
+#ifndef TEST_ACPI_H_
+#define TEST_ACPI_H_
 
 #include <aio.h>
 #include <stddef.h>
@@ -40,4 +40,4 @@ int __wrap_munmap(void *addr, size_t length);
 void __wrap_free(void *ptr);
 void __real_free(void *ptr);
 
-#endif /* __TEST_ACPI_H */
+#endif /* TEST_ACPI_H_ */

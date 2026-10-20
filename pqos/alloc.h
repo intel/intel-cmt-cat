@@ -34,8 +34,8 @@
  * Allocation module
  */
 
-#ifndef __ALLOCATION_H__
-#define __ALLOCATION_H__
+#ifndef ALLOCATION_H_
+#define ALLOCATION_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -225,4 +225,4 @@ const char *alloc_requested_option(void);
 }
 #endif
 
-#endif /* __ALLOCATION_H__ */
+#endif /* ALLOCATION_H_ */

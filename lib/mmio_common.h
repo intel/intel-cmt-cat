@@ -35,8 +35,8 @@
  * @brief Internal header file for MBM/MBA region aware init/shutdown
  */
 
-#ifndef __PQOS_MMIO_COMMON_H__
-#define __PQOS_MMIO_COMMON_H__
+#ifndef PQOS_MMIO_COMMON_H_
+#define PQOS_MMIO_COMMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -149,4 +149,4 @@ int mmio_get_num_mem_regions(unsigned *num_mem_regions);
 }
 #endif
 
-#endif /* __PQOS_MMIO_COMMON_H__ */
+#endif /* PQOS_MMIO_COMMON_H_ */

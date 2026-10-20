@@ -35,8 +35,8 @@
  * @brief Internal header file for common functions
  */
 
-#ifndef __PQOS_COMMON_H__
-#define __PQOS_COMMON_H__
+#ifndef PQOS_COMMON_H_
+#define PQOS_COMMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -190,4 +190,4 @@ PQOS_LOCAL int pqos_set_no_files_limit(unsigned long max_core_count);
 }
 #endif
 
-#endif /* __PQOS_COMMON_H__ */
+#endif /* PQOS_COMMON_H_ */

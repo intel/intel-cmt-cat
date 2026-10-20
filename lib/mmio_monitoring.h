@@ -34,8 +34,8 @@
 /**
  * @brief Internal header file to PQoS MMIO monitoring module
  */
-#ifndef __PQOS_MMIO_MON_H__
-#define __PQOS_MMIO_MON_H__
+#ifndef PQOS_MMIO_MON_H_
+#define PQOS_MMIO_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -285,4 +285,4 @@ PQOS_LOCAL int mmio_mon_poll(struct pqos_mon_data *group,
 }
 #endif
 
-#endif /* __PQOS_MMIO_MON_H__ */
+#endif /* PQOS_MMIO_MON_H_ */

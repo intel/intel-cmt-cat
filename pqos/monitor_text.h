@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __MONITOR_TEXT_H__
-#define __MONITOR_TEXT_H__
+#ifndef MONITOR_TEXT_H_
+#define MONITOR_TEXT_H_
 
 #include "pqos.h"
 
@@ -105,4 +105,4 @@ void monitor_text_footer(FILE *fp);
  */
 void monitor_text_end(FILE *fp);
 
-#endif /* #define __MONITOR_TEXT_H__ */
+#endif /* MONITOR_TEXT_H_ */

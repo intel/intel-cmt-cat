@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PQOS_OS_COMMON_H__
-#define __PQOS_OS_COMMON_H__
+#ifndef PQOS_OS_COMMON_H_
+#define PQOS_OS_COMMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,4 +45,4 @@ extern "C" {
 }
 #endif
 
-#endif /* __PQOS_OS_COMMON_H__ */
+#endif /* PQOS_OS_COMMON_H_ */

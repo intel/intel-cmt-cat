@@ -35,8 +35,8 @@
  * @brief Internal header file for uncore monitoring functions
  */
 
-#ifndef __PQOS_UNCORE_MON_H__
-#define __PQOS_UNCORE_MON_H__
+#ifndef PQOS_UNCORE_MON_H_
+#define PQOS_UNCORE_MON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -129,4 +129,4 @@ PQOS_LOCAL int uncore_mon_is_event_supported(const enum pqos_mon_event event);
 }
 #endif
 
-#endif /* __PQOS_UNCORE_MON_H__ */
+#endif /* PQOS_UNCORE_MON_H_ */

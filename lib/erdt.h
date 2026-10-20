@@ -35,8 +35,8 @@
  * @brief Internal header file for ERDT module
  */
 
-#ifndef __PQOS_ERDT_H__
-#define __PQOS_ERDT_H__
+#ifndef PQOS_ERDT_H_
+#define PQOS_ERDT_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -369,4 +369,4 @@ PQOS_LOCAL void erdt_fini(void);
 }
 #endif
 
-#endif /* __PQOS_ERDT_H__ */
+#endif /* PQOS_ERDT_H_ */

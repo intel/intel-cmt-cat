@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS utils initialization
  */
 
-#ifndef __PQOS_UTILS_H__
-#define __PQOS_UTILS_H__
+#ifndef PQOS_UTILS_H_
+#define PQOS_UTILS_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -147,4 +147,4 @@ PQOS_LOCAL int pqos_devinfo_get_domain_id(const struct pqos_devinfo *devinfo,
 }
 #endif
 
-#endif /* __PQOS_UTULS_H__ */
+#endif /* PQOS_UTILS_H_ */

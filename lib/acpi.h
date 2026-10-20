@@ -35,8 +35,8 @@
  * @brief Internal header file for ACPI initialization
  */
 
-#ifndef __PQOS_ACPI_H__
-#define __PQOS_ACPI_H__
+#ifndef PQOS_ACPI_H_
+#define PQOS_ACPI_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -218,4 +218,4 @@ PQOS_LOCAL void acpi_print(struct acpi_table *table);
 }
 #endif
 
-#endif /* __PQOS_ACPI_H__ */
+#endif /* PQOS_ACPI_H_ */
