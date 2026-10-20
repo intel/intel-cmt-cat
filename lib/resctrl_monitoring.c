@@ -306,7 +306,7 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
  *
  * @param [in] class_id CLOS id
  * @param [in] resctrl_group mon group name
- * @param [in] file file name inside group
+ * @param [in] file file name inside group, or NULL for the group itself
  * @param [out] buf Buffer to store path
  * @param [in] buf_size buffer size
  *
@@ -1192,7 +1192,14 @@ struct resctrl_core_group {
 };
 
 /**
- * @brief Parse resctrl core monitoring groups
+ * @brief Parse resctrl monitoring groups of the library
+ *
+ * Lists the groups with the L3 IDs of the cores assigned to them. Whether a
+ * group has tasks is left to resctrl_mon_tasks_assigned(), asked only of a
+ * group that could take the cores otherwise: the kernel lists a group's tasks
+ * by going through every task in the system, and a parse that read the tasks
+ * of each group made a start take time with the groups and the tasks there
+ * are, so that starting a group per core grew as their square
  *
  * @param [out] cgrp Parser monitoring groups
  * @param [out] cgrp_num Number of groups
@@ -1257,11 +1264,9 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                 }
 
                 for (i = 0; i < num_groups; i++) {
-                        char path[256];
                         const char *grp_name = namelist[i]->d_name;
                         struct resctrl_core_group *grp = NULL;
                         unsigned j;
-                        int retval;
 
                         /* group not managed by pqos library */
                         if (strncmp(grp_name, GROUP_NAME_PREFIX, 5) != 0)
@@ -1287,20 +1292,6 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                         }
                         if (!grp->valid)
                                 continue;
-
-                        /* Some tasks are assigned to group? */
-                        ret = resctrl_mon_group_path(clos, grp->name, "/tasks",
-                                                     path, sizeof(path));
-                        if (ret != PQOS_RETVAL_OK)
-                                break;
-                        retval = resctrl_mon_file_empty(path);
-                        if (retval < 0) {
-                                ret = PQOS_RETVAL_ERROR;
-                                break;
-                        } else if (!retval) {
-                                grp->valid = 0;
-                                continue;
-                        }
 
                         /* Cores assigned to group */
                         ret =
@@ -1409,6 +1400,59 @@ resctrl_mon_dirs_present(const char *name,
 }
 
 /**
+ * @brief Check if tasks are assigned to a monitoring group in any class
+ *
+ * Class 0 is looked in whatever max_clos is. Where there is no allocation
+ * feature, max_clos is 0, and the default group, class 0, still holds the
+ * monitoring groups, which resctrl_mon_parse() lists from it.
+ *
+ * @param [in] name mon group name
+ * @param [in] max_clos number of classes, 0 where there is no allocation
+ *                      feature
+ * @param [out] assigned 1 when the group's directory in some class lists a
+ *                       task
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_tasks_assigned(const char *name,
+                           const unsigned max_clos,
+                           int *assigned)
+{
+        unsigned clos = 0;
+
+        *assigned = 0;
+
+        do {
+                char path[256];
+                int empty;
+                int ret;
+
+                ret = resctrl_mon_group_path(clos, name, NULL, path,
+                                             sizeof(path));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                if (!pqos_dir_exists(path))
+                        continue;
+
+                ret = resctrl_mon_group_path(clos, name, "/tasks", path,
+                                             sizeof(path));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                empty = resctrl_mon_file_empty(path);
+                if (empty < 0)
+                        return PQOS_RETVAL_ERROR;
+                if (!empty) {
+                        *assigned = 1;
+                        break;
+                }
+        } while (++clos < max_clos);
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Assigns resctrl monitoring group
  *
  * @param group monitoring structure
@@ -1466,12 +1510,21 @@ resctrl_mon_assign(struct pqos_mon_data *group)
                         struct resctrl_core_group *grp = &cgrp[i];
                         uint64_t llc = 0;
                         unsigned l3id;
+                        int tasks;
 
                         if (!grp->valid)
                                 continue;
 
                         /* L3Ids overlap */
                         if ((l3ids & grp->l3ids) != 0)
+                                continue;
+
+                        /* a group that monitors tasks is not given cores */
+                        ret = resctrl_mon_tasks_assigned(grp->name, max_clos,
+                                                         &tasks);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto mon_assign_exit;
+                        if (tasks)
                                 continue;
 
                         /* check if llc doesn't exceed occupancy threshold */

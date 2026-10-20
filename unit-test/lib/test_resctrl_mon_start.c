@@ -107,6 +107,22 @@ resctrl_mon_rmdir(const unsigned class_id, const char *name)
         return __wrap_resctrl_mon_rmdir(class_id, name);
 }
 
+/* the groups the mon_groups of CLOS 0 and of COS1 list, each up to a NULL;
+ * none for a class whose list is NULL. A case that sets one has
+ * mon_groups_unlist() for its teardown, which cmocka runs after a failed
+ * case too, so that no case after it is given its list, nor reads one left
+ * in its stack frame
+ */
+static const char *const *mon_groups_listed[2];
+
+static int
+mon_groups_unlist(void **state __attribute__((unused)))
+{
+        memset(mon_groups_listed, 0, sizeof(mon_groups_listed));
+
+        return 0;
+}
+
 int
 __wrap_scandir(const char *restrict dirp,
                struct dirent ***restrict namelist,
@@ -114,17 +130,42 @@ __wrap_scandir(const char *restrict dirp,
                int (*compar)(const struct dirent **, const struct dirent **)
                    __attribute__((unused)))
 {
-        int ret = -1;
+        const char *const *listed;
+        int num = 0;
+        int i;
 
         *namelist = NULL;
 
         if (strcmp(dirp, RESCTRL_PATH "/mon_groups") == 0 ||
             strcmp(dirp, RESCTRL_PATH "/mon_groups/") == 0)
+                listed = mon_groups_listed[0];
+        else if (strcmp(dirp, RESCTRL_PATH "/COS1/mon_groups") == 0 ||
+                 strcmp(dirp, RESCTRL_PATH "/COS1/mon_groups/") == 0)
+                listed = mon_groups_listed[1];
+        else {
+                assert_string_equal(dirp, "scandir");
+                return -1;
+        }
+
+        while (listed != NULL && listed[num] != NULL)
+                num++;
+        if (num == 0)
                 return 0;
 
-        assert_string_equal(dirp, "scandir");
+        *namelist = calloc(num, sizeof(**namelist));
+        assert_non_null(*namelist);
+        for (i = 0; i < num; i++) {
+                const size_t len = strlen(listed[i]);
 
-        return ret;
+                /* room for the name past the structure too, whatever length
+                 * the C library declares d_name with
+                 */
+                (*namelist)[i] = calloc(1, sizeof(struct dirent) + len + 1);
+                assert_non_null((*namelist)[i]);
+                memcpy((*namelist)[i]->d_name, listed[i], len + 1);
+        }
+
+        return num;
 }
 
 FILE *
@@ -132,14 +173,42 @@ __wrap_pqos_fopen(const char *name, const char *mode)
 {
         unsigned i;
 
+        /* a file the library closes with fclose() has plain_close set, so
+         * that no pqos_fclose() is expected for it
+         */
         const struct {
                 const char path[256];
                 const char mode[5];
                 const char text[256];
+                int plain_close;
         } file[] = {
             {.path = RESCTRL_PATH_INFO_L3_MON "/max_threshold_occupancy",
              .mode = "r",
              .text = "16000"},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-other/tasks",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-busy/tasks",
+             .mode = "r",
+             .text = "1234\n",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-busy/tasks",
+             .mode = "r",
+             .text = "1234\n",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-split/tasks",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-split/tasks",
+             .mode = "r",
+             .text = "1234\n",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH
+             "/mon_groups/pqos-other/mon_data/mon_L3_00/llc_occupancy",
+             .mode = "r",
+             .text = "100\n"},
         };
 
         for (i = 0; i < DIM(file); i++) {
@@ -153,7 +222,8 @@ __wrap_pqos_fopen(const char *name, const char *mode)
                                 fprintf(fd, "%s", file[i].text);
 
                         fseek(fd, 0, SEEK_SET);
-                        expect_function_call(__wrap_pqos_fclose);
+                        if (!file[i].plain_close)
+                                expect_function_call(__wrap_pqos_fclose);
                         return fd;
                 }
         }
@@ -244,6 +314,253 @@ test_resctrl_mon_start_core(void **state)
 
         ret = resctrl_mon_stop(&group);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* the cores of a group's directory in a class, as the parse reads them: lcore
+ * alone
+ */
+static void
+expect_group_cores(const struct pqos_cpuinfo *cpu,
+                   const unsigned class_id,
+                   const char *name,
+                   const unsigned lcore)
+{
+        unsigned i;
+
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, class_id);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, name);
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < cpu->num_cores; i++) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get,
+                            cpu->cores[i].lcore == lcore);
+        }
+}
+
+static void
+test_resctrl_mon_start_core_shares_group_of_other_l3(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        /* core 2 is on L3 0, core 1 too, and core 5 on L3 1 */
+        unsigned cores[] = {2};
+        const char *const listed[] = {"pqos-same", "pqos-other", NULL};
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        group.num_cores = 1;
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+
+        mon_groups_listed[0] = listed;
+        expect_group_cores(data->cpu, 0, "pqos-same", 1);
+        expect_group_cores(data->cpu, 0, "pqos-other", 5);
+
+        /* pqos-same has a core of the L3 asked for, so its tasks are not
+         * listed (the fopen mock fails a file it does not know): only those
+         * of pqos-other are, which then has its occupancy read
+         */
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-other");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-other");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "pqos-other");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "pqos-other");
+
+        free(intl.resctrl.mon_group);
+        free(intl.resctrl.l3id);
+}
+
+/**
+ * @brief A group of another L3 that monitors a task is not given the core
+ *
+ * @param [in] state test data
+ * @param [in] max_clos number of classes the library is given: 0 as where
+ *                      there is no allocation feature, which leaves the
+ *                      default group's mon_groups, CLOS 0's, to look in
+ */
+static void
+start_core_not_in_group_with_tasks(void **state, const unsigned max_clos)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        const char *const listed[] = {"pqos-busy", NULL};
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        group.num_cores = 1;
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, max_clos);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, max_clos);
+
+        mon_groups_listed[0] = listed;
+        expect_group_cores(data->cpu, 0, "pqos-busy", 5);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-busy");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "test");
+
+        free(intl.resctrl.mon_group);
+        free(intl.resctrl.l3id);
+}
+
+static void
+test_resctrl_mon_start_core_not_in_group_with_tasks(void **state)
+{
+        start_core_not_in_group_with_tasks(state, 1);
+}
+
+static void
+test_resctrl_mon_start_core_not_in_group_with_tasks_no_alloc(void **state)
+{
+        start_core_not_in_group_with_tasks(state, 0);
+}
+
+static void
+test_resctrl_mon_start_core_not_in_cos1_group_with_tasks(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        const char *const listed[] = {"pqos-busy", NULL};
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        group.num_cores = 1;
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+
+        /* a group of another L3 with no directory in CLOS 0, and one in COS1
+         * that lists a task: a class without the group's directory is passed
+         * over, and the classes after it are looked in
+         */
+        mon_groups_listed[1] = listed;
+        expect_group_cores(data->cpu, 1, "pqos-busy", 5);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-busy");
+        will_return(__wrap_pqos_dir_exists, 0);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/COS1/mon_groups/pqos-busy");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "test");
+
+        free(intl.resctrl.mon_group);
+        free(intl.resctrl.l3id);
+}
+
+static void
+test_resctrl_mon_start_core_not_in_group_with_tasks_in_cos1(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        const char *const listed[] = {"pqos-split", NULL};
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        group.num_cores = 1;
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+
+        /* a group of another L3 with a directory in both classes, of which
+         * CLOS 0's lists no task and COS1's one: a class whose directory
+         * lists none is not the last looked in either
+         */
+        mon_groups_listed[0] = listed;
+        mon_groups_listed[1] = listed;
+        expect_group_cores(data->cpu, 0, "pqos-split", 5);
+        expect_group_cores(data->cpu, 1, "pqos-split", 6);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-split");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/COS1/mon_groups/pqos-split");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl.resctrl.mon_group, "test");
+
+        free(intl.resctrl.mon_group);
+        free(intl.resctrl.l3id);
 }
 
 static void
@@ -876,6 +1193,21 @@ main(void)
 
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_resctrl_mon_start_core),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_start_core_shares_group_of_other_l3,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_start_core_not_in_group_with_tasks,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_start_core_not_in_group_with_tasks_no_alloc,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_start_core_not_in_cos1_group_with_tasks,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_start_core_not_in_group_with_tasks_in_cos1,
+                mon_groups_unlist),
             cmocka_unit_test(test_resctrl_mon_start_pid),
             cmocka_unit_test(test_resctrl_mon_start_pid_cleanup_on_error),
             cmocka_unit_test(test_resctrl_mon_start_pid_ended_thread),
