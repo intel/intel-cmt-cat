@@ -253,6 +253,34 @@ static int stop_monitoring_loop = 0;
 static FILE *fp_monitor = NULL;
 
 /**
+ * The function that writes the end of the monitoring output, where
+ * monitor_loop() left it for monitor_flush() to call once the monitoring is
+ * stopped
+ */
+static void (*output_end)(FILE *fp);
+
+/**
+ * A stream the monitoring writes to, and whether a write to it failed: the
+ * monitoring output, and stdout, which the loop reports a counter's overflow
+ * on, where -o named another output. The loop does not say a failure on
+ * stderr: a pipe there whose reader has stopped reading would block the
+ * message, which a stop signal does not cut short, its handler restarting the
+ * write, with the groups and the library lock held. monitor_flush() says it,
+ * once they are not. The library's log, which goes to stdout unless -l named
+ * a file, fails on it as well, inside the poll; libpqos says only the first
+ * of those failures on stderr, as a line for each of them would fill such a
+ * pipe.
+ */
+struct output_failure {
+        const char *stream; /**< the stream, as the message names it */
+        int failed;         /**< 1 once a write to it failed */
+        int err;            /**< what it failed with, 0 where not known */
+};
+
+static struct output_failure output_failure = {"monitoring output", 0, 0};
+static struct output_failure stdout_failure = {"standard output", 0, 0};
+
+/**
  * Maintains process statistics. It is used for getting N pids to be displayed
  * in top-pid monitoring mode.
  */
@@ -1707,7 +1735,8 @@ monitoring_ctrlc(int signo)
 }
 
 /**
- * @brief Has SIGINT, SIGHUP and SIGTERM end monitoring the way Ctrl-C does
+ * @brief Has SIGINT, SIGHUP and SIGTERM end monitoring the way Ctrl-C does,
+ *        and SIGPIPE ignored
  *
  * Called before the first monitoring group starts. When the handlers were set
  * only as the monitoring loop began, a signal that came between the start and
@@ -1723,13 +1752,26 @@ monitoring_ctrlc(int signo)
  * would end the process with its groups running after all. SA_RESTART keeps
  * the read of the interval timer going through a signal, as signal() did.
  *
+ * SIGPIPE's default action ends the process at a write to a pipe whose reader
+ * has gone, with its groups running too. The reader often goes with the signal
+ * that stops the loop - a Ctrl-C reaches every process of "pqos | tee" - and
+ * the loop may still flush its output before it sees the stop. Ignored, the
+ * signal leaves that write to fail with EPIPE, which the loop records and
+ * returns on, so the groups are stopped. More often the write that fails is
+ * the end's, which monitor_flush() makes once they are; either way
+ * monitor_flush() says the failure. The library's log, on stdout unless -l
+ * named a file, then fails with EPIPE too, where SIGPIPE ended the process at
+ * the first message it wrote; libpqos says only the first of those failures,
+ * on stderr.
+ *
  * A handler that cannot be set fails the setup, before any group starts:
  * left at its default action, that signal would end the process with its
- * groups running, which is what setting the handlers here is for.
+ * groups running, which is what setting the handlers here is for. The same
+ * holds for SIGPIPE where it cannot be ignored.
  *
  * @return Operational status
  * @retval 0 on success
- * @retval -1 if a handler could not be set
+ * @retval -1 if a handler could not be set, or SIGPIPE not ignored
  */
 static int
 monitoring_catch_signals(void)
@@ -1751,6 +1793,12 @@ monitoring_catch_signals(void)
         }
         if (sigaction(SIGTERM, &sa, NULL) == -1) {
                 printf("Failed to catch SIGTERM!\n");
+                return -1;
+        }
+        sa.sa_handler = SIG_IGN;
+        if (sigaction(SIGPIPE, &sa, NULL) == -1) {
+                fprintf(stderr, "Failed to ignore SIGPIPE: %s\n",
+                        strerror(errno));
                 return -1;
         }
 
@@ -3567,6 +3615,114 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
         return (int)sel_monitor_num;
 }
 
+/**
+ * @brief Records that a write to a stream failed, unless that is recorded
+ *        already: the first failure is the one said
+ *
+ * @param [in,out] failure the stream's record
+ * @param [in] err what the write failed with, 0 where not known
+ */
+static void
+monitor_output_failed(struct output_failure *failure, const int err)
+{
+        if (failure->failed)
+                return;
+        failure->failed = 1;
+        failure->err = err;
+}
+
+/**
+ * @brief Says on stderr how a write to a stream failed, where one did, and
+ *        clears the record
+ *
+ * @param [in,out] failure the stream's record
+ *
+ * @return Operational status
+ * @retval 0 no write to it failed
+ * @retval -1 one did, which this said
+ */
+static int
+monitor_output_said(struct output_failure *failure)
+{
+        if (!failure->failed)
+                return 0;
+        if (failure->err != 0)
+                fprintf(stderr, "Failed to write %s: %s\n", failure->stream,
+                        strerror(failure->err));
+        else
+                fprintf(stderr, "Failed to write %s\n", failure->stream);
+        failure->failed = 0;
+        return -1;
+}
+
+/**
+ * @brief Flushes a stream the monitoring writes to, and tells whether it took
+ *        what was written to it
+ *
+ * A failed write sets the stream's error indicator, and so does a flush that
+ * fails: either way the stream has stopped taking what is written to it. A
+ * terminal that has hung up refuses every write (EIO), a full file system the
+ * blocks of a file (ENOSPC), and a pipe whose reader has gone what is written
+ * to it (EPIPE), monitoring_catch_signals() having SIGPIPE ignored. A
+ * terminal's stream is line buffered, so its writes fail as the rows are
+ * printed and the flush finds nothing left to fail on: only the indicator says
+ * so then, and the reason is known only where the flush itself failed.
+ *
+ * @param [in] fp the stream
+ * @param [in,out] failure its record, where a failure is recorded for
+ *                 monitor_flush() to say
+ *
+ * @return Operational status
+ * @retval 0 the stream took everything written to it so far
+ * @retval -1 it did not
+ */
+static int
+monitor_output_flush(FILE *fp, struct output_failure *failure)
+{
+        int err = 0;
+
+        if (fflush(fp) != 0)
+                err = errno;
+        else if (!ferror(fp))
+                return 0;
+        monitor_output_failed(failure, err);
+        return -1;
+}
+
+/**
+ * @brief monitor_output_flush() in the loop, until a stop is requested
+ *
+ * From then on the loop flushes nothing: a pipe whose reader has stopped
+ * reading blocks a flush, which a stop signal does not cut short, its handler
+ * restarting the write, and the groups and the library lock would be held
+ * until it read again. What a stream still holds is flushed once they are
+ * not, by monitor_flush(): the monitoring output's, and stdout's where -o
+ * named another output.
+ *
+ * That keeps back only what a stream buffers. A line buffered or unbuffered
+ * stream writes what is printed as it is printed, and a fully buffered one
+ * what outgrows its buffer; and the loop looks for a stop before each poll
+ * and after each round, not between the two. So the round of a poll during
+ * which a stop came is still printed, as is the output's beginning where the
+ * stop came while the groups started, and those writes can block as a flush
+ * would.
+ *
+ * @param [in] fp the stream
+ * @param [in,out] failure its record
+ *
+ * @return Operational status
+ * @retval 0 the stream took everything written to it so far, or a stop was
+ *         requested
+ * @retval -1 it did not
+ */
+static int
+monitor_loop_flush(FILE *fp, struct output_failure *failure)
+{
+        if (__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED))
+                return 0;
+        return monitor_output_flush(fp, failure);
+}
+
 int
 monitor_loop(void)
 {
@@ -3577,9 +3733,11 @@ monitor_loop(void)
         unsigned mon_number = 0, display_num = 0;
         int num_arrays;
         int failed = 0; /**< an error ended the loop, not a stop or timeout */
+        int output_failed = 0; /**< the output took no more of it */
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
         long runtime = 0;
         int first_measurement = 1; /**< flag to skip first poll output */
+        int overflowed = 0;        /**< the last poll overflowed */
 #ifdef __linux__
         int tfd;
 #else
@@ -3715,6 +3873,23 @@ monitor_loop(void)
 
         output.begin(fp_monitor, sel_mon_mem_region.num_mem_regions,
                      sel_mon_mem_region.region_num);
+        /* An output that takes no more of what is written ends the session,
+         * as a failed poll does, here before the first poll and after each
+         * output. A terminal that hangs up sends SIGHUP, whose handler stops
+         * the loop; but a process that started with SIGHUP ignored, as one
+         * started under nohup does, also ignores a hangup that comes before
+         * monitoring_catch_signals() has set the handler, and nothing sends it
+         * again. That session went on with nowhere to write, and without a
+         * timeout never ended, holding the library lock. Where a stop came
+         * while the groups started, the start is left in a fully buffered
+         * stream, for monitor_flush() to write with the end; a line buffered
+         * or unbuffered one has written it already (see monitor_loop_flush())
+         */
+        if (monitor_loop_flush(fp_monitor, &output_failure) != 0) {
+                __atomic_store_n(&stop_monitoring_loop, 1, __ATOMIC_RELAXED);
+                output_failed = 1;
+                failed = 1;
+        }
         while (!__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED)) {
                 struct tm *ptm = NULL;
                 unsigned i = 0;
@@ -3725,19 +3900,54 @@ monitor_loop(void)
 
                 ret = pqos_mon_poll(mon_grps, mon_number);
                 if (ret == PQOS_RETVAL_OVERFLOW) {
-                        printf("MBM counter overflow\n");
-                        continue;
+                        if (!stdout_failure.failed)
+                                printf("MBM counter overflow\n");
+                        /* checked here as after a round's output: a poll
+                         * that overflowed prints none, and an overflow that
+                         * repeats, as an MMIO counter's does while its
+                         * overflow bit stays set, would leave the output
+                         * unchecked for as long as it lasted
+                         */
+                        if (monitor_loop_flush(fp_monitor, &output_failure) !=
+                            0) {
+                                output_failed = 1;
+                                failed = 1;
+                                break;
+                        }
+                        /* where -o named another output, the message is all
+                         * that the loop writes to stdout, which is checked
+                         * as well. A failure there leaves the loop going, its
+                         * output working: it is recorded, for monitor_flush()
+                         * to say and fail the session with, and the message
+                         * is not written again
+                         */
+                        if (fp_monitor != stdout)
+                                (void)monitor_loop_flush(stdout,
+                                                         &stdout_failure);
+                        /* the loop polls again at once, but where the
+                         * overflow repeats, it waits for the timer first, as
+                         * after a round, and so meets the timeout: polling
+                         * again at once each time, it never did
+                         */
+                        if (!overflowed) {
+                                overflowed = 1;
+                                continue;
+                        }
                 } else if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to poll monitoring data!\n");
                         failed = 1;
                         break;
+                } else {
+                        overflowed = 0;
                 }
 
                 /**
                  * Skip output of the first measurement as memory bandwidth
                  * values are always zero on the first poll (no prior baseline).
+                 * A poll that overflowed is not a measurement: it is not
+                 * printed, nor taken for the first
                  */
-                if (!first_measurement) {
+                if (!first_measurement && !overflowed) {
                         memcpy(mon_data, mon_grps,
                                mon_number * sizeof(mon_grps[0]));
 
@@ -3776,9 +3986,15 @@ monitor_loop(void)
                         }
                         output.footer(fp_monitor);
 
-                        fflush(fp_monitor);
+                        if (monitor_loop_flush(fp_monitor, &output_failure) !=
+                            0) {
+                                output_failed = 1;
+                                failed = 1;
+                                break;
+                        }
                 }
-                first_measurement = 0;
+                if (!overflowed)
+                        first_measurement = 0;
 
                 if (__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED))
                         break;
@@ -3816,7 +4032,17 @@ monitor_loop(void)
                 }
                 runtime += timer_count * sel_mon_interval * 100l;
         }
-        output.end(fp_monitor);
+        /* and the end, which closes the XML root: a file without it is cut
+         * short. It is written by monitor_flush(), once the caller has
+         * stopped the monitoring and finalised the library, not here: a
+         * pipe whose reader stops reading blocks the write (at once where
+         * the stream is line buffered or unbuffered, at its flush where it
+         * is fully buffered), which a stop signal does not cut short, its
+         * handler restarting the write, and the groups and the library lock
+         * would be held until it read again
+         */
+        if (!output_failed)
+                output_end = output.end;
 
 #ifdef __linux__
         close(tfd);
@@ -3829,15 +4055,57 @@ monitor_loop(void)
         return failed ? -1 : 0;
 }
 
+int
+monitor_flush(void)
+{
+        void (*end)(FILE *fp) = output_end;
+        int ret = 0;
+
+        output_end = NULL;
+        if (end != NULL) {
+                end(fp_monitor);
+                (void)monitor_output_flush(fp_monitor, &output_failure);
+
+                /* a file that -o named is closed here, not in
+                 * monitor_cleanup(), and the close checked: a file system
+                 * such as NFS can report a write that failed - ENOSPC,
+                 * EDQUOT, EIO - only then. Where the flush has failed
+                 * already, the close is not said as well. stdout is left
+                 * for exit() to close; where it is not the output, it is
+                 * flushed and checked here as well: the loop flushes
+                 * nothing once a stop is requested, and a stop that came
+                 * with an overflow leaves the overflow's message unchecked
+                 */
+                if (fp_monitor != stdout) {
+                        if (pqos_fclose(fp_monitor) != 0)
+                                monitor_output_failed(&output_failure, errno);
+                        fp_monitor = NULL;
+                        (void)monitor_output_flush(stdout, &stdout_failure);
+                }
+        }
+
+        /* and what failed, here or in the loop, is said only now */
+        if (monitor_output_said(&output_failure) != 0)
+                ret = -1;
+        if (monitor_output_said(&stdout_failure) != 0)
+                ret = -1;
+
+        return ret;
+}
+
 void
 monitor_cleanup(void)
 {
         /**
-         * Close file descriptor for monitoring output
+         * Close file descriptor for monitoring output, where monitor_flush()
+         * did not: the loop left no end to write
          */
         if (fp_monitor != NULL && fp_monitor != stdout)
                 pqos_fclose(fp_monitor);
         fp_monitor = NULL;
+        output_end = NULL;
+        output_failure.failed = 0;
+        stdout_failure.failed = 0;
 
         /**
          * Free allocated memory

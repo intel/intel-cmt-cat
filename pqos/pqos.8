@@ -327,7 +327,14 @@ select the output format TYPE for monitored data. Supported TYPE settings are: "
 define monitoring sampling INTERVAL in 100ms units, 1=100ms, default 10=10x100ms=1s
 .TP
 .B \-t SECONDS, \-\-mon-time=SECONDS
-define monitoring time in seconds, use 'inf' or 'infinite' for infinite monitoring. Use CTRL+C to stop monitoring at any time.
+define monitoring time in seconds, use 'inf' or 'infinite' for infinite
+monitoring. Use CTRL+C to stop monitoring at any time; a hangup of the
+terminal stops it the same way.
+When a write to the monitoring output fails, as to a file on a full file
+system or to a pipe whose reader has exited, monitoring ends and pqos exits
+with status 1. Where \-o names a file, a counter overflow is still reported
+on standard output; when a write there fails, monitoring goes on without
+those reports, and pqos exits with status 1 when it ends.
 .TP
 .B \-r, \-\-mon\-reset[=CONFIG[,CONFIG]]
 reset monitoring and use all RMID's in the system and reconfigure allocation.

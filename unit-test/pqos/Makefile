@@ -308,6 +308,7 @@ $(BIN_DIR)/test_main_monitoring: ./test_main_monitoring.c $(PQOS_OBJS)
 		-Wl,--wrap=monitor_setup \
 		-Wl,--wrap=monitor_loop \
 		-Wl,--wrap=monitor_stop \
+		-Wl,--wrap=monitor_flush \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/main.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
@@ -368,8 +369,9 @@ $(BIN_DIR)/test_output_capture: ./test_output_capture.c
 # that they can free what they hold before their option handler ends it.
 # malloc(), calloc(), realloc() and strdup() are wrapped so that a case can
 # make the Nth call fail, and free() so that a case can see what the top-pids
-# handler freed. The file includes monitor.c to call its static functions, as
-# test_alloc does with alloc.c
+# handler freed; pqos_fclose() so that a case can have the close of the
+# monitoring output fail. The file includes monitor.c to call its static
+# functions, as test_alloc does with alloc.c
 # the loop's timer is a timerfd on Linux, and only there do the cases that
 # make it fail wrap its making, arming and reads
 ifeq ($(shell uname), Linux)
@@ -395,6 +397,7 @@ $(BIN_DIR)/test_monitor_failures: ./test_monitor_failures.c $(PQOS_OBJS)
 		-Wl,--wrap=fprintf \
 		-Wl,--wrap=pqos_mon_poll \
 		-Wl,--wrap=monitor_utils_get_cache_size \
+		-Wl,--wrap=pqos_fclose \
 		$(MONITOR_TIMER_WRAPS) \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@

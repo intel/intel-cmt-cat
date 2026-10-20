@@ -35,14 +35,19 @@
  * starting, and while the loop runs: either way the loop polls no more, and
  * every group that started is stopped. Before the handlers were set ahead of
  * the start, a signal in that window ended the process with its groups running.
+ * The setup has SIGPIPE ignored as well. A stop signal reaches every process of
+ * a pipeline such as "pqos | tee", and where it ends the reader of the output,
+ * the next write to the pipe fails with EPIPE, which monitor_flush() reports
+ * and returns from, rather than ending the process the way SIGPIPE's default
+ * action does.
  *
  * monitor.c is included rather than linked, because what the cases check and
  * reset is private to it: the flag the handler sets, and the selection and
  * timeout that monitor_setup(), monitor_loop() and monitor_stop() work from. A
  * case adds a group of this process as the -p option does and runs the three
- * as main() does. The library's start, poll and stop are mocked, and the
- * signal is raised from inside the mocked call - where a Ctrl-C lands in the
- * window this is about.
+ * as main() does, and monitor_flush() after them where the reader goes. The
+ * library's start, poll and stop are mocked, and the signal is raised from
+ * inside the mocked call - where a Ctrl-C lands in the window this is about.
  */
 
 #include "test_monitor_signals.h"
@@ -88,6 +93,42 @@ static struct pqos_mon_data g_group;
 /** the topology the loop asks for, which it reads the cache size from */
 static struct pqos_cpuinfo g_cpu;
 
+/** the pipe a case has the monitoring output go to: its read end, -1 for
+ * none, and a stream on its write end, NULL for none
+ */
+static int g_reader = -1;
+static FILE *g_writer;
+
+/** how many SIGPIPEs the process was sent while a case counted them: the
+ * handler adds to it with the atomic builtins monitor.c's own flag is set
+ * with, for the reason that file gives
+ */
+static int g_sigpipes;
+
+static void
+count_sigpipe(int signo)
+{
+        (void)signo;
+        __atomic_add_fetch(&g_sigpipes, 1, __ATOMIC_RELAXED);
+}
+
+/**
+ * @brief The reader of the pipe goes, as tee does at a Ctrl-C
+ *
+ * What the output's functions print is captured and never reaches the
+ * stream, so a line is left in it here, for the monitoring's next flush to
+ * write to the pipe.
+ */
+static void
+reader_goes(void)
+{
+        if (g_reader == -1)
+                return;
+        close(g_reader);
+        g_reader = -1;
+        (void)fputs("TIME 2026-10-20 16:00:00\n", g_writer);
+}
+
 int
 __wrap_pqos_inter_get(enum pqos_interface *interface)
 {
@@ -121,8 +162,10 @@ __wrap_pqos_mon_start_pids2(const unsigned num_pids,
 
         g_starts++;
         *group = &g_group;
-        if (g_signal_at_start != 0)
+        if (g_signal_at_start != 0) {
+                reader_goes();
                 raise(g_signal_at_start);
+        }
 
         return PQOS_RETVAL_OK;
 }
@@ -134,8 +177,10 @@ __wrap_pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
         (void)num_groups;
 
         g_polls++;
-        if (g_signal_at_poll != 0)
+        if (g_signal_at_poll != 0) {
+                reader_goes();
                 raise(g_signal_at_poll);
+        }
 
         return PQOS_RETVAL_OK;
 }
@@ -251,23 +296,59 @@ stop_selection(void)
         assert_false(output_exit_was_called());
 }
 
+/**
+ * @brief Gives a signal its default action back
+ *
+ * With sigaction(), as monitor.c sets the actions, so that no flag or mask
+ * of a case's is left; and the real one, as a case may have had the wrapped
+ * sigaction() refuse this signal.
+ *
+ * @param signo signal number
+ */
+static void
+default_action(const int signo)
+{
+        struct sigaction sa;
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = SIG_DFL;
+        sigemptyset(&sa.sa_mask);
+        (void)__real_sigaction(signo, &sa, NULL);
+}
+
 static int
 reset(void **state)
 {
         (void)state;
-        signal(SIGINT, SIG_DFL);
-        signal(SIGHUP, SIG_DFL);
-        signal(SIGTERM, SIG_DFL);
+        default_action(SIGINT);
+        default_action(SIGHUP);
+        default_action(SIGTERM);
         stop_monitoring_loop = 0;
         if (sel_monitor_group != NULL)
                 stop_selection();
         sel_monitor_type = 0;
         /* a case that fails stops the loop at its timeout, not never */
         sel_timeout = 1;
+        /* the pipe's stream writes what it still holds as it closes, where
+         * the reader may have gone: it is closed while SIGPIPE is ignored, or
+         * counted, and the default action restored only after that
+         */
+        if (g_writer != NULL) {
+                if (fp_monitor == g_writer)
+                        fp_monitor = stdout;
+                fclose(g_writer);
+                g_writer = NULL;
+        }
+        if (g_reader != -1) {
+                close(g_reader);
+                g_reader = -1;
+        }
+        default_action(SIGPIPE);
         monitor_cleanup();
         g_signal_at_start = 0;
         g_signal_at_poll = 0;
         g_sigaction_refuses = 0;
+        __atomic_store_n(&g_sigpipes, 0, __ATOMIC_RELAXED);
         g_starts = 0;
         g_polls = 0;
         g_stops = 0;
@@ -380,6 +461,120 @@ test_sigint_during_the_loop_ends_it(void **state)
         assert_int_equal(g_stops, 1);
 }
 
+/** whether the capture holds the failed write to a pipe whose reader went */
+static int
+said_epipe(void)
+{
+        return output_has_text("Failed to write monitoring output: %s",
+                               strerror(EPIPE));
+}
+
+/**
+ * @brief A stop signal that ends the reader of the output's pipe as well
+ *
+ * The write to the pipe of what the output still holds then fails with EPIPE.
+ * Whether the signal comes while the group starts or at the loop's first
+ * poll, which prints nothing, the loop ends at the stop having flushed
+ * nothing and said nothing: once a stop is requested, a flush could block on
+ * a pipe whose reader has stopped reading, and a message on stderr as well,
+ * with the group running. It is the flush of the output's end, which
+ * monitor_flush() makes once the group is stopped, that fails, and
+ * monitor_flush() says so, once, and closes the output. A handler counts
+ * SIGPIPE until the setup has it ignored: raised, it would have ended the
+ * process with the group running.
+ *
+ * @param [in] in_loop 1 for the signal at the loop's first poll, 0 for it
+ *             while the group starts
+ */
+static void
+a_signal_that_ends_the_reader(const int in_loop)
+{
+        struct sigaction sa;
+        const char *said;
+        int fds[2];
+        int closed;
+        int ret = -1;
+
+        assert_int_equal(pipe(fds), 0);
+        g_reader = fds[0];
+        g_writer = fdopen(fds[1], "w");
+        if (g_writer == NULL)
+                close(fds[1]);
+        assert_non_null(g_writer);
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = count_sigpipe;
+        sigemptyset(&sa.sa_mask);
+        assert_int_equal(sigaction(SIGPIPE, &sa, NULL), 0);
+
+        if (in_loop)
+                g_signal_at_poll = SIGINT;
+        else
+                g_signal_at_start = SIGINT;
+
+        assert_int_equal(setup(), 0);
+        fp_monitor = g_writer;
+
+        run_function(monitor_loop, ret);
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, 0);
+        assert_false(output_has_text("Failed to write"));
+        assert_int_equal(g_timers_set, 1);
+        assert_int_equal(g_polls, (unsigned)in_loop);
+
+        stop_selection();
+        assert_int_equal(g_stops, 1);
+
+        run_function(monitor_flush, ret);
+        /* it closed an output it wrote the end to, which reset() is not to
+         * close again
+         */
+        closed = fp_monitor == NULL;
+        if (closed)
+                g_writer = NULL;
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, -1);
+        assert_true(closed);
+        assert_true(said_epipe());
+        said = strstr(output_get(), "Failed to write");
+        assert_non_null(said);
+        assert_null(strstr(said + 1, "Failed to write"));
+        assert_int_equal(__atomic_load_n(&g_sigpipes, __ATOMIC_RELAXED), 0);
+}
+
+static void
+test_sigint_ending_the_reader_at_the_start_stops_the_group(void **state)
+{
+        (void)state;
+        a_signal_that_ends_the_reader(0);
+}
+
+static void
+test_sigint_ending_the_reader_in_the_loop_ends_it(void **state)
+{
+        (void)state;
+        a_signal_that_ends_the_reader(1);
+}
+
+/**
+ * @brief SIGPIPE that cannot be ignored fails the setup before any group starts
+ *
+ * Left at its default action, a write to a pipe whose reader has gone would
+ * end the process with its groups running, so there must be none. The setup
+ * says why it failed: the wrapped sigaction() refuses with EPERM.
+ */
+static void
+test_no_group_starts_where_sigpipe_cannot_be_ignored(void **state)
+{
+        (void)state;
+        g_sigaction_refuses = SIGPIPE;
+
+        assert_int_equal(setup(), -1);
+        assert_true(
+            output_has_text("Failed to ignore SIGPIPE: %s\n", strerror(EPERM)));
+        assert_int_equal(g_starts, 0);
+}
+
 int
 main(void)
 {
@@ -394,6 +589,15 @@ main(void)
                                             reset, reset),
             cmocka_unit_test_setup_teardown(
                 test_no_group_starts_without_a_handler, reset, reset),
+            cmocka_unit_test_setup_teardown(
+                test_sigint_ending_the_reader_at_the_start_stops_the_group,
+                reset, reset),
+            cmocka_unit_test_setup_teardown(
+                test_sigint_ending_the_reader_in_the_loop_ends_it, reset,
+                reset),
+            cmocka_unit_test_setup_teardown(
+                test_no_group_starts_where_sigpipe_cannot_be_ignored, reset,
+                reset),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);

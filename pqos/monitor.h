@@ -267,12 +267,57 @@ void monitor_cleanup(void);
  * @return 0 when the monitoring ran until its timeout or a stop, or until
  *         more intervals passed between two reads of its timer than it counts
  *         - the process was stopped, or its output blocked - which it reports
- *         as "Failed to read timer" but is no failure of the run; -1 where it
- *         could not start, or an error ended it, having said why. Either way
- *         the caller stops the monitoring and finalises the library, which an
- *         exit from in here would skip
+ *         as "Failed to read timer" but is no failure of the run, and its
+ *         output took all that was flushed to it: the end of the output is
+ *         left for monitor_flush() to write, and, once a stop is requested,
+ *         what the loop has not flushed. A write that failed to stdout, which
+ *         a counter's overflow is reported on, where -o named another output,
+ *         does not end the monitoring: the loop leaves it to monitor_flush()
+ *         to say, and reports no overflow there from then on.
+ *         -1 where it could not start or an error ended it, having said why,
+ *         or where a write to its output failed, as to a terminal that has
+ *         hung up, a file on a full file system or a pipe whose reader has
+ *         gone, which it leaves monitor_flush() to say.
+ *         Either way the caller stops the monitoring and finalises the
+ *         library, which an exit from in here would skip, and then calls
+ *         monitor_flush()
  */
 int monitor_loop(void);
+
+/**
+ * @brief Where the loop left the end of the monitoring output, writes it,
+ *        which closes the XML root, flushes it, and closes a file that -o
+ *        named, flushing stdout then as well; and says what write failed
+ *
+ * monitor_loop() leaves the end to this: a pipe whose reader has stopped
+ * reading blocks its write - at once where the stream is line buffered or
+ * unbuffered, at the flush where it is fully buffered - and the groups and
+ * the library lock would be held until it read again. The caller writes it
+ * here, once it has stopped the monitoring and finalised the library. The
+ * loop leaves the failure of a write to this as well, for the same reason: a
+ * pipe on stderr whose reader has stopped reading blocks the message.
+ *
+ * The file is closed here rather than by monitor_cleanup(), as a file
+ * system such as NFS can report a write that failed only at the close.
+ * stdout is left open, for exit() to close; but where -o named a file, stdout
+ * is flushed here and checked, the loop flushing nothing once a stop is
+ * requested: a stop that comes with a counter's overflow leaves the
+ * overflow's message there.
+ *
+ * Where the loop left no end - a write to its output failed, or it did not
+ * get as far as its output - this writes none, and flushes and closes
+ * nothing: a file that -o named is left for monitor_cleanup() to close,
+ * unchecked. It then only says the failures that the loop recorded.
+ *
+ * @return Operation status
+ * @retval 0 no write failed: the output took its end, or the loop left no
+ *         end to write, not having got as far as its output
+ * @retval -1 a write failed - in the loop, to the output, or to stdout where
+ *         -o named another output; or here, the end's, the file's close or
+ *         stdout's flush - which this says on stderr, the first failure of
+ *         each stream only
+ */
+int monitor_flush(void);
 
 /**
  * @brief Retrieve monitoring interval

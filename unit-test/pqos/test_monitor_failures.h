@@ -36,6 +36,7 @@
 #include "pqos.h"
 
 #include <stddef.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -43,9 +44,10 @@
  * --wrap, and the real ones it hands every other call to; the interface
  * query monitor_setup() and monitor_loop() make first, which it answers
  * itself or fails; the poll and the cache size the loop asks for, which a
- * case supplies or fails; and, on Linux, the loop's making, arming and reads
- * of its timer, which a case makes fail or be cut short, and which go to the
- * real calls otherwise.
+ * case supplies or fails; the close of the output, which a case fails once
+ * the real call has closed it; and, on Linux, the loop's making, arming and
+ * reads of its timer, which a case makes fail or be cut short, and which go
+ * to the real calls otherwise.
  */
 void *__real_malloc(size_t size);
 void *__real_calloc(size_t nmemb, size_t size);
@@ -61,6 +63,8 @@ int __wrap_pqos_inter_get(enum pqos_interface *interface);
 int __wrap_pqos_mon_poll(struct pqos_mon_data **groups,
                          const unsigned num_groups);
 int __wrap_monitor_utils_get_cache_size(unsigned *p_cache_size);
+int __real_pqos_fclose(FILE *stream);
+int __wrap_pqos_fclose(FILE *stream);
 #ifdef __linux__
 int __real_timerfd_create(int clockid, int flags);
 int __wrap_timerfd_create(int clockid, int flags);

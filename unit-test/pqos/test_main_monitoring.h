@@ -52,7 +52,7 @@ int __wrap_pqos_cap_get_type(const struct pqos_cap *cap,
                              const struct pqos_capability **cap_item);
 
 /* The allocation it applies first, nothing here, and the monitoring itself,
- * whose loop returns what a case says
+ * whose loop and the flush of the output's end return what a case says
  */
 int __wrap_alloc_apply(const struct pqos_capability *cap_l3ca,
                        const struct pqos_capability *cap_l2ca,
@@ -65,5 +65,6 @@ int __wrap_monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          const struct pqos_devinfo *dev_info);
 int __wrap_monitor_loop(void);
 void __wrap_monitor_stop(void);
+int __wrap_monitor_flush(void);
 
 #endif /* TEST_MAIN_MONITORING_H_ */

@@ -35,13 +35,17 @@
  *
  * main() makes a monitoring loop that an error ended an EXIT_FAILURE, and it
  * still stops the monitoring and finalises the library afterwards, which is
- * what the loop's returning rather than ending the process is for. main.c is
- * included, as test_print_modes.c includes it, and what main() asks of the
+ * what the loop's returning rather than ending the process is for. The end of
+ * the output, which the loop leaves unwritten, it has monitor_flush() write
+ * and flush last, and makes a flush that failed an EXIT_FAILURE too. main.c
+ * is included, as test_print_modes.c includes it, and what main() asks of the
  * library and of the monitoring on the way is wrapped: a case runs a
- * monitoring command line through appmain() to a loop whose result it sets,
- * and records the order in which main() runs the loop, stops the monitoring
- * and finalises the library. Stopping needs the library initialised, so
- * the stop has to come between the other two.
+ * monitoring command line through appmain() to a loop and a flush whose
+ * results it sets, and records the order in which main() runs the loop,
+ * stops the monitoring, finalises the library and flushes. Stopping needs the
+ * library initialised, so the stop has to come between the loop and the
+ * finalising; and a flush that a reader which stopped reading blocks must
+ * come after both, holding nothing.
  */
 
 #include "test_main_monitoring.h"
@@ -64,16 +68,19 @@
 #include <cmocka.h>
 /* clang-format on */
 
-/** the system main() is given: two cores, with monitoring the one capability */
+/** the system main() is given: three cores, with monitoring the one
+ * capability
+ */
 static struct pqos_cap m_cap;
 static struct pqos_cap_mon m_mon;
 static struct pqos_capability m_cap_mon;
 static struct pqos_sysconfig m_sys;
 
-/** what the loop returns, and what main() called from the loop on, in order:
- * "loop", "stop" and "fini", each followed by a space
+/** what the loop and the flush return, and what main() called from the loop
+ * on, in order: "loop", "stop", "fini" and "flush", each followed by a space
  */
 static int m_loop_result;
+static int m_flush_result;
 static char m_calls[64];
 
 static void
@@ -169,8 +176,16 @@ __wrap_monitor_stop(void)
         called("stop");
 }
 
+int
+__wrap_monitor_flush(void)
+{
+        called("flush");
+        return m_flush_result;
+}
+
 /**
- * @brief Runs "pqos -m <groups>" to a loop that returns \a loop_result
+ * @brief Runs "pqos -m <groups>" to a loop that returns \a loop_result and a
+ *        flush that returns \a flush_result
  *
  * The groups are added to what earlier cases selected, which the parser keeps,
  * so each case names a core of its own.
@@ -178,7 +193,9 @@ __wrap_monitor_stop(void)
  * @return what appmain() returned
  */
 static int
-run_monitoring(const char *groups, const int loop_result)
+run_monitoring(const char *groups,
+               const int loop_result,
+               const int flush_result)
 {
         char *argv[] = {strdup("pqos"), strdup("-m"), strdup(groups), NULL};
         const int argc = (int)DIM(argv) - 1;
@@ -189,6 +206,7 @@ run_monitoring(const char *groups, const int loop_result)
                 assert_non_null(argv[i]);
 
         m_loop_result = loop_result;
+        m_flush_result = flush_result;
         m_calls[0] = '\0';
         optind = 1;
         opterr = 0;
@@ -204,12 +222,12 @@ test_a_monitoring_loop_that_fails_makes_pqos_exit_1(void **state)
 {
         UNUSED_ARG(state);
 
-        assert_int_equal(run_monitoring("all:0", -1), EXIT_FAILURE);
+        assert_int_equal(run_monitoring("all:0", -1, 0), EXIT_FAILURE);
         assert_int_equal(output_exit_was_called(), 0);
         /* and the monitoring is stopped, then the library finalised, all the
          * same, which is what the loop returns for
          */
-        assert_string_equal(m_calls, "loop stop fini ");
+        assert_string_equal(m_calls, "loop stop fini flush ");
 }
 
 static void
@@ -217,9 +235,20 @@ test_a_monitoring_loop_that_ends_well_makes_pqos_exit_0(void **state)
 {
         UNUSED_ARG(state);
 
-        assert_int_equal(run_monitoring("all:1", 0), EXIT_SUCCESS);
+        assert_int_equal(run_monitoring("all:1", 0, 0), EXIT_SUCCESS);
         assert_int_equal(output_exit_was_called(), 0);
-        assert_string_equal(m_calls, "loop stop fini ");
+        assert_string_equal(m_calls, "loop stop fini flush ");
+}
+
+static void
+test_an_output_whose_end_fails_makes_pqos_exit_1(void **state)
+{
+        UNUSED_ARG(state);
+
+        /* the loop ended well, but the output did not take its end */
+        assert_int_equal(run_monitoring("all:2", 0, -1), EXIT_FAILURE);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_string_equal(m_calls, "loop stop fini flush ");
 }
 
 int
@@ -229,16 +258,18 @@ main(void)
             cmocka_unit_test(
                 test_a_monitoring_loop_that_fails_makes_pqos_exit_1),
             cmocka_unit_test(
-                test_a_monitoring_loop_that_ends_well_makes_pqos_exit_0)};
+                test_a_monitoring_loop_that_ends_well_makes_pqos_exit_0),
+            cmocka_unit_test(test_an_output_whose_end_fails_makes_pqos_exit_1)};
         struct pqos_cpuinfo *cpu =
-            calloc(1, sizeof(*cpu) + 2 * sizeof(struct pqos_coreinfo));
+            calloc(1, sizeof(*cpu) + 3 * sizeof(struct pqos_coreinfo));
         int ret;
 
         if (cpu == NULL)
                 return EXIT_FAILURE;
-        cpu->num_cores = 2;
+        cpu->num_cores = 3;
         cpu->cores[0].lcore = 0;
         cpu->cores[1].lcore = 1;
+        cpu->cores[2].lcore = 2;
         m_cap_mon.type = PQOS_CAP_TYPE_MON;
         m_cap_mon.u.mon = &m_mon;
         m_sys.cap = &m_cap;

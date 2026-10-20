@@ -2535,6 +2535,13 @@ error_exit_2:
         ASSERT(ret == PQOS_RETVAL_OK);
         if (ret != PQOS_RETVAL_OK)
                 printf("Error shutting down PQoS library!\n");
+        /* the end of the monitoring output, which the loop left to be
+         * written here, and a write that failed, which it left to be said:
+         * a reader that stopped reading can hold the process here, but no
+         * longer its groups or the library lock
+         */
+        if (monitor_flush() != 0)
+                exit_val = EXIT_FAILURE;
 
 error_exit_1:
         monitor_cleanup();
