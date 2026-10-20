@@ -44,6 +44,9 @@
  * pci_parse_pci_ids() searches the library's own list, pci_ids_files. For it
  * a wrapped lstat() says what is at those three places, and passes every
  * other name through to the real one.
+ *
+ * pci_ids_read() takes a device's names from an open database, here one over
+ * the small database below, read through fmemopen().
  */
 
 #include "test_pci.h"
@@ -65,6 +68,30 @@ static char m_names[5][64];
 
 /** what the library logged in the case */
 static char m_logged[2048];
+
+/**
+ * Two vendors, then four classes. 04 and 40 are each a subclass in two
+ * classes, and 0040 is also an Intel device. The last vendor is followed by
+ * the classes, whose subclass lines look like device lines. A subsystem line
+ * and a programming interface line, each two tabs in, look like a device and
+ * a subclass of the numbers 8086 and 00.
+ */
+static char m_ids[] = "# a comment\n"
+                      "8086  Intel Corporation\n"
+                      "\t4948  6xxx Series QAT\n"
+                      "\t0040  A device whose ID is a subclass number\n"
+                      "\t\t8086 0001  A subsystem\n"
+                      "1234  Another vendor\n"
+                      "\t4948  Another vendor's device\n"
+                      "C 06  Bridge\n"
+                      "\t04  PCI bridge\n"
+                      "\t\t00  Normal decode\n"
+                      "C 0b  Processor\n"
+                      "\t40  Co-processor\n"
+                      "C 0d  Wireless controller\n"
+                      "\t40  Cellular controller/modem\n"
+                      "C 0f  Satellite communication controller\n"
+                      "\t04  Satellite data communication controller\n";
 
 /**
  * What the wrapped lstat() says is at each of the library's places: 0 for
@@ -462,6 +489,87 @@ test_pci_parse_pci_ids_nowhere(void **state __attribute__((unused)))
                                          "/usr/share/pci.ids."));
 }
 
+/**
+ * @brief Reads the names of a device from the database above
+ */
+static void
+names(struct pqos_pci_info *info,
+      unsigned int class_code,
+      unsigned int vendor_id,
+      unsigned int device_id)
+{
+        FILE *fd = fmemopen(m_ids, sizeof(m_ids) - 1, "r");
+
+        assert_non_null(fd);
+        memset(info, 0, sizeof(*info));
+        pci_ids_read(fd, info, class_code, vendor_id, device_id);
+        fclose(fd);
+}
+
+static void
+test_pci_ids_read_coprocessor(void **state __attribute__((unused)))
+{
+        struct pqos_pci_info info;
+
+        names(&info, 0x0b4000, 0x8086, 0x4948);
+        assert_string_equal(info.vendor_name, "Intel Corporation");
+        assert_string_equal(info.device_name, "6xxx Series QAT");
+        assert_string_equal(info.subclass_name, "Co-processor");
+}
+
+static void
+test_pci_ids_read_bridge(void **state __attribute__((unused)))
+{
+        struct pqos_pci_info info;
+
+        names(&info, 0x060400, 0x8086, 0x0040);
+        assert_string_equal(info.device_name,
+                            "A device whose ID is a subclass number");
+        assert_string_equal(info.subclass_name, "PCI bridge");
+}
+
+static void
+test_pci_ids_read_class_not_listed(void **state __attribute__((unused)))
+{
+        struct pqos_pci_info info;
+
+        /*
+         * Subclass 40 of a class the database does not have: class 0b's and
+         * class 0d's 40, and Intel's device 0040, are none of them it
+         */
+        names(&info, 0x124000, 0x8086, 0x4948);
+        assert_string_equal(info.vendor_name, "Intel Corporation");
+        assert_string_equal(info.device_name, "6xxx Series QAT");
+        assert_string_equal(info.subclass_name, "");
+}
+
+static void
+test_pci_ids_read_last_vendor(void **state __attribute__((unused)))
+{
+        struct pqos_pci_info info;
+
+        /* a device the last vendor does not list: no subclass line is it */
+        names(&info, 0x0b4000, 0x1234, 0x0004);
+        assert_string_equal(info.vendor_name, "Another vendor");
+        assert_string_equal(info.device_name, "");
+        assert_string_equal(info.subclass_name, "Co-processor");
+}
+
+static void
+test_pci_ids_read_two_tabs_are_neither(void **state __attribute__((unused)))
+{
+        struct pqos_pci_info info;
+
+        /*
+         * Device 8086 and subclass 00 of class 06: only the subsystem line
+         * and the programming interface line, two tabs in, have those numbers
+         */
+        names(&info, 0x060000, 0x8086, 0x8086);
+        assert_string_equal(info.vendor_name, "Intel Corporation");
+        assert_string_equal(info.device_name, "");
+        assert_string_equal(info.subclass_name, "");
+}
+
 int
 main(void)
 {
@@ -498,7 +606,12 @@ main(void)
             cmocka_unit_test_teardown(
                 test_pci_parse_pci_ids_where_fedora_keeps_it, case_teardown),
             cmocka_unit_test_teardown(test_pci_parse_pci_ids_nowhere,
-                                      case_teardown)};
+                                      case_teardown),
+            cmocka_unit_test(test_pci_ids_read_coprocessor),
+            cmocka_unit_test(test_pci_ids_read_bridge),
+            cmocka_unit_test(test_pci_ids_read_class_not_listed),
+            cmocka_unit_test(test_pci_ids_read_last_vendor),
+            cmocka_unit_test(test_pci_ids_read_two_tabs_are_neither)};
 
         return cmocka_run_group_tests(tests, dir_setup, dir_teardown);
 }

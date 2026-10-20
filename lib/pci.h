@@ -116,6 +116,24 @@ PQOS_LOCAL FILE *pci_ids_open(const char *const *files,
 PQOS_LOCAL FILE *pci_ids_find(const char *const *files, unsigned num_files);
 
 /**
+ * @brief Reads a device's vendor, device and subclass names from pci.ids
+ *
+ * A name the database does not have is left as it was.
+ *
+ * @param [in] fd the database, read to its end
+ * @param [out] info the device's information, whose names are filled in
+ * @param [in] class_code the device's class code: class, subclass and
+ *             programming interface, a byte each
+ * @param [in] vendor_id the device's vendor ID
+ * @param [in] device_id the device's device ID
+ */
+PQOS_LOCAL void pci_ids_read(FILE *fd,
+                             struct pqos_pci_info *info,
+                             unsigned int class_code,
+                             unsigned int vendor_id,
+                             unsigned int device_id);
+
+/**
  * @brief Fills in a device's vendor, device and subclass names from pci.ids
  *
  * The file is looked for in pci_ids_files by pci_ids_find(). A name it does

@@ -178,24 +178,37 @@ pci_ids_find(const char *const *files, unsigned num_files)
 }
 
 void
-pci_parse_pci_ids(struct pqos_pci_info *info,
-                  unsigned int class_code,
-                  unsigned int vendor_id,
-                  unsigned int device_id)
+pci_ids_read(FILE *fd,
+             struct pqos_pci_info *info,
+             unsigned int class_code,
+             unsigned int vendor_id,
+             unsigned int device_id)
 {
-        FILE *fd = pci_ids_find(pci_ids_files, DIM(pci_ids_files));
         char line[BUF_SIZE_512];
         int vendor_found = 0;
+        int class_found = 0;
+        unsigned int class_id = (class_code >> 16) & 0xFF;
         unsigned int subclass = (class_code >> 8) & 0xFF;
-
-        if (fd == NULL)
-                return;
 
         while (fgets(line, sizeof(line), fd)) {
                 if (line[0] == '#')
                         continue;
 
-                if (line[0] != '\t' && line[0] != 'C') {
+                /*
+                 * "C <class>" starts the subclasses of a class, after the
+                 * vendors. A subclass number means something else in each
+                 * class, so only the device's own class names its subclass.
+                 */
+                if (line[0] == 'C' && line[1] == ' ') {
+                        unsigned int cid = 0;
+
+                        vendor_found = 0;
+                        class_found =
+                            sscanf(line, "C %x", &cid) == 1 && cid == class_id;
+                        continue;
+                }
+
+                if (line[0] != '\t') {
                         unsigned int vid = 0;
                         char vname[BUF_SIZE_256] = {0};
 
@@ -208,7 +221,7 @@ pci_parse_pci_ids(struct pqos_pci_info *info,
                                 } else
                                         vendor_found = 0;
                         }
-                } else if (vendor_found && line[1] != '\t') {
+                } else if (line[1] != '\t' && vendor_found) {
                         unsigned int did = 0;
                         char dname[BUF_SIZE_256] = {0};
 
@@ -217,9 +230,7 @@ pci_parse_pci_ids(struct pqos_pci_info *info,
                                         snprintf(info->device_name,
                                                  sizeof(info->device_name),
                                                  "%s", dname);
-                }
-
-                if (line[0] == '\t' && line[1] != '\t') {
+                } else if (line[1] != '\t' && class_found) {
                         unsigned int scid = 0;
                         char scname[BUF_SIZE_256] = {0};
 
@@ -230,7 +241,20 @@ pci_parse_pci_ids(struct pqos_pci_info *info,
                                                  "%s", scname);
                 }
         }
+}
 
+void
+pci_parse_pci_ids(struct pqos_pci_info *info,
+                  unsigned int class_code,
+                  unsigned int vendor_id,
+                  unsigned int device_id)
+{
+        FILE *fd = pci_ids_find(pci_ids_files, DIM(pci_ids_files));
+
+        if (fd == NULL)
+                return;
+
+        pci_ids_read(fd, info, class_code, vendor_id, device_id);
         fclose(fd);
 }
 
