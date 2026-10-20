@@ -712,6 +712,7 @@ $(BIN_DIR)/test_resctrl_mon_assoc: test_resctrl_mon_assoc.c $(LIB_OBJS)
 		-Wl,--wrap=scandir \
 		-Wl,--wrap=pqos_fopen \
 		-Wl,--wrap=pqos_fclose \
+		-Wl,--wrap=pqos_dir_exists \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

@@ -1015,20 +1015,38 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-static int
+PQOS_STATIC int
 resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
 {
         int ret;
         char buf[RESCTRL_MON_GROUP_NAME_SIZE];
         unsigned class_id;
+        struct resctrl_cpumask mask;
 
         ASSERT(name != NULL);
+
+        ret = alloc_assoc_get(lcore, &class_id);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /* the group's own directory first: a core still where the start put
+         * it, as it is at nearly every poll, needs no search through the
+         * class's groups, which reads a file of each and so grew with the
+         * groups started
+         */
+        if (resctrl_mon_cpumask_read(class_id, name, &mask) == PQOS_RETVAL_OK &&
+            resctrl_cpumask_get(lcore, &mask))
+                return PQOS_RETVAL_OK;
 
         ret = resctrl_mon_assoc_get(lcore, buf, sizeof(buf));
         /* core already associated with mon group */
         if (ret == PQOS_RETVAL_OK)
                 return PQOS_RETVAL_OK;
 
+        /* the class again, which the search looked the core up in too: a
+         * writer to resctrl, which the library's lock does not hold off, may
+         * have moved the core to another since the lookup above
+         */
         ret = alloc_assoc_get(lcore, &class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;

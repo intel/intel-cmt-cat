@@ -505,6 +505,250 @@ test_resctrl_mon_assoc_set_error(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+/* ======== resctrl_mon_assoc_restore ======== */
+
+static void
+test_resctrl_mon_assoc_restore_core_in_its_group(void **state
+                                                 __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+
+        /* the group's own directory has the core: no other group is read */
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 1);
+
+        ret = resctrl_mon_assoc_restore(lcore, "own");
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_resctrl_mon_assoc_restore_core_in_another_group(void **state
+                                                     __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 0);
+
+        /* the search of the class's groups finds it in "test", which is
+         * left as it is
+         */
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS1/mon_groups/");
+        will_return(__wrap_scandir, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "test");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 1);
+
+        ret = resctrl_mon_assoc_restore(lcore, "own");
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_resctrl_mon_assoc_restore_own_group_unreadable(void **state
+                                                    __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+
+        /* the group's own directory cannot be read, as when the group has
+         * none in the core's class, which does not fail the restore
+         */
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_ERROR);
+
+        /* the class's groups are searched instead, and the core, found in
+         * "test", is left there: nothing is made or written
+         */
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS1/mon_groups/");
+        will_return(__wrap_scandir, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "test");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 1);
+
+        ret = resctrl_mon_assoc_restore(lcore, "own");
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_resctrl_mon_assoc_restore_core_moved_out(void **state
+                                              __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+
+        /* the group's directory has lost the core */
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 0);
+
+        /* and no group of its class has it */
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS1/mon_groups/");
+        will_return(__wrap_scandir, 0);
+
+        /* so it is put back, in the class it is in */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/COS1/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 1);
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_value(__wrap_resctrl_mon_mkdir, class_id, 1);
+        expect_string(__wrap_resctrl_mon_mkdir, name, "own");
+        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_set, lcore, lcore);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_assoc_restore(lcore, "own");
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_resctrl_mon_assoc_restore_core_moved_to_another_class(
+    void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 3);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+
+        /* the group's directory in class 1 has lost the core */
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 0);
+
+        /* a writer to resctrl has moved it to class 2 since, where the
+         * search finds it in no group
+         */
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 3);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 2);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS2/mon_groups/");
+        will_return(__wrap_scandir, 0);
+
+        /* it is put back in the group's directory in class 2, not 1 */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 3);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 2);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/COS2/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 1);
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 3);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 2);
+        expect_value(__wrap_resctrl_mon_mkdir, class_id, 2);
+        expect_string(__wrap_resctrl_mon_mkdir, name, "own");
+        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 2);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_set, lcore, lcore);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 2);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_assoc_restore(lcore, "own");
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 /* ======== resctrl_mon_assoc_get_pid ======== */
 
 static void
@@ -727,6 +971,14 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_set_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_set),
             cmocka_unit_test(test_resctrl_mon_assoc_set_error),
+            cmocka_unit_test(test_resctrl_mon_assoc_restore_core_in_its_group),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_core_in_another_group),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_own_group_unreadable),
+            cmocka_unit_test(test_resctrl_mon_assoc_restore_core_moved_out),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_core_moved_to_another_class),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_no_alloc),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_unassigned),
