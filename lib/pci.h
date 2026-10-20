@@ -116,6 +116,13 @@ PQOS_LOCAL FILE *pci_ids_open(const char *const *files,
 PQOS_LOCAL FILE *pci_ids_find(const char *const *files, unsigned num_files);
 
 /**
+ * The conversion pci_ids_read() copies the name on a line of pci.ids with:
+ * into a buffer of BUF_SIZE_256, so at most 255 characters and the
+ * terminating NUL
+ */
+#define PCI_IDS_NAME "%255[^\n]"
+
+/**
  * @brief Reads a device's vendor, device and subclass names from pci.ids
  *
  * A name the database does not have is left as it was.

@@ -490,6 +490,24 @@ test_pci_parse_pci_ids_nowhere(void **state __attribute__((unused)))
 }
 
 /**
+ * @brief Reads the names of a device from a database
+ */
+static void
+names_in(char *ids,
+         struct pqos_pci_info *info,
+         unsigned int class_code,
+         unsigned int vendor_id,
+         unsigned int device_id)
+{
+        FILE *fd = fmemopen(ids, strlen(ids), "r");
+
+        assert_non_null(fd);
+        memset(info, 0, sizeof(*info));
+        pci_ids_read(fd, info, class_code, vendor_id, device_id);
+        fclose(fd);
+}
+
+/**
  * @brief Reads the names of a device from the database above
  */
 static void
@@ -498,12 +516,43 @@ names(struct pqos_pci_info *info,
       unsigned int vendor_id,
       unsigned int device_id)
 {
-        FILE *fd = fmemopen(m_ids, sizeof(m_ids) - 1, "r");
+        names_in(m_ids, info, class_code, vendor_id, device_id);
+}
 
-        assert_non_null(fd);
-        memset(info, 0, sizeof(*info));
-        pci_ids_read(fd, info, class_code, vendor_id, device_id);
-        fclose(fd);
+/**
+ * @brief Appends a run of one character to a database being built
+ */
+static void
+append_run(char *ids, size_t size, char c, size_t count)
+{
+        size_t used = strlen(ids);
+
+        assert_true(used + count < size);
+        memset(ids + used, c, count);
+        ids[used + count] = '\0';
+}
+
+/**
+ * @brief Appends text to a database being built
+ */
+static void
+append(char *ids, size_t size, const char *text)
+{
+        assert_true(strlen(ids) + strlen(text) < size);
+        strcat(ids, text);
+}
+
+/**
+ * @brief Checks that a name is a run of one character, of a length
+ */
+static void
+assert_run(const char *name, char c, size_t count)
+{
+        size_t i;
+
+        assert_int_equal(strlen(name), count);
+        for (i = 0; i < count; i++)
+                assert_int_equal(name[i], c);
 }
 
 static void
@@ -553,6 +602,82 @@ test_pci_ids_read_last_vendor(void **state __attribute__((unused)))
         assert_string_equal(info.vendor_name, "Another vendor");
         assert_string_equal(info.device_name, "");
         assert_string_equal(info.subclass_name, "Co-processor");
+}
+
+static void
+test_pci_ids_read_a_long_name_is_cut(void **state __attribute__((unused)))
+{
+        char ids[1024] = "";
+        struct pqos_pci_info info;
+
+        /*
+         * A vendor, one of its devices and a subclass, each named by 300
+         * characters, more than the 256-byte buffers the parse copies a name
+         * into: each name is cut to 255, and nothing is written past them
+         */
+        append(ids, sizeof(ids), "8086  ");
+        append_run(ids, sizeof(ids), 'v', 300);
+        append(ids, sizeof(ids), "\n\t4948  ");
+        append_run(ids, sizeof(ids), 'd', 300);
+        append(ids, sizeof(ids), "\nC 0b  Processor\n\t40  ");
+        append_run(ids, sizeof(ids), 's', 300);
+        append(ids, sizeof(ids), "\n");
+
+        names_in(ids, &info, 0x0b4000, 0x8086, 0x4948);
+        assert_run(info.vendor_name, 'v', 255);
+        assert_run(info.device_name, 'd', 255);
+        assert_run(info.subclass_name, 's', 255);
+}
+
+static void
+test_pci_ids_name_is_bounded(void **state __attribute__((unused)))
+{
+        /*
+         * a name buffer as the parse has it, then guard bytes, room enough
+         * for an unbounded copy of any line, so that a conversion without
+         * its bound fails the case and does not overrun the stack
+         */
+        char name[BUF_SIZE_256 * 2];
+        char line[512] = "8086  "; /* the parse reads lines of up to 511 */
+        unsigned int id = 0;
+        size_t i;
+        int ret;
+
+        memset(name, 'G', sizeof(name));
+        append_run(line, sizeof(line), 'n', 400);
+        ret = sscanf(line, "%x " PCI_IDS_NAME, &id, name);
+        assert_int_equal(ret, 2);
+        assert_int_equal(id, 0x8086);
+        assert_run(name, 'n', BUF_SIZE_256 - 1);
+        for (i = BUF_SIZE_256; i < sizeof(name); i++)
+                assert_int_equal(name[i], 'G');
+}
+
+static void
+test_pci_ids_read_a_line_longer_than_the_buffer_is_one_line(
+    void **state __attribute__((unused)))
+{
+        char ids[1024] = "";
+        struct pqos_pci_info info;
+
+        /*
+         * A vendor line of 530 characters, whose part past the 511 the line
+         * buffer holds looks like a device line of that vendor. It is one
+         * line: its name is cut, and its end names no device. The line after
+         * it is read as one.
+         */
+        append(ids, sizeof(ids), "8086  ");
+        append_run(ids, sizeof(ids), 'x', 505);
+        append(ids, sizeof(ids),
+               "\t1234  Not a device\n"
+               "\t5678  A device\n");
+
+        names_in(ids, &info, 0x0b4000, 0x8086, 0x1234);
+        assert_run(info.vendor_name, 'x', 255);
+        assert_string_equal(info.device_name, "");
+
+        names_in(ids, &info, 0x0b4000, 0x8086, 0x5678);
+        assert_string_equal(info.device_name, "A device");
 }
 
 static void
@@ -611,7 +736,11 @@ main(void)
             cmocka_unit_test(test_pci_ids_read_bridge),
             cmocka_unit_test(test_pci_ids_read_class_not_listed),
             cmocka_unit_test(test_pci_ids_read_last_vendor),
-            cmocka_unit_test(test_pci_ids_read_two_tabs_are_neither)};
+            cmocka_unit_test(test_pci_ids_read_two_tabs_are_neither),
+            cmocka_unit_test(test_pci_ids_name_is_bounded),
+            cmocka_unit_test(test_pci_ids_read_a_long_name_is_cut),
+            cmocka_unit_test(
+                test_pci_ids_read_a_line_longer_than_the_buffer_is_one_line)};
 
         return cmocka_run_group_tests(tests, dir_setup, dir_teardown);
 }

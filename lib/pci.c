@@ -191,6 +191,19 @@ pci_ids_read(FILE *fd,
         unsigned int subclass = (class_code >> 8) & 0xFF;
 
         while (fgets(line, sizeof(line), fd)) {
+                /*
+                 * A line longer than the buffer is read up to it, and the
+                 * rest of it is passed over, so that what follows is not
+                 * taken for a line of its own
+                 */
+                if (strchr(line, '\n') == NULL) {
+                        int c;
+
+                        do {
+                                c = fgetc(fd);
+                        } while (c != EOF && c != '\n');
+                }
+
                 if (line[0] == '#')
                         continue;
 
@@ -212,7 +225,8 @@ pci_ids_read(FILE *fd,
                         unsigned int vid = 0;
                         char vname[BUF_SIZE_256] = {0};
 
-                        if (sscanf(line, "%x %[^\n]", &vid, vname) == 2) {
+                        if (sscanf(line, "%x " PCI_IDS_NAME, &vid, vname) ==
+                            2) {
                                 if (vid == vendor_id) {
                                         snprintf(info->vendor_name,
                                                  sizeof(info->vendor_name),
@@ -225,7 +239,8 @@ pci_ids_read(FILE *fd,
                         unsigned int did = 0;
                         char dname[BUF_SIZE_256] = {0};
 
-                        if (sscanf(line, "\t%x %[^\n]", &did, dname) == 2)
+                        if (sscanf(line, "\t%x " PCI_IDS_NAME, &did, dname) ==
+                            2)
                                 if (did == device_id)
                                         snprintf(info->device_name,
                                                  sizeof(info->device_name),
@@ -234,7 +249,8 @@ pci_ids_read(FILE *fd,
                         unsigned int scid = 0;
                         char scname[BUF_SIZE_256] = {0};
 
-                        if (sscanf(line, "\t%x %[^\n]", &scid, scname) == 2)
+                        if (sscanf(line, "\t%x " PCI_IDS_NAME, &scid, scname) ==
+                            2)
                                 if (scid == subclass)
                                         snprintf(info->subclass_name,
                                                  sizeof(info->subclass_name),
