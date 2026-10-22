@@ -381,9 +381,10 @@ __wrap_pqos_mba_set(const unsigned mba_id,
         check_expected_ptr(requested);
 
         ret = mock_type(int);
+        /* one entry of actual for each request, as the library writes it */
         if (ret == PQOS_RETVAL_OK && actual != NULL)
                 memcpy(actual, mock_ptr_type(struct pqos_mba *),
-                       sizeof(struct pqos_mba));
+                       num_clos * sizeof(struct pqos_mba));
 
         return ret;
 }

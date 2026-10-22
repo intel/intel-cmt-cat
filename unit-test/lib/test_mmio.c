@@ -132,6 +132,37 @@ __wrap_get_miss_iol3_mbm_rmid_range_v1(const struct pqos_erdt_ibrd *ibrd,
         return mock_type(int);
 }
 
+/* the MBA caps of one class and region as the register mocks hold them, by
+ * PQOS_BW_CTRL_TYPE_*_IDX, so that a reset can be followed write by write
+ */
+static struct {
+        unsigned bw[PQOS_BW_CTRL_TYPE_COUNT];
+        char log[16];    /* a letter a write: n minimum, o optimal, x maximum */
+        unsigned writes; /* letters in log */
+        int chain_broken; /* a write left minimum > optimal or optimal > max */
+        int fail_read;    /* 1 + the PQOS_BW_CTRL_TYPE_*_IDX whose read fails */
+} mba_regs;
+
+/**
+ * @brief Records a write of one cap in mba_regs
+ *
+ * @param [in] type PQOS_BW_CTRL_TYPE_*_IDX of the cap
+ * @param [in] letter the cap's letter in mba_regs.log
+ * @param [in] value value written
+ */
+static void
+mba_regs_write(const int type, const char letter, const unsigned value)
+{
+        mba_regs.bw[type] = value;
+        if (mba_regs.writes < sizeof(mba_regs.log) - 1)
+                mba_regs.log[mba_regs.writes++] = letter;
+        if (mba_regs.bw[PQOS_BW_CTRL_TYPE_MIN_IDX] >
+                mba_regs.bw[PQOS_BW_CTRL_TYPE_OPT_IDX] ||
+            mba_regs.bw[PQOS_BW_CTRL_TYPE_OPT_IDX] >
+                mba_regs.bw[PQOS_BW_CTRL_TYPE_MAX_IDX])
+                mba_regs.chain_broken = 1;
+}
+
 int
 __wrap_get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                                          int region_num,
@@ -142,7 +173,9 @@ __wrap_get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         check_expected(region_num);
         check_expected(clos_number);
 
-        *value = 0;
+        if (mba_regs.fail_read == 1 + PQOS_BW_CTRL_TYPE_OPT_IDX)
+                return PQOS_RETVAL_ERROR;
+        *value = mba_regs.bw[PQOS_BW_CTRL_TYPE_OPT_IDX];
         return PQOS_RETVAL_OK;
 }
 
@@ -156,7 +189,9 @@ __wrap_get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         check_expected(region_num);
         check_expected(clos_number);
 
-        *value = 0;
+        if (mba_regs.fail_read == 1 + PQOS_BW_CTRL_TYPE_MIN_IDX)
+                return PQOS_RETVAL_ERROR;
+        *value = mba_regs.bw[PQOS_BW_CTRL_TYPE_MIN_IDX];
         return PQOS_RETVAL_OK;
 }
 
@@ -170,7 +205,9 @@ __wrap_get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         check_expected(region_num);
         check_expected(clos_number);
 
-        *value = 0;
+        if (mba_regs.fail_read == 1 + PQOS_BW_CTRL_TYPE_MAX_IDX)
+                return PQOS_RETVAL_ERROR;
+        *value = mba_regs.bw[PQOS_BW_CTRL_TYPE_MAX_IDX];
         return PQOS_RETVAL_OK;
 }
 
@@ -184,6 +221,8 @@ __wrap_set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         check_expected(region_num);
         check_expected(clos_number);
         check_expected(value);
+
+        mba_regs_write(PQOS_BW_CTRL_TYPE_OPT_IDX, 'o', value);
 
         return mock_type(int);
 }
@@ -199,6 +238,8 @@ __wrap_set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         check_expected(clos_number);
         check_expected(value);
 
+        mba_regs_write(PQOS_BW_CTRL_TYPE_MIN_IDX, 'n', value);
+
         return mock_type(int);
 }
 
@@ -212,6 +253,8 @@ __wrap_set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         check_expected(region_num);
         check_expected(clos_number);
         check_expected(value);
+
+        mba_regs_write(PQOS_BW_CTRL_TYPE_MAX_IDX, 'x', value);
 
         return mock_type(int);
 }
@@ -481,8 +524,14 @@ test_mba_set_resolves_domain_id(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/**
+ * @brief Asserts that an MBA request within its domain's range is written
+ *
+ * @param [in] bw optimal bandwidth limit value
+ * @param [in] range the MARC's MBA BW Control Window Range
+ */
 static void
-test_mba_set_accepts_max_bw(void **state __attribute__((unused)))
+assert_mba_set_accepts_in_range(const int bw, const uint32_t range)
 {
         struct pqos_cpu_agent_info cpu_agent = {0};
         struct pqos_erdt_info erdt = {0};
@@ -494,8 +543,9 @@ test_mba_set_accepts_max_bw(void **state __attribute__((unused)))
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = range;
 
-        mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, MBA_MAX_BW);
+        mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, bw);
 
         will_return(__wrap__pqos_get_erdt, &erdt);
         mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
@@ -503,8 +553,7 @@ test_mba_set_accepts_max_bw(void **state __attribute__((unused)))
                      &cpu_agent.marc);
         expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, region_num, 0);
         expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number, 1);
-        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, value,
-                     MBA_MAX_BW);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, value, bw);
         will_return(__wrap_set_mba_optimal_bw_region_clos_v1, PQOS_RETVAL_OK);
 
         ret = mmio_mba_set(0, 1, &requested, NULL);
@@ -512,20 +561,33 @@ test_mba_set_accepts_max_bw(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+static void
+test_mba_set_accepts_max_bw(void **state __attribute__((unused)))
+{
+        /* no range from the MARC: the 9-bit fields' largest value */
+        assert_mba_set_accepts_in_range(0x1FF, 0);
+}
+
 /**
  * @brief Asserts that an MBA request is rejected without any register write
  *
- * No expect_*() call is registered for the setter wrapper, so cmocka fails the
- * test if the request reaches it.
+ * No expect_*() call is registered for the setter wrappers, so cmocka fails
+ * the test if the request reaches them.
  *
  * @param [in] num_mem_regions number of memory regions advertised by MRRM
  * @param [in] region_num memory region number
- * @param [in] bw optimal bandwidth limit value
+ * @param [in] type PQOS_BW_CTRL_TYPE_*_IDX of the bandwidth limit requested
+ * @param [in] bw bandwidth limit value
+ * @param [in] range the MARC's MBA BW Control Window Range
+ * @param [in] log text the error logged contains, or NULL not to check it
  */
 static void
-assert_mba_set_rejects(const uint8_t num_mem_regions,
-                       const int region_num,
-                       const int bw)
+assert_mba_set_rejects_type(const uint8_t num_mem_regions,
+                            const int region_num,
+                            const int type,
+                            const int bw,
+                            const uint32_t range,
+                            const char *log)
 {
         struct pqos_cpu_agent_info cpu_agent = {0};
         struct pqos_erdt_info erdt = {0};
@@ -537,15 +599,146 @@ assert_mba_set_rejects(const uint8_t num_mem_regions,
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = range;
 
-        mba_request_init(&requested, cpu_agent.rmdd.domain_id, region_num, bw);
+        mba_request_init(&requested, cpu_agent.rmdd.domain_id, region_num, -1);
+        requested.mem_regions[0].bw_ctrl_val[type] = bw;
 
         will_return(__wrap__pqos_get_erdt, &erdt);
         mrrm_will_return(&mrrm, num_mem_regions);
+        test_log[0] = '\0';
 
         ret = mmio_mba_set(0, 1, &requested, NULL);
 
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        if (log != NULL)
+                assert_non_null(strstr(test_log, log));
+}
+
+/**
+ * @brief assert_mba_set_rejects_type() for the optimal bandwidth limit
+ *
+ * @param [in] num_mem_regions number of memory regions advertised by MRRM
+ * @param [in] region_num memory region number
+ * @param [in] bw optimal bandwidth limit value
+ * @param [in] range the MARC's MBA BW Control Window Range
+ */
+static void
+assert_mba_set_rejects_in_range(const uint8_t num_mem_regions,
+                                const int region_num,
+                                const int bw,
+                                const uint32_t range)
+{
+        assert_mba_set_rejects_type(num_mem_regions, region_num,
+                                    PQOS_BW_CTRL_TYPE_OPT_IDX, bw, range, NULL);
+}
+
+/**
+ * @brief assert_mba_set_rejects_in_range() for an agent whose MARC gives no
+ *        MBA BW Control Window Range, so that the fields' 0x1FF bounds it
+ */
+static void
+assert_mba_set_rejects(const uint8_t num_mem_regions,
+                       const int region_num,
+                       const int bw)
+{
+        assert_mba_set_rejects_in_range(num_mem_regions, region_num, bw, 0);
+}
+
+static void
+test_mba_set_rejects_outside_window_range(void **state __attribute__((unused)))
+{
+        /* Q from the MARC: 1 through 0xFF, for each of the three caps */
+        for (int type = 0; type < PQOS_BW_CTRL_TYPE_COUNT; type++) {
+                assert_mba_set_rejects_type(
+                    PQOS_MAX_MEM_REGIONS, 0, type, 0x100, 0xFF,
+                    "bandwidth value 0x100 is out of range (0x1-0xff)");
+                assert_mba_set_rejects_type(
+                    PQOS_MAX_MEM_REGIONS, 0, type, 0x1FF, 0xFF,
+                    "bandwidth value 0x1ff is out of range (0x1-0xff)");
+                /* 0 is not a value the registers take, whatever Q */
+                assert_mba_set_rejects_type(
+                    PQOS_MAX_MEM_REGIONS, 0, type, 0, 0xFF,
+                    "bandwidth value 0 is out of range (0x1-0xff)");
+        }
+        /* a range wider than the fields leaves the fields' widest value */
+        assert_mba_set_rejects_type(
+            PQOS_MAX_MEM_REGIONS, 0, PQOS_BW_CTRL_TYPE_OPT_IDX, 0x200, 0x200,
+            "bandwidth value 0x200 is out of range (0x1-0x1ff)");
+        /* and so does no range */
+        assert_mba_set_rejects_type(
+            PQOS_MAX_MEM_REGIONS, 0, PQOS_BW_CTRL_TYPE_OPT_IDX, 0, 0,
+            "bandwidth value 0 is out of range (0x1-0x1ff)");
+}
+
+static void
+test_mba_set_accepts_window_range(void **state __attribute__((unused)))
+{
+        /* both ends of 1..Q */
+        assert_mba_set_accepts_in_range(0xFF, 0xFF);
+        assert_mba_set_accepts_in_range(1, 0xFF);
+        assert_mba_set_accepts_in_range(1, 0);
+}
+
+static void
+test_mba_set_uses_requested_domain_range(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba requested;
+        struct pqos_mba batch[2];
+        int ret;
+
+        /* 0xC0 is within domain 20's range and above domain 10's */
+        erdt.max_clos = 4;
+        erdt.num_cpu_agents = DIM(cpu_agents);
+        erdt.cpu_agents = cpu_agents;
+        cpu_agent_init(&cpu_agents[0], 10);
+        cpu_agents[0].marc.control_window_range = 0x7F;
+        cpu_agent_init(&cpu_agents[1], 20);
+        cpu_agents[1].marc.control_window_range = 0xFF;
+
+        mba_request_init(&requested, 20, 0, 0xC0);
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, marc,
+                     &cpu_agents[1].marc);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, region_num, 0);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number, 1);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, value, 0xC0);
+        will_return(__wrap_set_mba_optimal_bw_region_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        mba_request_init(&requested, 10, 0, 0xC0);
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "out of range (0x1-0x7f) in Domain "
+                                         "ID 0xa!"));
+
+        /* both in one call, the wider range first: each request is checked
+         * against its own domain's range, so the call is refused before any
+         * register is written - no setter is expected
+         */
+        mba_request_init(&batch[0], 20, 0, 0xC0);
+        mba_request_init(&batch[1], 10, 0, 0xC0);
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_set(0, DIM(batch), batch, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "out of range (0x1-0x7f) in Domain "
+                                         "ID 0xa!"));
 }
 
 static void
@@ -751,6 +944,80 @@ test_mba_get_rejects_unsupported_num_regions(void **state
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+/**
+ * @brief Queues the reads of the three caps a reset makes before it writes
+ *        them
+ *
+ * @param [in] marc the agent's MARC information
+ * @param [in] count number of class and region pairs reset
+ */
+static void
+expect_mba_reset_reads(const struct pqos_erdt_marc *marc, const int count)
+{
+        expect_value_count(__wrap_get_mba_optimal_bw_region_clos_v1, marc, marc,
+                           count);
+        expect_any_count(__wrap_get_mba_optimal_bw_region_clos_v1, region_num,
+                         count);
+        expect_any_count(__wrap_get_mba_optimal_bw_region_clos_v1, clos_number,
+                         count);
+        expect_value_count(__wrap_get_mba_min_bw_region_clos_v1, marc, marc,
+                           count);
+        expect_any_count(__wrap_get_mba_min_bw_region_clos_v1, region_num,
+                         count);
+        expect_any_count(__wrap_get_mba_min_bw_region_clos_v1, clos_number,
+                         count);
+        expect_value_count(__wrap_get_mba_max_bw_region_clos_v1, marc, marc,
+                           count);
+        expect_any_count(__wrap_get_mba_max_bw_region_clos_v1, region_num,
+                         count);
+        expect_any_count(__wrap_get_mba_max_bw_region_clos_v1, clos_number,
+                         count);
+}
+
+/**
+ * @brief Queues the writes of all three caps to one value, and their success
+ *
+ * @param [in] marc the agent's MARC information
+ * @param [in] value value each cap is written
+ * @param [in] count number of class and region pairs reset
+ */
+static void
+expect_mba_reset_writes(const struct pqos_erdt_marc *marc,
+                        const unsigned value,
+                        const int count)
+{
+        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, marc, marc,
+                           count);
+        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, region_num,
+                         count);
+        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number,
+                         count);
+        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, value,
+                           value, count);
+        will_return_count(__wrap_set_mba_optimal_bw_region_clos_v1,
+                          PQOS_RETVAL_OK, count);
+        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, marc, marc,
+                           count);
+        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, region_num,
+                         count);
+        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, clos_number,
+                         count);
+        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, value, value,
+                           count);
+        will_return_count(__wrap_set_mba_min_bw_region_clos_v1, PQOS_RETVAL_OK,
+                          count);
+        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, marc, marc,
+                           count);
+        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, region_num,
+                         count);
+        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, clos_number,
+                         count);
+        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, value, value,
+                           count);
+        will_return_count(__wrap_set_mba_max_bw_region_clos_v1, PQOS_RETVAL_OK,
+                          count);
+}
+
 static void
 test_mba_reset_uses_mrrm_count(void **state __attribute__((unused)))
 {
@@ -765,47 +1032,223 @@ test_mba_reset_uses_mrrm_count(void **state __attribute__((unused)))
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
+        /* Q, the MBA BW Control Window Range, below the fields' 0x1FF */
+        cpu_agent.marc.control_window_range = 0xFF;
+        memset(&mba_regs, 0, sizeof(mba_regs));
 
         will_return(__wrap__pqos_get_erdt, &erdt);
         mrrm_will_return(&mrrm, supported);
-
-        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, marc,
-                           &cpu_agent.marc, num_writes);
-        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, region_num,
-                         num_writes);
-        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number,
-                         num_writes);
-        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, value,
-                           MBA_MAX_BW, num_writes);
-        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, marc,
-                           &cpu_agent.marc, num_writes);
-        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, region_num,
-                         num_writes);
-        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, clos_number,
-                         num_writes);
-        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, value,
-                           MBA_MAX_BW, num_writes);
-        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, marc,
-                           &cpu_agent.marc, num_writes);
-        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, region_num,
-                         num_writes);
-        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, clos_number,
-                         num_writes);
-        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, value,
-                           MBA_MAX_BW, num_writes);
-
-        for (int i = 0; i < num_writes; i++) {
-                will_return(__wrap_set_mba_optimal_bw_region_clos_v1,
-                            PQOS_RETVAL_OK);
-                will_return(__wrap_set_mba_min_bw_region_clos_v1,
-                            PQOS_RETVAL_OK);
-                will_return(__wrap_set_mba_max_bw_region_clos_v1,
-                            PQOS_RETVAL_OK);
-        }
+        expect_mba_reset_reads(&cpu_agent.marc, num_writes);
+        expect_mba_reset_writes(&cpu_agent.marc, 0xFF, num_writes);
 
         ret = mmio_alloc_reset_mba();
 
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/**
+ * @brief Asserts that a reset writes the fields' largest value into all three
+ *        caps of an agent whose MARC gives the range given
+ *
+ * @param [in] range the MARC's MBA BW Control Window Range
+ */
+static void
+assert_mba_reset_writes_field_max(const uint32_t range)
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = range;
+        memset(&mba_regs, 0, sizeof(mba_regs));
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        expect_mba_reset_reads(&cpu_agent.marc, 1);
+        /* the field's width, not PQOS_MMIO_MBA_MAX_BW, which it is tested by */
+        expect_mba_reset_writes(&cpu_agent.marc, 0x1FF, 1);
+
+        ret = mmio_alloc_reset_mba();
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_mba_reset_without_window_range_writes_field_max(void **state
+                                                     __attribute__((unused)))
+{
+        /* a MARC that gives no MBA BW Control Window Range */
+        assert_mba_reset_writes_field_max(0);
+}
+
+static void
+test_mba_reset_window_range_above_field_writes_field_max(
+    void **state __attribute__((unused)))
+{
+        /* a range wider than the 9-bit fields: a write of it would spill
+         * into the bits beside the field
+         */
+        assert_mba_reset_writes_field_max(0x200);
+}
+
+static void
+test_mba_reset_writes_each_domain_range(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        const int num_writes = 2; /* max_clos * regions, an agent */
+        int ret;
+
+        erdt.max_clos = 2;
+        erdt.num_cpu_agents = DIM(cpu_agents);
+        erdt.cpu_agents = cpu_agents;
+        cpu_agent_init(&cpu_agents[0], 10);
+        cpu_agents[0].marc.control_window_range = 0x7F;
+        cpu_agent_init(&cpu_agents[1], 20);
+        cpu_agents[1].marc.control_window_range = 0xFF;
+        memset(&mba_regs, 0, sizeof(mba_regs));
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        /* each agent's caps get that agent's Q */
+        expect_mba_reset_reads(&cpu_agents[0].marc, num_writes);
+        expect_mba_reset_reads(&cpu_agents[1].marc, num_writes);
+        expect_mba_reset_writes(&cpu_agents[0].marc, 0x7F, num_writes);
+        expect_mba_reset_writes(&cpu_agents[1].marc, 0xFF, num_writes);
+
+        ret = mmio_alloc_reset_mba();
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/**
+ * @brief Asserts the order a reset to Q = 0xFF writes the caps in from the
+ *        caps given, and that no write leaves the minimum above the optimal
+ *        or the optimal above the maximum
+ *
+ * @param [in] min minimum bandwidth cap found
+ * @param [in] opt optimal bandwidth cap found
+ * @param [in] max maximum bandwidth cap found
+ * @param [in] order the caps' letters in the order written, as mba_regs.log
+ */
+static void
+assert_mba_reset_order(const unsigned min,
+                       const unsigned opt,
+                       const unsigned max,
+                       const char *order)
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = 0xFF;
+        memset(&mba_regs, 0, sizeof(mba_regs));
+        mba_regs.bw[PQOS_BW_CTRL_TYPE_MIN_IDX] = min;
+        mba_regs.bw[PQOS_BW_CTRL_TYPE_OPT_IDX] = opt;
+        mba_regs.bw[PQOS_BW_CTRL_TYPE_MAX_IDX] = max;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        expect_mba_reset_reads(&cpu_agent.marc, 1);
+        expect_mba_reset_writes(&cpu_agent.marc, 0xFF, 1);
+
+        ret = mmio_alloc_reset_mba();
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(mba_regs.log, order);
+        assert_false(mba_regs.chain_broken);
+}
+
+/**
+ * @brief Asserts that a reset whose read of one cap fails returns the error
+ *        and writes no cap: the order of the writes is decided from all three
+ *        reads, so none is made on two of them
+ *
+ * @param [in] type PQOS_BW_CTRL_TYPE_*_IDX of the cap whose read fails
+ * @param [in] reads the reads made up to the failing one, in the order the
+ *             reset makes them: minimum, optimal, maximum
+ */
+static void
+assert_mba_reset_read_fails(const int type, const int reads)
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = 0xFF;
+        memset(&mba_regs, 0, sizeof(mba_regs));
+        mba_regs.fail_read = 1 + type;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        expect_value(__wrap_get_mba_min_bw_region_clos_v1, marc,
+                     &cpu_agent.marc);
+        expect_any(__wrap_get_mba_min_bw_region_clos_v1, region_num);
+        expect_any(__wrap_get_mba_min_bw_region_clos_v1, clos_number);
+        if (reads > 1) {
+                expect_value(__wrap_get_mba_optimal_bw_region_clos_v1, marc,
+                             &cpu_agent.marc);
+                expect_any(__wrap_get_mba_optimal_bw_region_clos_v1,
+                           region_num);
+                expect_any(__wrap_get_mba_optimal_bw_region_clos_v1,
+                           clos_number);
+        }
+        if (reads > 2) {
+                expect_value(__wrap_get_mba_max_bw_region_clos_v1, marc,
+                             &cpu_agent.marc);
+                expect_any(__wrap_get_mba_max_bw_region_clos_v1, region_num);
+                expect_any(__wrap_get_mba_max_bw_region_clos_v1, clos_number);
+        }
+
+        /* no setter expectation: a write would fail the case */
+        ret = mmio_alloc_reset_mba();
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(mba_regs.writes, 0);
+}
+
+static void
+test_mba_reset_stops_at_a_cap_it_cannot_read(void **state
+                                             __attribute__((unused)))
+{
+        assert_mba_reset_read_fails(PQOS_BW_CTRL_TYPE_MIN_IDX, 1);
+        assert_mba_reset_read_fails(PQOS_BW_CTRL_TYPE_OPT_IDX, 2);
+        assert_mba_reset_read_fails(PQOS_BW_CTRL_TYPE_MAX_IDX, 3);
+}
+
+static void
+test_mba_reset_keeps_cap_order(void **state __attribute__((unused)))
+{
+        /* all above Q, as resets that wrote 0x1FF left them: lowered,
+         * minimum first
+         */
+        assert_mba_reset_order(0x1FF, 0x1FF, 0x1FF, "nox");
+        /* all below Q: raised, maximum first */
+        assert_mba_reset_order(1, 1, 1, "xon");
+        /* on both sides of Q: those above lowered, then the rest raised */
+        assert_mba_reset_order(1, 0x1FF, 0x1FF, "oxn");
+        /* the minimum above the optimal, as restoring the optimal caps alone
+         * left them: the minimum is lowered first, which mends that
+         */
+        assert_mba_reset_order(0x1FF, 0xFF, 0x1FF, "nxo");
+        /* at Q already */
+        assert_mba_reset_order(0xFF, 0xFF, 0xFF, "xon");
 }
 
 static void
@@ -827,46 +1270,17 @@ test_mba_reset_skips_domain_without_marc(void **state __attribute__((unused)))
         erdt.cpu_agents = cpu_agents;
         cpu_agents[0].rmdd.domain_id = 10;
         cpu_agent_init(&cpu_agents[1], 20);
+        cpu_agents[1].marc.control_window_range = 0xFF;
+        memset(&mba_regs, 0, sizeof(mba_regs));
 
         will_return(__wrap__pqos_get_erdt, &erdt);
         mrrm_will_return(&mrrm, supported);
 
-        /* the writes are expected against the second agent's MARC only, so a
-         * write through the zeroed one would fail the case
+        /* the reads and writes are expected against the second agent's MARC
+         * only, so one through the zeroed MARC would fail the case
          */
-        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, marc,
-                           &cpu_agents[1].marc, num_writes);
-        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, region_num,
-                         num_writes);
-        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number,
-                         num_writes);
-        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, value,
-                           MBA_MAX_BW, num_writes);
-        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, marc,
-                           &cpu_agents[1].marc, num_writes);
-        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, region_num,
-                         num_writes);
-        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, clos_number,
-                         num_writes);
-        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, value,
-                           MBA_MAX_BW, num_writes);
-        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, marc,
-                           &cpu_agents[1].marc, num_writes);
-        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, region_num,
-                         num_writes);
-        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, clos_number,
-                         num_writes);
-        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, value,
-                           MBA_MAX_BW, num_writes);
-
-        for (int i = 0; i < num_writes; i++) {
-                will_return(__wrap_set_mba_optimal_bw_region_clos_v1,
-                            PQOS_RETVAL_OK);
-                will_return(__wrap_set_mba_min_bw_region_clos_v1,
-                            PQOS_RETVAL_OK);
-                will_return(__wrap_set_mba_max_bw_region_clos_v1,
-                            PQOS_RETVAL_OK);
-        }
+        expect_mba_reset_reads(&cpu_agents[1].marc, num_writes);
+        expect_mba_reset_writes(&cpu_agents[1].marc, 0xFF, num_writes);
 
         ret = mmio_alloc_reset_mba();
 
@@ -1288,6 +1702,9 @@ main(void)
             cmocka_unit_test(test_mbm_range_rejects_invalid_range),
             cmocka_unit_test(test_mba_set_resolves_domain_id),
             cmocka_unit_test(test_mba_set_accepts_max_bw),
+            cmocka_unit_test(test_mba_set_accepts_window_range),
+            cmocka_unit_test(test_mba_set_rejects_outside_window_range),
+            cmocka_unit_test(test_mba_set_uses_requested_domain_range),
             cmocka_unit_test(test_mba_set_rejects_invalid_request),
             cmocka_unit_test(test_mba_set_rejects_unsupported_region),
             cmocka_unit_test(test_mba_set_validates_before_write),
@@ -1295,7 +1712,14 @@ main(void)
             cmocka_unit_test(test_mba_get_uses_mrrm_count),
             cmocka_unit_test(test_mba_get_rejects_unsupported_num_regions),
             cmocka_unit_test(test_mba_reset_uses_mrrm_count),
+            cmocka_unit_test(test_mba_reset_writes_each_domain_range),
+            cmocka_unit_test(test_mba_reset_keeps_cap_order),
+            cmocka_unit_test(test_mba_reset_stops_at_a_cap_it_cannot_read),
             cmocka_unit_test(test_mba_reset_skips_domain_without_marc),
+            cmocka_unit_test(
+                test_mba_reset_without_window_range_writes_field_max),
+            cmocka_unit_test(
+                test_mba_reset_window_range_above_field_writes_field_max),
             cmocka_unit_test(test_mba_set_rejects_domain_without_marc),
             cmocka_unit_test(test_mba_get_rejects_domain_without_marc),
             cmocka_unit_test(test_mba_set_rejects_partly_populated_marc),

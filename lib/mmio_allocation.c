@@ -261,6 +261,28 @@ cpu_agent_has_mba(const struct pqos_cpu_agent_info *cpu_agent)
 }
 
 /**
+ * @brief Gives the highest MBA bandwidth control value of a CPU agent, Q
+ *
+ * The agent's MARC structure gives it as the MBA BW Control Window Range:
+ * the values its registers take are 1 through Q, 1 the most throttling and
+ * Q none. A MARC that gives no range, or one wider than the 9-bit fields,
+ * leaves the fields' largest value.
+ *
+ * @param [in] marc the CPU agent's MARC information
+ *
+ * @return the highest bandwidth control value
+ */
+static unsigned
+mba_bw_range(const struct pqos_erdt_marc *marc)
+{
+        if (marc->control_window_range == 0 ||
+            marc->control_window_range > MBA_MAX_BW)
+                return MBA_MAX_BW;
+
+        return marc->control_window_range;
+}
+
+/**
  * @brief Report a domain that carries no MBA registers
  *
  * On the MMIO interface the MBA registers live in the MARC block of a CPU
@@ -297,6 +319,78 @@ log_domain_without_mba(const struct pqos_erdt_info *erdt, uint16_t domain_id)
                              "reports none");
 }
 
+/**
+ * The bandwidth caps of one class and region, minimum first and maximum last,
+ * so that the order of the table is the order the caps keep:
+ * minimum <= optimal <= maximum
+ */
+static const struct {
+        int (*get)(const struct pqos_erdt_marc *marc,
+                   int region_num,
+                   unsigned int clos_number,
+                   unsigned int *value);
+        int (*set)(const struct pqos_erdt_marc *marc,
+                   int region_num,
+                   unsigned int clos_number,
+                   unsigned int value);
+} mba_caps[] = {
+    {get_mba_min_bw_region_clos_v1, set_mba_min_bw_region_clos_v1},
+    {get_mba_optimal_bw_region_clos_v1, set_mba_optimal_bw_region_clos_v1},
+    {get_mba_max_bw_region_clos_v1, set_mba_max_bw_region_clos_v1},
+};
+
+/**
+ * @brief Sets the three bandwidth caps of one class and region to one value
+ *
+ * The caps above the value are lowered first, minimum first, and the others
+ * raised after them, maximum first. From caps with
+ * minimum <= optimal <= maximum that holds after every write, whichever side
+ * of the value each cap starts on; a fixed order breaks it from one side or
+ * the other.
+ *
+ * @param [in] marc the CPU agent's MARC information
+ * @param [in] region_num memory region
+ * @param [in] class_id class of service
+ * @param [in] bw value for all three caps
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+mba_reset_caps(const struct pqos_erdt_marc *marc,
+               const int region_num,
+               const unsigned class_id,
+               const unsigned bw)
+{
+        unsigned cur[DIM(mba_caps)];
+        unsigned i;
+        int ret;
+
+        for (i = 0; i < DIM(mba_caps); i++) {
+                ret = mba_caps[i].get(marc, region_num, class_id, &cur[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        for (i = 0; i < DIM(mba_caps); i++) {
+                if (cur[i] <= bw)
+                        continue;
+                ret = mba_caps[i].set(marc, region_num, class_id, bw);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        for (i = DIM(mba_caps); i-- > 0;) {
+                if (cur[i] > bw)
+                        continue;
+                ret = mba_caps[i].set(marc, region_num, class_id, bw);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 mmio_alloc_reset_mba(void)
 {
@@ -311,37 +405,23 @@ mmio_alloc_reset_mba(void)
                 return ret;
 
         for (unsigned domain = 0; domain < erdt->num_cpu_agents; domain++) {
+                const struct pqos_cpu_agent_info *agent =
+                    &erdt->cpu_agents[domain];
+
                 /* An agent enumerated without a MARC block holds no MBA
                  * register to reset. Writing one anyway would map its zeroed
                  * register base, which fails, and take the whole allocation
                  * reset down with it, leaving every other domain unreset.
                  */
-                if (!cpu_agent_has_mba(&erdt->cpu_agents[domain]))
+                if (!cpu_agent_has_mba(agent))
                         continue;
+
+                /* the caps equal and unthrottled, as the hardware starts */
+                const unsigned bw = mba_bw_range(&agent->marc);
 
                 for (unsigned i = 0; i < erdt->max_clos; i++) {
                         for (int j = 0; j < (int)num_mem_regions; j++) {
-                                ret = set_mba_optimal_bw_region_clos_v1(
-                                    (const struct pqos_erdt_marc *)&erdt
-                                        ->cpu_agents[domain]
-                                        .marc,
-                                    j, i, MBA_MAX_BW);
-                                if (ret != PQOS_RETVAL_OK)
-                                        return ret;
-
-                                ret = set_mba_min_bw_region_clos_v1(
-                                    (const struct pqos_erdt_marc *)&erdt
-                                        ->cpu_agents[domain]
-                                        .marc,
-                                    j, i, MBA_MAX_BW);
-                                if (ret != PQOS_RETVAL_OK)
-                                        return ret;
-
-                                ret = set_mba_max_bw_region_clos_v1(
-                                    (const struct pqos_erdt_marc *)&erdt
-                                        ->cpu_agents[domain]
-                                        .marc,
-                                    j, i, MBA_MAX_BW);
+                                ret = mba_reset_caps(&agent->marc, j, i, bw);
                                 if (ret != PQOS_RETVAL_OK)
                                         return ret;
                         }
@@ -354,8 +434,11 @@ mmio_alloc_reset_mba(void)
 /**
  * @brief Validates one MBA request
  *
- * The MARC bandwidth control fields are 9 bits wide. A wider value would be
- * silently cut down by the register write, so reject it instead.
+ * The values a CPU agent's MBA registers take are 1 through its Q, the MBA BW
+ * Control Window Range of its MARC structure (mba_bw_range()). A value
+ * outside it is rejected: the platform does not permit it, and above the
+ * 9-bit fields the register write would spill into the bits beside the field,
+ * as it ORs the value in unmasked.
  *
  * Memory regions are validated against the number of regions the platform
  * advertises through MRRM, not against PQOS_MAX_MEM_REGIONS, so a region the
@@ -391,6 +474,8 @@ mmio_mba_check_request(const struct pqos_mba *mba,
             (unsigned)mba->num_mem_regions > num_mem_regions)
                 return PQOS_RETVAL_PARAM;
 
+        const unsigned max_bw = mba_bw_range(&cpu_agent->marc);
+
         for (int j = 0; j < mba->num_mem_regions; j++) {
                 const int region_num = mba->mem_regions[j].region_num;
 
@@ -420,11 +505,12 @@ mmio_mba_check_request(const struct pqos_mba *mba,
                                 return PQOS_RETVAL_PARAM;
                         }
 
-                        if (bw > MBA_MAX_BW) {
+                        if (bw < 1 || (unsigned)bw > max_bw) {
                                 LOG_ERROR("MBA CLOS%u bandwidth value %#x is "
-                                          "out of range (0x0-%#x)!\n",
-                                          mba->class_id, (unsigned)bw,
-                                          MBA_MAX_BW);
+                                          "out of range (0x1-%#x) in Domain "
+                                          "ID 0x%x!\n",
+                                          mba->class_id, (unsigned)bw, max_bw,
+                                          mba->domain_id);
                                 return PQOS_RETVAL_PARAM;
                         }
                 }

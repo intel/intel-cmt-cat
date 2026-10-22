@@ -59,6 +59,11 @@ __wrap_strdup(const char *s)
 
 static int cleanup_alloc_opts(void **state);
 
+/* the pqos_inter_get() calls alloc_apply() makes for one MMIO MBA option
+ * applied
+ */
+#define INTER_GETS 2
+
 static void
 mock_inter_get(const enum pqos_interface inter, unsigned count)
 {
@@ -1067,6 +1072,160 @@ test_alloc_apply_mba(void **state)
 
         /* cleanup before test */
         sel_alloc_opt_num = 0;
+}
+
+/**
+ * @brief The MMIO request set_mba_clos() makes of each domain for
+ *        "mba:1=0xc0" on memory region 0, all three bandwidth limits asked
+ */
+static void
+mmio_mba_requests(struct pqos_mba *mbas, const unsigned n)
+{
+        unsigned i;
+        int type;
+
+        memset(mbas, 0, n * sizeof(*mbas));
+        for (i = 0; i < n; i++) {
+                memset(mbas[i].mem_regions, -1, sizeof(mbas[i].mem_regions));
+                mbas[i].class_id = 1;
+                mbas[i].mb_max = 0xc0;
+                mbas[i].domain_id = i;
+                mbas[i].num_mem_regions = 1;
+                mbas[i].mem_regions[0].region_num = 0;
+                for (type = 0; type < PQOS_BW_CTRL_TYPE_COUNT; type++)
+                        mbas[i].mem_regions[0].bw_ctrl_val[type] = 0xc0;
+        }
+}
+
+/**
+ * @brief Clears what an MMIO MBA case selected, so that no later case runs
+ *        with a domain, a memory region or a definition still selected;
+ *        set_alloc() has freed the definition already
+ */
+static void
+mmio_mba_requests_done(void)
+{
+        sel_alloc_domain_id.num_domain_ids = 0;
+        memset(&sel_alloc_mem_regions, 0, sizeof(sel_alloc_mem_regions));
+        alloc_opts[0] = NULL;
+        sel_alloc_opt_num = 0;
+}
+
+static void
+test_alloc_apply_mba_mmio_domains_in_one_request(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mba requested[2];
+        int ret = 0;
+
+        /* two domains, one call: the library checks both before it writes
+         * either, so a value one of them refuses leaves both as they were
+         */
+        mmio_mba_requests(requested, 2);
+        sel_alloc_opt_num = 1;
+        alloc_opts[0] = strdup("mba:1=0xc0");
+        selfn_alloc_domain_id("0,1");
+        selfn_alloc_mem_regions("0");
+
+        mock_inter_get(PQOS_INTER_MMIO, INTER_GETS);
+        will_return(__wrap_pqos_get_num_mem_regions, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_get_num_mem_regions, 1);
+        expect_value(__wrap_pqos_mba_set, mba_id, 0);
+        expect_value(__wrap_pqos_mba_set, num_clos, 2);
+        expect_memory(__wrap_pqos_mba_set, requested, requested,
+                      sizeof(requested));
+        will_return(__wrap_pqos_mba_set, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_mba_set, requested);
+
+        run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
+
+        assert_int_equal(ret, 1);
+        assert_true(output_has_text("Domain ID 0 MBA CLOS1 Memory Region 0 "
+                                    "Optimal Bandwidth=> 0xc0 requested, "
+                                    "0xc0 applied"));
+        assert_true(output_has_text("Domain ID 1 MBA CLOS1 Memory Region 0 "
+                                    "Maximum Bandwidth=> 0xc0 requested, "
+                                    "0xc0 applied"));
+
+        mmio_mba_requests_done();
+}
+
+static void
+test_alloc_apply_mba_mmio_refused_writes_no_domain(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mba requested[2];
+        int ret = 0;
+
+        /* the library refuses the value for domain 1, whose range is narrower:
+         * one call, nothing written, and both domains are said to have failed
+         */
+        mmio_mba_requests(requested, 2);
+        sel_alloc_opt_num = 1;
+        alloc_opts[0] = strdup("mba:1=0xc0");
+        selfn_alloc_domain_id("0,1");
+        selfn_alloc_mem_regions("0");
+
+        /* one fewer: nothing applied, so nothing is asked afterwards */
+        mock_inter_get(PQOS_INTER_MMIO, INTER_GETS - 1);
+        will_return(__wrap_pqos_get_num_mem_regions, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_get_num_mem_regions, 1);
+        expect_value(__wrap_pqos_mba_set, mba_id, 0);
+        expect_value(__wrap_pqos_mba_set, num_clos, 2);
+        expect_memory(__wrap_pqos_mba_set, requested, requested,
+                      sizeof(requested));
+        will_return(__wrap_pqos_mba_set, PQOS_RETVAL_PARAM);
+
+        run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
+
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("Domain ID 0 MBA CLOS1 - FAILED!"));
+        assert_true(output_has_text("Domain ID 1 MBA CLOS1 - FAILED!"));
+        assert_false(output_has_text("applied"));
+        assert_false(output_has_text("partly written"));
+
+        mmio_mba_requests_done();
+}
+
+static void
+test_alloc_apply_mba_mmio_failed_write_is_said_of_all(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mba requested[2];
+        int ret = 0;
+
+        /* a register write fails after the checks: domains before it may be
+         * written and the library does not say which, so no domain is said
+         * to have failed or to be as it was
+         */
+        mmio_mba_requests(requested, 2);
+        sel_alloc_opt_num = 1;
+        alloc_opts[0] = strdup("mba:1=0xc0");
+        selfn_alloc_domain_id("0,1");
+        selfn_alloc_mem_regions("0");
+
+        mock_inter_get(PQOS_INTER_MMIO, INTER_GETS - 1);
+        will_return(__wrap_pqos_get_num_mem_regions, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_get_num_mem_regions, 1);
+        expect_value(__wrap_pqos_mba_set, mba_id, 0);
+        expect_value(__wrap_pqos_mba_set, num_clos, 2);
+        expect_memory(__wrap_pqos_mba_set, requested, requested,
+                      sizeof(requested));
+        will_return(__wrap_pqos_mba_set, PQOS_RETVAL_ERROR);
+
+        run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
+
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("MBA CLOS1 - FAILED! The selected domains "
+                                    "may be partly written; -s shows what "
+                                    "they hold."));
+        assert_false(output_has_text("Domain ID"));
+        assert_false(output_has_text("applied"));
+
+        mmio_mba_requests_done();
 }
 
 static void
@@ -2304,6 +2463,11 @@ main(void)
                 test_print_domain_alloc_config_skips_domain_without_card),
             cmocka_unit_test(test_alloc_apply_mba),
             cmocka_unit_test(test_alloc_apply_mba_max),
+            cmocka_unit_test(test_alloc_apply_mba_mmio_domains_in_one_request),
+            cmocka_unit_test(
+                test_alloc_apply_mba_mmio_refused_writes_no_domain),
+            cmocka_unit_test(
+                test_alloc_apply_mba_mmio_failed_write_is_said_of_all),
             cmocka_unit_test(test_alloc_apply_l3ca),
             cmocka_unit_test(test_alloc_apply_l3ca_cdp),
             cmocka_unit_test(test_alloc_apply_l2),

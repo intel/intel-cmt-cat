@@ -110,9 +110,10 @@ const char *pqos_retval_to_string(int retval);
 #define PQOS_BW_CTRL_TYPE_MAX_IDX 2
 
 /**
- * Maximum MBA bandwidth control value on the MMIO interface. The Intel(R) RDT
- * architecture specification defines the bandwidth control fields as 9 bits
- * wide.
+ * Largest value of an MBA bandwidth control field on the MMIO interface: the
+ * Intel(R) RDT architecture specification defines the fields as 9 bits wide.
+ * A platform permits 1 through Q, Q being the MBA BW Control Window Range of
+ * the CPU agent's ERDT MARC structure, which may be lower.
  */
 #define PQOS_MMIO_MBA_MAX_BW 0x1FF
 
@@ -2443,8 +2444,15 @@ int pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * Memory regions data structure with bandwidth control type
  */
 struct pqos_mba_mem_region {
-        int bw_ctrl_val[PQOS_BW_CTRL_TYPE_COUNT]; /**< Q value: 0 - 0x1FF.
-                                                     Invalid value is -1 */
+        int bw_ctrl_val[PQOS_BW_CTRL_TYPE_COUNT]; /**< bandwidth value. To
+                                                     set: 1 through the
+                                                     domain's MARC
+                                                     control_window_range, or
+                                                     through 0x1FF where that is
+                                                     0 or wider; not requested
+                                                     is -1. As read: the
+                                                     register field, 0 through
+                                                     0x1FF */
         int region_num; /**< Memory region number: 0 or 1 or 2 or 3.
                            Invalid value is -1 */
 };
@@ -2475,8 +2483,17 @@ struct pqos_mba {
  * @param [in]  requested table with class of service definitions
  * @param [out] actual table with class of service definitions
  *
+ * On the MMIO interface every requested bandwidth value is checked against
+ * its domain's range (see pqos_mba_mem_region) before any register is
+ * written. A table read by pqos_mba_get() from caps programmed outside that
+ * range, as earlier releases' resets left them at 0x1FF, is refused, however
+ * often it is given and whatever is reset meanwhile: replace its values that
+ * are out of range, or read the table again after an allocation reset has
+ * put the caps in range.
+ *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM on an invalid or out of range request
  */
 int pqos_mba_set(const unsigned mba_id,
                  const unsigned num_clos,
@@ -2491,6 +2508,9 @@ int pqos_mba_set(const unsigned mba_id,
  *              that can be accommodated at \a mba_tab
  * @param [out] num_clos number of classes of service read into \a mba_tab
  * @param [out] mba_tab table with read classes of service
+ *
+ * On the MMIO interface the bandwidth values are the register fields as read,
+ * which may lie outside the range pqos_mba_set() accepts.
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success

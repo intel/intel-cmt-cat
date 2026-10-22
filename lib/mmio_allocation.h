@@ -49,6 +49,10 @@ extern "C" {
  * @brief Writes default values into Optimal, Minimum and Maximum MBA Registers
  * for CPU agents
  *
+ * Each CPU agent's optimal, minimum and maximum bandwidth fields all get the
+ * agent's Q, the MBA BW Control Window Range of its MARC structure, or 0x1FF
+ * where that range is 0 or wider than the fields: the caps equal and
+ * unthrottled, the state the hardware is initialized to.
  * Used as part of CAT/MBA reset process.
  *
  * @return Operation status

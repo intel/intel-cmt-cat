@@ -40,7 +40,8 @@
 #define DASE (ACPI_ERDT_STRUCT_DASE_HEADER_LENGTH + 2)
 #define CPU                                                                    \
         (sizeof(struct acpi_table_erdt_rmdd) +                                 \
-         sizeof(struct acpi_table_erdt_cacd) + 4)
+         sizeof(struct acpi_table_erdt_cacd) + 4 +                             \
+         sizeof(struct acpi_table_erdt_marc))
 #define DEV                                                                    \
         (sizeof(struct acpi_table_erdt_rmdd) +                                 \
          sizeof(struct acpi_table_erdt_dacd) + DASE)
@@ -107,12 +108,22 @@ expect_listing(const int listed, const int file_errno)
         expect_string(__wrap_access, path, ERDT_FILE);
         will_return(__wrap_access, file_errno);
 }
+/**
+ * @brief Writes an ERDT of one CPU domain and one device domain into f
+ *
+ * @param [out] f the fixture
+ * @param [in] with_marc whether the CPU domain carries a MARC: one without is
+ *             a domain enumerated for monitoring alone, and parses as well
+ */
 static void
-init(struct fixture *f)
+init_marc(struct fixture *f, const int with_marc)
 {
+        const size_t cpu_length =
+            CPU - (with_marc ? 0 : sizeof(struct acpi_table_erdt_marc));
         struct acpi_table_erdt *t;
         struct acpi_table_erdt_rmdd *cpu, *dev;
         struct acpi_table_erdt_cacd *cacd;
+        struct acpi_table_erdt_marc *marc;
         struct acpi_table_erdt_dacd *dacd;
         struct acpi_table_erdt_dase *dase;
         uint32_t id = 0x1234;
@@ -121,11 +132,11 @@ init(struct fixture *f)
         t = (void *)f->data;
         f->table.erdt = t;
         t->header.header.revision = ACPI_ERDT_REVISION;
-        t->header.header.length = SIZE;
+        t->header.header.length = SIZE - (CPU - cpu_length);
         t->header.max_clos = 16;
         cpu = (void *)t->erdt_sub_structures;
         cpu->type = 0;
-        cpu->length = CPU;
+        cpu->length = cpu_length;
         cpu->flags = 1;
         cpu->domain_id = 7;
         cpu->max_rmids = 3;
@@ -134,6 +145,21 @@ init(struct fixture *f)
         cacd->length = sizeof(*cacd) + 4;
         cacd->rmdd_domain_id = 7;
         memcpy(cacd->enumeration_ids, &id, 4);
+        /* every field a value of its own, so that one read from another's
+         * place shows
+         */
+        if (with_marc) {
+                marc = (void *)((uint8_t *)cacd + cacd->length);
+                marc->type = ACPI_ERDT_STRUCT_MARC_TYPE;
+                marc->length = sizeof(*marc);
+                marc->mba_flags = 3;
+                marc->register_indexing_function_version = 1;
+                marc->mba_optimal_bw_register_block_base_address = 0xf0000000;
+                marc->mba_minimum_bw_register_block_base_address = 0xf0001000;
+                marc->mba_maximum_bw_register_block_base_address = 0xf0002000;
+                marc->mba_register_block_size = 2;
+                marc->mba_bw_control_window_range = 0xff;
+        }
         dev = (void *)((uint8_t *)cpu + cpu->length);
         dev->type = 0;
         dev->length = DEV;
@@ -149,6 +175,12 @@ init(struct fixture *f)
         dase->segment_number = 2;
         dase->path[0] = 4;
         dase->path[1] = 1;
+}
+
+static void
+init(struct fixture *f)
+{
+        init_marc(f, 1);
 }
 static void
 expect_table(struct fixture *f)
@@ -170,6 +202,7 @@ test_valid(void **state __attribute__((unused)))
         struct pqos_cap cap = {0};
         struct pqos_cpuinfo cpu = {0};
         struct pqos_erdt_info *info = NULL;
+        const struct pqos_erdt_marc *marc;
 
         init(&f);
         expect_table(&f);
@@ -177,10 +210,46 @@ test_valid(void **state __attribute__((unused)))
         assert_int_equal(info->num_cpu_agents, 1);
         assert_int_equal(info->num_dev_agents, 1);
         assert_int_equal(info->cpu_agents[0].cacd.enumeration_ids[0], 0x1234);
+        marc = &info->cpu_agents[0].marc;
+        assert_int_equal(marc->flags, 3);
+        assert_int_equal(marc->reg_index_func_ver, 1);
+        assert_int_equal(marc->opt_bw_reg_block_base_addr, 0xf0000000);
+        assert_int_equal(marc->min_bw_reg_block_base_addr, 0xf0001000);
+        assert_int_equal(marc->max_bw_reg_block_base_addr, 0xf0002000);
+        assert_int_equal(marc->reg_block_size, 2);
+        /* Q, which the MMIO MBA reset writes and requests are checked by */
+        assert_int_equal(marc->control_window_range, 0xff);
         assert_int_equal(info->dev_agents[0].dacd.dase[0].path[0], 4);
         erdt_fini();
         erdt_fini();
 }
+static void
+test_valid_without_marc(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+        const struct pqos_erdt_marc *marc;
+
+        /* a CPU domain with no MARC parses, and its MARC information is
+         * zero: what the MMIO paths read as a domain without MBA registers
+         */
+        init_marc(&f, 0);
+        expect_table(&f);
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_OK);
+        assert_int_equal(info->num_cpu_agents, 1);
+        assert_int_equal(info->cpu_agents[0].cacd.enumeration_ids[0], 0x1234);
+        marc = &info->cpu_agents[0].marc;
+        assert_int_equal(marc->opt_bw_reg_block_base_addr, 0);
+        assert_int_equal(marc->min_bw_reg_block_base_addr, 0);
+        assert_int_equal(marc->max_bw_reg_block_base_addr, 0);
+        assert_int_equal(marc->control_window_range, 0);
+        assert_int_equal(info->num_dev_agents, 1);
+        assert_int_equal(info->dev_agents[0].dacd.dase[0].path[0], 4);
+        erdt_fini();
+}
+
 static void
 test_errors(void **state __attribute__((unused)))
 {
@@ -327,6 +396,7 @@ main(void)
 {
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_valid),
+            cmocka_unit_test(test_valid_without_marc),
             cmocka_unit_test(test_errors),
             cmocka_unit_test(test_no_table_is_said_nothing_of),
             cmocka_unit_test(test_an_unreadable_table_is_said),

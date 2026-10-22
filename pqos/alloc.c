@@ -651,7 +651,9 @@ set_mba_clos(const unsigned class_id,
                  */
                 if (available_bw > PQOS_MMIO_MBA_MAX_BW) {
                         printf("MBA CLOS%u bandwidth value %#" PRIx64
-                               " is out of range (0x1-%#x). "
+                               " is out of range: above %#x, the widest a "
+                               "bandwidth control field holds; the domain's "
+                               "range is shown by --print-topology. "
                                "Failed to set MBA configuration!\n",
                                class_id, available_bw, PQOS_MMIO_MBA_MAX_BW);
                         return -1;
@@ -756,6 +758,55 @@ set_mba_clos(const unsigned class_id,
         mba.num_mem_regions = mem_regions->num_mem_regions;
 
         /**
+         * On MMIO every selected domain is asked for in one call. The library
+         * checks each value against its own domain's range before it writes
+         * any, so a value one domain refuses (PQOS_RETVAL_PARAM) leaves every
+         * domain as it was, where a call per domain had written the domains
+         * before it. Any other failure is of a register write or read back,
+         * after the domains before it were written. The library does not say
+         * which those are, so such a failure is reported for the whole
+         * request.
+         */
+        if (interface == PQOS_INTER_MMIO) {
+                struct pqos_mba *requested = calloc(count, sizeof(*requested));
+                struct pqos_mba *applied = calloc(count, sizeof(*applied));
+
+                if (requested == NULL || applied == NULL) {
+                        free(requested);
+                        free(applied);
+                        printf("Failed to set MBA configuration!\n");
+                        return -1;
+                }
+
+                for (i = 0; i < count; i++) {
+                        requested[i] = mba;
+                        requested[i].domain_id =
+                            sel_alloc_domain_id.domain_ids[i];
+                }
+
+                ret = pqos_mba_set(requested[0].domain_id, count, requested,
+                                   applied);
+                if (ret == PQOS_RETVAL_OK) {
+                        for (i = 0; i < count; i++)
+                                print_mmio_mba_log(&requested[i], &applied[i]);
+                        set = count;
+                } else if (ret == PQOS_RETVAL_PARAM) {
+                        for (i = 0; i < count; i++)
+                                printf("Domain ID %u MBA CLOS%u - FAILED!\n",
+                                       requested[i].domain_id, mba.class_id);
+                } else
+                        printf("MBA CLOS%u - FAILED! The selected domains may "
+                               "be partly written; -s shows what they "
+                               "hold.\n",
+                               mba.class_id);
+
+                free(requested);
+                free(applied);
+                sel_alloc_mod += set;
+                return set < count ? -1 : (int)set;
+        }
+
+        /**
          * Set all selected classes
          */
         for (i = 0; i < count; i++) {
@@ -763,19 +814,13 @@ set_mba_clos(const unsigned class_id,
                 const char *package;
                 int ret = 0;
 
-                if (interface == PQOS_INTER_MMIO) {
-                        mba.domain_id = sel_alloc_domain_id.domain_ids[i];
-                        ret = pqos_mba_set(sel_alloc_domain_id.domain_ids[i], 1,
-                                           &mba, &actual);
-                } else
-                        ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
+                ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
 
-                if ((cpu->vendor == PQOS_VENDOR_AMD ||
-                     cpu->vendor == PQOS_VENDOR_HYGON) &&
-                    interface != PQOS_INTER_MMIO) {
+                if (cpu->vendor == PQOS_VENDOR_AMD ||
+                    cpu->vendor == PQOS_VENDOR_HYGON) {
                         package = "Core Complex";
                         unit = "";
-                } else if (interface != PQOS_INTER_MMIO) {
+                } else {
                         /**
                          * Label the output as "Domain ID" when the
                          * platform exposes multiple L3 CAT IDs per
@@ -787,30 +832,21 @@ set_mba_clos(const unsigned class_id,
                         else
                                 package = "SOCKET";
                         unit = "%";
-                } else
-                        package = "Domain ID";
+                }
 
-                if (ret != PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
-                        printf("%s %u MBA CLOS%u - FAILED!\n", package,
-                               mba.domain_id, mba.class_id);
-                        break;
-                } else if (ret != PQOS_RETVAL_OK) {
+                if (ret != PQOS_RETVAL_OK) {
                         printf("%s %u MBA CLOS%u - FAILED!\n", package,
                                sock_ids[i], mba.class_id);
                         break;
                 }
 
-                if (interface == PQOS_INTER_MMIO)
-                        print_mmio_mba_log(&mba, &actual);
-                else {
-                        printf("%s %u MBA CLOS%u => ", package, sock_ids[i],
-                               actual.class_id);
-                        if (ctrl == 1)
-                                printf("%u MBps\n", mba.mb_max);
-                        else
-                                printf("%u%s requested, %u%s applied\n",
-                                       mba.mb_max, unit, actual.mb_max, unit);
-                }
+                printf("%s %u MBA CLOS%u => ", package, sock_ids[i],
+                       actual.class_id);
+                if (ctrl == 1)
+                        printf("%u MBps\n", mba.mb_max);
+                else
+                        printf("%u%s requested, %u%s applied\n", mba.mb_max,
+                               unit, actual.mb_max, unit);
 
                 set++;
         }
