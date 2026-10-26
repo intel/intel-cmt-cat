@@ -45,12 +45,12 @@ os_cap_mon_resctrl_support(const enum pqos_mon_event event,
 
         check_expected(event);
         assert_non_null(supported);
-        assert_non_null(scale);
 
         ret = mock_type(int);
         if (ret == PQOS_RETVAL_OK) {
                 *supported = mock_type(int);
-                if (*supported)
+                /* the caller may not ask for the scale, as the real one */
+                if (*supported && scale != NULL)
                         *scale = mock_type(int);
         }
 
@@ -704,6 +704,110 @@ test_os_cap_mba_discover_ctrl(void **state)
         assert_int_equal(cap.ctrl_on, 1);
 }
 
+/* ======== os_cap_get_mba_ctrl ======== */
+
+/**
+ * resctrl mounted with the default options before the process started: MBA
+ * CTRL is off, as the mount options said, and its support is asked of the
+ * kernel, which answers \a probe; where it cannot, the support is decided
+ * from the memory bandwidth resctrl monitors, local \a mbl and total \a mbt
+ */
+static void
+assert_get_mba_ctrl(struct test_data *data,
+                    const int probe,
+                    const int mbl,
+                    const int mbt,
+                    const int expected)
+{
+        int supported;
+        int enabled;
+        int ret;
+
+        data->cap_mba.ctrl = -1;
+        data->cap_mba.ctrl_on = 0;
+
+        expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
+        will_return(__wrap_pqos_file_exists, 1);
+
+        expect_string(__wrap_resctrl_mount_option_supported, option,
+                      "mba_MBps");
+        will_return(__wrap_resctrl_mount_option_supported, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mount_option_supported, probe);
+
+        if (probe == -1) {
+                expect_value(os_cap_mon_resctrl_support, event,
+                             PQOS_MON_EVENT_LMEM_BW);
+                will_return(os_cap_mon_resctrl_support, PQOS_RETVAL_OK);
+                will_return(os_cap_mon_resctrl_support, mbl);
+        }
+        if (probe == -1 && !mbl) {
+                expect_value(os_cap_mon_resctrl_support, event,
+                             PQOS_MON_EVENT_TMEM_BW);
+                will_return(os_cap_mon_resctrl_support, PQOS_RETVAL_OK);
+                will_return(os_cap_mon_resctrl_support, mbt);
+        }
+
+        ret = os_cap_get_mba_ctrl(data->cap, data->cpu, &supported, &enabled);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(supported, expected);
+        assert_int_equal(enabled, 0);
+}
+
+static void
+test_os_cap_get_mba_ctrl_kernel_takes(void **state)
+{
+        /* the kernel takes mba_MBps: supported, whatever is monitored */
+        assert_get_mba_ctrl((struct test_data *)*state, 1, 0, 0, 1);
+}
+
+static void
+test_os_cap_get_mba_ctrl_kernel_refuses(void **state)
+{
+        /* refused: unsupported, and nothing is remounted to find out */
+        assert_get_mba_ctrl((struct test_data *)*state, 0, 1, 1, 0);
+}
+
+static void
+test_os_cap_get_mba_ctrl_local_bw(void **state)
+{
+        /* the kernel cannot be asked: local bandwidth, the support unknown */
+        assert_get_mba_ctrl((struct test_data *)*state, -1, 1, 0, -1);
+}
+
+static void
+test_os_cap_get_mba_ctrl_total_bw(void **state)
+{
+        /* total bandwidth only: the kernel may control from it */
+        assert_get_mba_ctrl((struct test_data *)*state, -1, 0, 1, -1);
+}
+
+static void
+test_os_cap_get_mba_ctrl_no_bw(void **state)
+{
+        assert_get_mba_ctrl((struct test_data *)*state, -1, 0, 0, 0);
+}
+
+static void
+test_os_cap_get_mba_ctrl_mounted_mbps(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int supported;
+        int enabled;
+        int ret;
+
+        /* mounted with mba_MBps: supported and on, and nothing is asked */
+        data->cap_mba.ctrl = -1;
+        data->cap_mba.ctrl_on = 1;
+
+        expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
+        will_return(__wrap_pqos_file_exists, 1);
+
+        ret = os_cap_get_mba_ctrl(data->cap, data->cpu, &supported, &enabled);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(supported, 1);
+        assert_int_equal(enabled, 1);
+}
+
 /* ======== os_cap_mon_discover ======== */
 
 static void
@@ -962,11 +1066,45 @@ test_os_cap_init_unmounted(void **state __attribute__((unused)))
         expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
         will_return(__wrap_pqos_file_exists, 0);
 
+        /* the kernel cannot be asked */
+        expect_string(__wrap_resctrl_mount_option_supported, option,
+                      "mba_MBps");
+        will_return(__wrap_resctrl_mount_option_supported, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mount_option_supported, -1);
+
         /* probe for mba ctrl */
         expect_value(__wrap_resctrl_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
         expect_value(__wrap_resctrl_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
         expect_value(__wrap_resctrl_mount, mba_cfg, PQOS_MBA_CTRL);
         will_return(__wrap_resctrl_mount, PQOS_RETVAL_ERROR);
+
+        expect_value(__wrap_resctrl_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
+        expect_value(__wrap_resctrl_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
+        expect_value(__wrap_resctrl_mount, mba_cfg, PQOS_MBA_DEFAULT);
+        will_return(__wrap_resctrl_mount, PQOS_RETVAL_OK);
+
+        ret = os_cap_init(PQOS_INTER_OS);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_os_cap_init_unmounted_refused(void **state __attribute__((unused)))
+{
+        int ret;
+
+        expect_string(__wrap_pqos_file_contains, fname, "/proc/filesystems");
+        expect_string(__wrap_pqos_file_contains, str, "resctrl");
+        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_file_contains, 1);
+
+        expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
+        will_return(__wrap_pqos_file_exists, 0);
+
+        /* the kernel refuses mba_MBps: nothing is mounted with it */
+        expect_string(__wrap_resctrl_mount_option_supported, option,
+                      "mba_MBps");
+        will_return(__wrap_resctrl_mount_option_supported, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mount_option_supported, 0);
 
         expect_value(__wrap_resctrl_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
         expect_value(__wrap_resctrl_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
@@ -1019,7 +1157,16 @@ main(void)
             cmocka_unit_test(test_os_cap_mba_discover_native_control_mode),
             cmocka_unit_test(test_os_cap_mba_discover_legacy_control_mode),
             cmocka_unit_test(test_os_cap_mba_discover_empty_throttle_value),
-            cmocka_unit_test(test_os_cap_mba_discover_empty_delay_linear)};
+            cmocka_unit_test(test_os_cap_mba_discover_empty_delay_linear),
+            /* before os_cap_init(), which decides the support for the
+             * process where resctrl was not mounted at start
+             */
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_kernel_takes),
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_kernel_refuses),
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_local_bw),
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_total_bw),
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_no_bw),
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_mounted_mbps)};
 
         const struct CMUnitTest tests_mon[] = {
             cmocka_unit_test(test_os_cap_mon_discover_resctrl_llc),
@@ -1034,6 +1181,7 @@ main(void)
         const struct CMUnitTest tests_all[] = {
             cmocka_unit_test(test_os_cap_init_mounted),
             cmocka_unit_test(test_os_cap_init_unmounted),
+            cmocka_unit_test(test_os_cap_init_unmounted_refused),
             cmocka_unit_test(test_os_cap_init_resctrl_mon)};
 
         const struct CMUnitTest tests_unsupported[] = {

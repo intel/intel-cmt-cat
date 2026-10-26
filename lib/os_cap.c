@@ -128,13 +128,22 @@ os_cap_init(const enum pqos_interface inter)
          * Mount resctrl with default parameters
          */
         if (!pqos_file_exists(RESCTRL_PATH "/cpus")) {
+                int mbps;
+
                 LOG_INFO("resctrl not mounted\n");
                 /**
-                 * Check if it is possible to enable MBA CTRL
+                 * Check if it is possible to enable MBA CTRL: the kernel is
+                 * asked first, and where it refuses the option nothing is
+                 * mounted with it
                  */
-                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
-                                    PQOS_MBA_CTRL);
-                if (ret == PQOS_RETVAL_OK) {
+                ret = resctrl_mount_option_supported("mba_MBps", &mbps);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                if (mbps != 0)
+                        ret =
+                            resctrl_mount(PQOS_REQUIRE_CDP_OFF,
+                                          PQOS_REQUIRE_CDP_OFF, PQOS_MBA_CTRL);
+                if (mbps != 0 && ret == PQOS_RETVAL_OK) {
                         FILE *fd;
 
                         /* Verify possibility of setting mba value above 100 */
@@ -147,8 +156,15 @@ os_cap_init(const enum pqos_interface inter)
                                         mba_ctrl = 0;
                         }
                         resctrl_umount();
-                } else
+                } else {
+                        /* refused when asked, or the mount with it failed. A
+                         * kernel that took the option can still refuse it at
+                         * the mount, and the mount without it comes next:
+                         * where that fails too, so does initialisation, so a
+                         * failure here is the option's
+                         */
                         mba_ctrl = 0;
+                }
 
                 ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
                                     PQOS_MBA_DEFAULT);
@@ -790,19 +806,41 @@ ctrl_support:
         if (*supported != -1)
                 goto ctrl_exit;
 
-        if (*enabled == 1)
+        if (*enabled == 1) {
                 *supported = 1;
+                goto ctrl_exit;
+        }
 
-        /* Check if MBL monitoring is supported */
-        else {
+        /* the kernel is asked whether it takes mba_MBps, without remounting
+         * resctrl, which would take its groups away
+         */
+        ret = resctrl_mount_option_supported("mba_MBps", supported);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /*
+         * Where it cannot be asked: the kernel's software controller works
+         * from local memory bandwidth, and on newer kernels from total memory
+         * bandwidth where local is not monitored. Without either it cannot be
+         * there; with one the support stays unknown.
+         */
+        if (*supported == -1) {
                 int mbl = 0;
 
                 ret = os_cap_mon_resctrl_support(PQOS_MON_EVENT_LMEM_BW, &mbl,
                                                  NULL);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
-                if (!mbl)
-                        *supported = 0;
+                if (!mbl) {
+                        int mbt = 0;
+
+                        ret = os_cap_mon_resctrl_support(PQOS_MON_EVENT_TMEM_BW,
+                                                         &mbt, NULL);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                        if (!mbt)
+                                *supported = 0;
+                }
         }
 
 ctrl_exit:

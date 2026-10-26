@@ -900,6 +900,94 @@ test_cap_print_mba40_in_some_domains(void **state)
         _test_cap_print_mba40(-1, "enabled in some MBA domains only");
 }
 
+/* ======== cap_print_features: MBA CTRL ======== */
+
+/**
+ * @brief Asserts the MBA CTRL line the OS interface's capability report prints
+ *        for the support and state given
+ *
+ * @param [in] inter the interface the report is for
+ * @param [in] ctrl MBA CTRL support: 1, 0 or -1 unknown
+ * @param [in] ctrl_on MBA CTRL state: 1, 0 or -1 unknown
+ * @param [in] line the line expected, or NULL where none is
+ */
+static void
+assert_mba_ctrl_line_on(const enum pqos_interface inter,
+                        const int ctrl,
+                        const int ctrl_on,
+                        const char *line)
+{
+        struct pqos_cap_mba mba = {.num_classes = 8};
+        struct pqos_cpuinfo cpu;
+        struct pqos_sysconfig sys;
+        union {
+                struct pqos_cap cap;
+                char reserved[sizeof(struct pqos_cap) +
+                              sizeof(struct pqos_capability)];
+        } caps;
+
+        memset(&cpu, 0, sizeof(cpu));
+        memset(&sys, 0, sizeof(sys));
+        memset(&caps, 0, sizeof(caps));
+        mba.ctrl = ctrl;
+        mba.ctrl_on = ctrl_on;
+        caps.cap.num_cap = 1;
+        caps.cap.capabilities[0].type = PQOS_CAP_TYPE_MBA;
+        caps.cap.capabilities[0].u.mba = &mba;
+        sys.cap = &caps.cap;
+        sys.cpu = &cpu;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, inter);
+        run_void_function(cap_print_features, &sys, 0);
+
+        assert_int_equal(output_has_text("Memory Bandwidth Allocation (MBA)"),
+                         1);
+        if (line != NULL)
+                assert_int_equal(output_has_text(line), 1);
+        else
+                assert_int_equal(output_has_text("CTRL:"), 0);
+}
+
+/** @brief assert_mba_ctrl_line_on() for the OS interface */
+static void
+assert_mba_ctrl_line(const int ctrl, const int ctrl_on, const char *line)
+{
+        assert_mba_ctrl_line_on(PQOS_INTER_OS, ctrl, ctrl_on, line);
+}
+
+static void
+test_cap_print_features_mba_ctrl(void **state)
+{
+        UNUSED_ARG(state);
+
+        assert_mba_ctrl_line(1, 1, "CTRL: enabled");
+        assert_mba_ctrl_line(1, 0, "CTRL: disabled");
+        assert_mba_ctrl_line(0, 0, "CTRL: unsupported");
+        /* the kernel could not be asked: said so, rather than nothing */
+        assert_mba_ctrl_line(-1, 0, "CTRL: unknown");
+        assert_mba_ctrl_line(-1, -1, "CTRL: unknown");
+        /* supported, its state not known: no line, as before */
+        assert_mba_ctrl_line(1, -1, NULL);
+        assert_mba_ctrl_line_on(PQOS_INTER_OS_RESCTRL_MON, -1, 0,
+                                "CTRL: unknown");
+}
+
+static void
+test_cap_print_features_mba_ctrl_hardware(void **state)
+{
+        UNUSED_ARG(state);
+
+        /* MSR and MMIO have no MBA CTRL and report its support -1, enabled
+         * 0: no line, as before, rather than an "unknown" that suggests one
+         * or a "disabled"; with its state unknown too, no line either
+         */
+        assert_mba_ctrl_line_on(PQOS_INTER_MSR, -1, 0, NULL);
+        assert_mba_ctrl_line_on(PQOS_INTER_MMIO, -1, 0, NULL);
+        assert_mba_ctrl_line_on(PQOS_INTER_MSR, -1, -1, NULL);
+        assert_mba_ctrl_line_on(PQOS_INTER_MMIO, -1, -1, NULL);
+}
+
 int
 main(void)
 {
@@ -948,9 +1036,14 @@ main(void)
             cmocka_unit_test(test_cap_print_mba40_disabled),
             cmocka_unit_test(test_cap_print_mba40_in_some_domains)};
 
+        const struct CMUnitTest tests_print_features[] = {
+            cmocka_unit_test(test_cap_print_features_mba_ctrl),
+            cmocka_unit_test(test_cap_print_features_mba_ctrl_hardware)};
+
         result += cmocka_run_group_tests(tests_print_region_devices,
                                          test_cap_group_setup, NULL);
         result += cmocka_run_group_tests(tests_print_mba40, NULL, NULL);
+        result += cmocka_run_group_tests(tests_print_features, NULL, NULL);
 
         return result;
 }

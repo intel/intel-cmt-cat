@@ -116,6 +116,25 @@ PQOS_LOCAL int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
 PQOS_LOCAL int resctrl_umount(void);
 
 /**
+ * @brief Asks the kernel whether resctrl takes a mount option, without
+ *        mounting or unmounting anything
+ *
+ * The option is set on a filesystem context opened for resctrl and never
+ * created, which the kernel parses as it would a mount's. A refusal there is
+ * the kernel's answer; a kernel that cannot be asked this way, or whose
+ * resctrl parses its options only when it mounts, leaves the answer unknown.
+ *
+ * @param [in] option mount option, a flag such as "mba_MBps"
+ * @param [out] supported 1 taken, 0 refused, -1 not known
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success, whatever the answer
+ * @retval PQOS_RETVAL_PARAM on a NULL parameter
+ */
+PQOS_LOCAL int resctrl_mount_option_supported(const char *option,
+                                              int *supported);
+
+/**
  * @brief Structure to hold parsed cpu mask
  *
  * Structure contains table with cpu bit mask. Each table item holds

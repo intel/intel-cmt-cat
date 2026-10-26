@@ -1241,7 +1241,9 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
                 LOG_ERROR("Mount OS interface error!\n");
 
                 /* nothing is concluded about the support from the failure,
-                 * which may be operational as well as a refusal
+                 * which may be operational as well as a refusal: what the
+                 * kernel refuses is asked of it at discovery, without
+                 * remounting (os_cap_get_mba_ctrl())
                  */
                 if (os_alloc_mount_back(cap, ret == PQOS_RETVAL_BUSY) !=
                     PQOS_RETVAL_OK)

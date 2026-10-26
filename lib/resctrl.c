@@ -44,8 +44,23 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
+
+/*
+ * fsopen(2) and fsconfig(2), called by number: the C library has wrappers for
+ * them only from glibc 2.36, and <linux/mount.h>, which has these values,
+ * clashes with <sys/mount.h> in older ones
+ */
+#define RESCTRL_FSOPEN_CLOEXEC    0x00000001
+#define RESCTRL_FSCONFIG_SET_FLAG 0
+
+/*
+ * A flag no kernel defines: a resctrl that parses its options as they are
+ * set refuses it, and one that parses them only when it mounts takes it
+ */
+#define RESCTRL_NO_SUCH_OPTION "pqos_no_such_option"
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 
@@ -310,6 +325,86 @@ resctrl_umount(void)
                 LOG_ERROR("Could not umount resctrl filesystem!\n");
                 return none ? PQOS_RETVAL_RESOURCE : PQOS_RETVAL_ERROR;
         }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_mount_option_supported(const char *option, int *supported)
+{
+        if (option == NULL || supported == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        *supported = -1;
+
+#if defined(SYS_fsopen) && defined(SYS_fsconfig)
+        {
+                int state;
+
+                /* the thread's cancellation is off from the open until the
+                 * descriptor is closed: close() is a cancellation point, and
+                 * a cancellation acted on there, asked for at any time since
+                 * the open, would leave the descriptor and its filesystem
+                 * context open, with nothing to close them. It is put back
+                 * before anything is logged, as resctrl_lock() puts it back
+                 */
+                (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
+
+                const int fd =
+                    (int)syscall(SYS_fsopen, "resctrl", RESCTRL_FSOPEN_CLOEXEC);
+
+                if (fd < 0) {
+                        const int err = errno;
+
+                        (void)pthread_setcancelstate(state, &state);
+                        errno = err;
+                        LOG_DEBUG("resctrl option %s not asked: fsopen error "
+                                  "%d - %m\n",
+                                  option, err);
+                        return PQOS_RETVAL_OK;
+                }
+
+                /* the answers are kept, 0 or the errno, and the descriptor
+                 * closed before anything is logged: a log callback that ends
+                 * the thread would otherwise leave it open
+                 */
+                const int bogus =
+                    syscall(SYS_fsconfig, fd, RESCTRL_FSCONFIG_SET_FLAG,
+                            RESCTRL_NO_SUCH_OPTION, NULL, 0) == 0
+                        ? 0
+                        : errno;
+                int answer = -1;
+
+                if (bogus == EINVAL)
+                        answer =
+                            syscall(SYS_fsconfig, fd, RESCTRL_FSCONFIG_SET_FLAG,
+                                    option, NULL, 0) == 0
+                                ? 0
+                                : errno;
+                close(fd);
+                (void)pthread_setcancelstate(state, &state);
+
+                if (bogus == 0)
+                        LOG_DEBUG("resctrl option %s not asked: options are "
+                                  "parsed only when resctrl mounts\n",
+                                  option);
+                else if (bogus != EINVAL) {
+                        errno = bogus;
+                        LOG_DEBUG("resctrl option %s not asked: fsconfig "
+                                  "error %d for an unknown option - %m\n",
+                                  option, bogus);
+                } else if (answer == 0)
+                        *supported = 1;
+                else if (answer == EINVAL)
+                        *supported = 0;
+                else {
+                        errno = answer;
+                        LOG_DEBUG("resctrl option %s not asked: fsconfig "
+                                  "error %d - %m\n",
+                                  option, answer);
+                }
+        }
+#endif
 
         return PQOS_RETVAL_OK;
 }

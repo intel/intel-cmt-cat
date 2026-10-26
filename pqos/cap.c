@@ -377,32 +377,38 @@ cap_print_features_l2ca(const unsigned indent,
  * @param [in] indent indentation level
  * @param [in] mba MBA capability structure
  * @param [in] verbose enable verbose mode
+ * @param [in] os whether the interface is the OS one, where MBA CTRL is
+ *            asked of the kernel; the others leave its support at -1 for a
+ *            controller they do not have
  */
 static void
 cap_print_features_mba(const unsigned indent,
                        const struct pqos_cap_mba *mba,
-                       const int verbose)
+                       const int verbose,
+                       const int os)
 {
         const char *mba40_status = "unsupported";
+        const char *ctrl_status = NULL;
 
         ASSERT(mba != NULL);
 
         printf_indent(indent, "Memory Bandwidth Allocation (MBA)\n");
         printf_indent(indent + 4, "Num CLOS: %u\n", mba->num_classes);
 
-        if (mba->ctrl != -1) {
-                const char *ctrl_status = NULL;
+        /* -1 on the OS interface: the kernel could not be asked. On the
+         * others there is no such controller to report
+         */
+        if (mba->ctrl == -1)
+                ctrl_status = os ? "unknown" : NULL;
+        else if (!mba->ctrl)
+                ctrl_status = "unsupported";
+        else if (!mba->ctrl_on)
+                ctrl_status = "disabled";
+        else if (mba->ctrl_on == 1)
+                ctrl_status = "enabled";
 
-                if (!mba->ctrl)
-                        ctrl_status = "unsupported";
-                else if (!mba->ctrl_on)
-                        ctrl_status = "disabled";
-                else if (mba->ctrl_on == 1)
-                        ctrl_status = "enabled";
-
-                if (ctrl_status)
-                        printf_indent(indent + 4, "CTRL: %s\n", ctrl_status);
-        }
+        if (ctrl_status)
+                printf_indent(indent + 4, "CTRL: %s\n", ctrl_status);
 
         if (!verbose)
                 return;
@@ -621,7 +627,10 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
          * Memory Bandwidth Allocation capabilities
          */
         if (cap_mba != NULL)
-                cap_print_features_mba(8, cap_mba->u.mba, verbose);
+                cap_print_features_mba(8, cap_mba->u.mba, verbose,
+                                       interface == PQOS_INTER_OS ||
+                                           interface ==
+                                               PQOS_INTER_OS_RESCTRL_MON);
 
         /**
          * Slow Memory Bandwidth Allocation capabilities

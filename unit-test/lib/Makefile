@@ -667,10 +667,12 @@ $(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=open \
+		-Wl,--wrap=close \
 		-Wl,--wrap=nanosleep \
 		-Wl,--wrap=clock_gettime \
 		-Wl,--wrap=mount \
 		-Wl,--wrap=umount2 \
+		-Wl,--wrap=syscall \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -808,6 +810,8 @@ $(BIN_DIR)/test_os_alloc_mount: test_os_alloc_mount.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=resctrl_mount \
 		-Wl,--wrap=resctrl_umount \
+		-Wl,--wrap=resctrl_alloc_schemata_read \
+		-Wl,--wrap=resctrl_schemata_mba_get \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -890,6 +894,7 @@ $(BIN_DIR)/test_os_cap: test_os_cap.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=resctrl_mount \
 		-Wl,--wrap=resctrl_umount \
+		-Wl,--wrap=resctrl_mount_option_supported \
 		-Wl,--wrap=resctrl_lock_exclusive \
 		-Wl,--wrap=resctrl_lock_release \
 		-Wl,--wrap=resctrl_lock_shared \

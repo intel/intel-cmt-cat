@@ -42,6 +42,7 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <sys/file.h>
+#include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -210,6 +211,110 @@ __wrap_umount2(const char *target, int flags)
         return ret;
 }
 
+/* the descriptor a probe case hands the probe, while the probe is to have it
+ * open, and the messages logged, and logged while it was: a log callback may
+ * end the thread, so the probe closes it before it logs. And the calls made,
+ * and the messages logged, with the thread's cancellation in the wrong state:
+ * on from the open to the close of the descriptor, the close included, which
+ * is a cancellation point, and off once it is closed
+ */
+static int probe_fd = -1;
+static int probe_logged;
+static int logged_while_open;
+static int probe_calls_cancellable;
+static int probe_logged_uncancellable;
+
+/* the calling thread's cancellation state, left as it is */
+static int
+cancel_state(void)
+{
+        int found;
+        int set;
+
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found);
+        (void)pthread_setcancelstate(found, &set);
+        return found;
+}
+
+int __real_close(int fd);
+
+/* close() as it is, noting a close of the probe's descriptor made with the
+ * thread's cancellation on
+ */
+int
+__wrap_close(int fd)
+{
+        if (probe_fd >= 0 && fd == probe_fd &&
+            cancel_state() == PTHREAD_CANCEL_ENABLE)
+                probe_calls_cancellable++;
+
+        return __real_close(fd);
+}
+
+/* fsopen(2) and fsconfig(2) as the kernel answers them: the descriptor or 0,
+ * or -1 and the errno queued after it. fsconfig() is to be given the
+ * descriptor fsopen() gave, and both are to run with cancellation off
+ */
+long
+__wrap_syscall(long number, ...)
+{
+        va_list ap;
+        long ret;
+
+        va_start(ap, number);
+#if defined(SYS_fsopen) && defined(SYS_fsconfig)
+        if (number == SYS_fsopen || number == SYS_fsconfig) {
+                if (cancel_state() == PTHREAD_CANCEL_ENABLE)
+                        probe_calls_cancellable++;
+        }
+        if (number == SYS_fsopen) {
+                const char *fs_name = va_arg(ap, const char *);
+                const unsigned flags = va_arg(ap, unsigned);
+
+                check_expected(fs_name);
+                /* FSOPEN_CLOEXEC */
+                assert_int_equal(flags, 1);
+        } else if (number == SYS_fsconfig) {
+                const int fd = va_arg(ap, int);
+                const unsigned cmd = va_arg(ap, unsigned);
+                const char *key = va_arg(ap, const char *);
+                const void *value = va_arg(ap, const void *);
+                const int aux = va_arg(ap, int);
+
+                assert_int_equal(fd, probe_fd);
+                /* FSCONFIG_SET_FLAG, which the kernel refuses with EINVAL
+                 * before it reads the key where a value or aux is given
+                 */
+                assert_int_equal(cmd, 0);
+                check_expected(key);
+                assert_null(value);
+                assert_int_equal(aux, 0);
+        } else
+                fail_msg("syscall %ld not expected", number);
+#else
+        fail_msg("syscall %ld not expected", number);
+#endif
+        va_end(ap);
+
+        ret = mock_type(long);
+        if (ret < 0)
+                errno = mock_type(int);
+
+        return ret;
+}
+
+static void
+probe_log_check(void *context __attribute__((unused)),
+                const size_t size __attribute__((unused)),
+                const char *message __attribute__((unused)))
+{
+        probe_logged++;
+        if (probe_fd >= 0 && fcntl(probe_fd, F_GETFD) != -1)
+                logged_while_open++;
+        if (cancel_state() == PTHREAD_CANCEL_DISABLE)
+                probe_logged_uncancellable++;
+}
+
 /* ======== resctrl_mount ======== */
 
 static void
@@ -333,6 +438,109 @@ test_resctrl_umount_error(void **state __attribute__((unused)))
         ret = resctrl_umount();
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
+
+/* ======== resctrl_mount_option_supported ======== */
+
+static void
+test_resctrl_mount_option_param(void **state __attribute__((unused)))
+{
+        int supported;
+
+        assert_int_equal(resctrl_mount_option_supported(NULL, &supported),
+                         PQOS_RETVAL_PARAM);
+        assert_int_equal(resctrl_mount_option_supported("mba_MBps", NULL),
+                         PQOS_RETVAL_PARAM);
+}
+
+#if defined(SYS_fsopen) && defined(SYS_fsconfig)
+
+/**
+ * The kernel's answers, in turn: to fsopen(), to the flag no kernel has and to
+ * the option asked about; a negative answer is -errno, and 1 is no call
+ */
+static void
+assert_mount_option(const int fsopen_err,
+                    const int bogus_err,
+                    const int option_err,
+                    const int expected)
+{
+        int supported = 2;
+        int fd = -1;
+        int ret;
+
+        expect_string(__wrap_syscall, fs_name, "resctrl");
+        if (fsopen_err != 0) {
+                will_return(__wrap_syscall, -1);
+                will_return(__wrap_syscall, -fsopen_err);
+        } else {
+                /* a descriptor of its own for the probe to close */
+                fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+                assert_true(fd >= 0);
+                will_return(__wrap_syscall, fd);
+
+                expect_string(__wrap_syscall, key, "pqos_no_such_option");
+                will_return(__wrap_syscall, bogus_err == 0 ? 0 : -1);
+                if (bogus_err != 0)
+                        will_return(__wrap_syscall, -bogus_err);
+
+                if (option_err != 1) {
+                        expect_string(__wrap_syscall, key, "mba_MBps");
+                        will_return(__wrap_syscall, option_err == 0 ? 0 : -1);
+                        if (option_err != 0)
+                                will_return(__wrap_syscall, -option_err);
+                }
+        }
+
+        probe_fd = fd;
+        probe_logged = 0;
+        logged_while_open = 0;
+        probe_calls_cancellable = 0;
+        probe_logged_uncancellable = 0;
+        /* the probe logs at debug level, which only super verbose passes */
+        (void)log_init(-1, probe_log_check, NULL, LOG_VER_SUPER_VERBOSE);
+        ret = resctrl_mount_option_supported("mba_MBps", &supported);
+        test_log_init_silent();
+        probe_fd = -1;
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(supported, expected);
+        assert_int_equal(logged_while_open, 0);
+        /* cancellation off for the descriptor's life, and on again after */
+        assert_int_equal(probe_calls_cancellable, 0);
+        assert_int_equal(probe_logged_uncancellable, 0);
+        assert_int_equal(cancel_state(), PTHREAD_CANCEL_ENABLE);
+        /* an answer not known is said, so the check above saw a message */
+        if (expected == -1)
+                assert_true(probe_logged > 0);
+
+        /* the probe closed it: closing it again fails */
+        if (fd >= 0)
+                assert_int_equal(close(fd), -1);
+}
+
+static void
+test_resctrl_mount_option_supported(void **state __attribute__((unused)))
+{
+        /* taken, and refused, where the made-up flag is refused */
+        assert_mount_option(0, -EINVAL, 0, 1);
+        assert_mount_option(0, -EINVAL, -EINVAL, 0);
+        /* another error for the option: not known */
+        assert_mount_option(0, -EINVAL, -EPERM, -1);
+}
+
+static void
+test_resctrl_mount_option_not_asked(void **state __attribute__((unused)))
+{
+        /* fsopen() fails: no resctrl, or not permitted */
+        assert_mount_option(-ENODEV, 0, 1, -1);
+        assert_mount_option(-EPERM, 0, 1, -1);
+        /* a resctrl that takes the made-up flag parses options only when it
+         * mounts, and one that answers it otherwise cannot be read either:
+         * the option is not asked
+         */
+        assert_mount_option(0, 0, 1, -1);
+        assert_mount_option(0, -ENOMEM, 1, -1);
+}
+#endif
 
 /* ======== resctrl_cpumask_set ======== */
 
@@ -1384,6 +1592,11 @@ main(void)
             cmocka_unit_test(test_resctrl_mount_mba_ctrl),
             cmocka_unit_test(test_resctrl_umount),
             cmocka_unit_test(test_resctrl_umount_error),
+#if defined(SYS_fsopen) && defined(SYS_fsconfig)
+            cmocka_unit_test(test_resctrl_mount_option_supported),
+            cmocka_unit_test(test_resctrl_mount_option_not_asked),
+#endif
+            cmocka_unit_test(test_resctrl_mount_option_param),
             cmocka_unit_test(test_resctrl_cpumask_set),
             cmocka_unit_test(test_resctrl_cpumask_unset),
             cmocka_unit_test(test_resctrl_cpumask_read),

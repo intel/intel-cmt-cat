@@ -98,6 +98,21 @@ __wrap_resctrl_umount(void)
 }
 
 int
+__wrap_resctrl_mount_option_supported(const char *option, int *supported)
+{
+        int ret;
+
+        check_expected(option);
+        assert_non_null(supported);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *supported = mock_type(int);
+
+        return ret;
+}
+
+int
 __wrap_resctrl_lock_shared(void)
 {
         return mock_type(int);

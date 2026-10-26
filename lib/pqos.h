@@ -574,8 +574,14 @@ struct pqos_cap_mba {
         unsigned throttle_max;  /**< the max MBA can be throttled */
         unsigned throttle_step; /**< MBA granularity */
         int is_linear;          /**< the type of MBA linear/nonlinear */
-        int ctrl;               /**< MBA controller support */
-        int ctrl_on;            /**< MBA controller enabled */
+        int ctrl;               /**< MBA controller support: 1 supported,
+                                   0 not, -1 unknown, where the OS interface
+                                   could not ask the kernel without
+                                   remounting resctrl; MSR and MMIO have no
+                                   MBA controller and report -1, with
+                                   ctrl_on 0 */
+        int ctrl_on;            /**< MBA controller enabled: 1, 0, or -1
+                                   unknown */
         int mba40;              /**< MBA 4.0 extensions support */
         int mba40_on;           /**< MBA 4.0 extensions enabled: 1 in
                                      every MBA domain, 0 in none, -1 in
@@ -3060,8 +3066,10 @@ int pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
  *
  * @param [in] cap platform QoS capabilities structure
  *                 returned by \a pqos_cap_get
- * @param [out] ctrl_supported place to store MBA controller support status
- * @param [out] ctrl_enabled place to store MBA controller enable status
+ * @param [out] ctrl_supported place to store MBA controller support status:
+ *              1, 0, or -1 unknown (see pqos_cap_mba)
+ * @param [out] ctrl_enabled place to store MBA controller enable status:
+ *              1, 0, or -1 unknown
  *
  */
 int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
