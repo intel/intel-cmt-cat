@@ -161,8 +161,16 @@ mount:
         }
 
 unmount:
-        if (ret != PQOS_RETVAL_OK)
-                resctrl_umount();
+        /* a mount that cannot be taken down again may be this one, with the
+         * options that did not take, or one another manager has mounted since
+         * the resctrl lock was given up: PQOS_RETVAL_BUSY tells the caller
+         * that a mount is left that this call cannot show to be its own, so
+         * that it leaves that mount alone, as os_alloc_mount_back() does.
+         * Where nothing is mounted any more there is no such mount, and the
+         * error is the mount's own
+         */
+        if (ret != PQOS_RETVAL_OK && resctrl_umount() == PQOS_RETVAL_ERROR)
+                ret = PQOS_RETVAL_BUSY;
         return ret;
 }
 
@@ -1072,14 +1080,117 @@ smba_cfg_update(const enum pqos_mba_config smba_cfg,
 }
 
 /**
+ * @brief Mounts resctrl back after a remount that failed
+ *
+ * What comes back is what the library knows of the old mount: its L3 CDP,
+ * L2 CDP and MBA CTRL options, as the capabilities hold them, and the class
+ * directories, empty. Other mount options are not restored. The cores were
+ * moved to the default class before resctrl was unmounted, and the unmount
+ * took the classes' schemata and tasks with it.
+ *
+ * A failed mount unmounts what it mounted. Where that unmount failed too
+ * (os_alloc_mount() answers PQOS_RETVAL_BUSY), a mount was left behind, and
+ * nothing here can tell whether the mount at the path is still that one: the
+ * resctrl lock was released before the reset, and another manager may have
+ * replaced it since. So no mount is taken down here, and the mount-back
+ * fails instead. Where no mount was left behind, whatever is mounted now is
+ * someone else's and is left alone too: the mount-back fails.
+ *
+ * @param [in] cap platform QoS capabilities structure
+ * @param [in] left_mounted whether the failed mount left resctrl mounted
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK resctrl is mounted back and its classes prepared
+ * @retval PQOS_RETVAL_RESOURCE resctrl, or its classes, could not be put back
+ */
+static int
+os_alloc_mount_back(const struct pqos_cap *cap, const int left_mounted)
+{
+        int ret;
+
+        const struct pqos_capability *alloc_cap = NULL;
+        enum pqos_cdp_config l3_cdp = PQOS_REQUIRE_CDP_OFF;
+        enum pqos_cdp_config l2_cdp = PQOS_REQUIRE_CDP_OFF;
+        enum pqos_mba_config mba = PQOS_MBA_DEFAULT;
+
+        /* the configuration resctrl was mounted with, where it applies */
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                (void)l3_cdp_update(PQOS_REQUIRE_CDP_ANY, alloc_cap->u.l3ca,
+                                    &l3_cdp);
+        alloc_cap = NULL;
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                (void)l2_cdp_update(PQOS_REQUIRE_CDP_ANY, alloc_cap->u.l2ca,
+                                    &l2_cdp);
+        alloc_cap = NULL;
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+        if (alloc_cap != NULL)
+                (void)mba_cfg_update(PQOS_MBA_ANY, alloc_cap->u.mba, &mba);
+
+        if (left_mounted) {
+                LOG_ERROR("Unable to restore the previous resctrl "
+                          "configuration: resctrl stays mounted, with the "
+                          "options that did not take or another manager's!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        LOG_INFO("OS alloc reset - mount resctrl back with "
+                 "l3_cdp %s, l2_cdp %s, mba ctrl %s\n",
+                 l3_cdp == PQOS_REQUIRE_CDP_ON ? "on" : "off",
+                 l2_cdp == PQOS_REQUIRE_CDP_ON ? "on" : "off",
+                 mba == PQOS_MBA_CTRL ? "on" : "off");
+        ret = os_alloc_mount(l3_cdp, l2_cdp, mba);
+        if (ret != PQOS_RETVAL_OK) {
+                /* only os_alloc_mount() knows whether it left a mount */
+                LOG_ERROR("Unable to restore the previous resctrl "
+                          "configuration: resctrl is %s!\n",
+                          ret == PQOS_RETVAL_BUSY
+                              ? "mounted, but not as it was"
+                              : "not mounted by this reset");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /* the classes are made with the resctrl lock held: its descriptor
+         * keeps the mount from being taken down meanwhile, and a manager
+         * that takes the lock, as the kernel's documentation asks of every
+         * one, waits for them. A mount that replaced this one between the
+         * mount and the lock cannot be told from it: the reset cannot hold
+         * the lock across the remount, whose unmount the descriptor would
+         * refuse, and the kernel gives a mount no identity that is not
+         * reused
+         */
+        if (resctrl_lock_exclusive() != PQOS_RETVAL_OK) {
+                LOG_ERROR("Unable to restore the previous resctrl "
+                          "configuration: resctrl is mounted back, but its "
+                          "lock cannot be taken to make its classes!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+        ret = os_alloc_prep(cap);
+        resctrl_lock_release();
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("OS alloc prep error!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Performs "full reset" of CAT.
  *
  * Allocs all cores to default CLOS
  * Remounts resctrl file system with new CDP configuration
  *
+ * Where the new configuration cannot be mounted, resctrl is mounted back with
+ * the CDP and MBA CTRL options it had (os_alloc_mount_back()), and the error
+ * of the refused mount is returned; where it cannot be mounted back either,
+ * PQOS_RETVAL_RESOURCE is, so that a caller can tell the two apart.
+ *
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
  * @param [in] l2_cdp_cfg requested L2 CAT CDP config
  * @param [in] mba_cfg requested MBA config
+ * @param [in] smba_cfg requested SMBA config
  * @param [in] cap platform QoS capabilities structure
  *
  * @return Operation status
@@ -1108,8 +1219,13 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
 
         LOG_INFO("OS alloc reset - unmount resctrl\n");
         ret = resctrl_umount();
-        if (ret != PQOS_RETVAL_OK)
+        if (ret != PQOS_RETVAL_OK) {
+                /* a failed unmount is an error here, as before: this
+                 * reset's RESOURCE says resctrl could not be mounted back
+                 */
+                ret = PQOS_RETVAL_ERROR;
                 goto os_alloc_reset_full_exit;
+        }
 
         /**
          * Mount now with CDP option.
@@ -1123,6 +1239,13 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
         ret = os_alloc_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Mount OS interface error!\n");
+
+                /* nothing is concluded about the support from the failure,
+                 * which may be operational as well as a refusal
+                 */
+                if (os_alloc_mount_back(cap, ret == PQOS_RETVAL_BUSY) !=
+                    PQOS_RETVAL_OK)
+                        ret = PQOS_RETVAL_RESOURCE;
                 goto os_alloc_reset_full_exit;
         }
 
@@ -1318,9 +1441,10 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
                                   "monitoring in order to change CDP/MBA "
                                   "settings\n");
                         ret = PQOS_RETVAL_ERROR;
-                } else
+                } else {
                         ret = os_alloc_reset_full(l3_cdp, l2_cdp, mba_ctrl,
                                                   smba_ctrl, cap);
+                }
         } else
                 ret = os_alloc_reset_light(l3_cap, l2_cap, mba_cap, smba_cap);
 

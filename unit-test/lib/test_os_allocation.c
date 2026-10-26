@@ -1222,11 +1222,12 @@ test_os_alloc_reset_prep(struct test_data *data)
         }
 }
 
+/**
+ * Queues what a full reset does before it mounts resctrl: the lock taken and
+ * released, monitoring found inactive, the cores reset and resctrl unmounted
+ */
 static void
-test_os_alloc_reset_full(struct test_data *data,
-                         enum pqos_cdp_config l3_cdp_cfg,
-                         enum pqos_cdp_config l2_cdp_cfg,
-                         enum pqos_mba_config mba_cfg)
+expect_os_alloc_reset_full_start(struct test_data *data)
 {
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
@@ -1238,6 +1239,33 @@ test_os_alloc_reset_full(struct test_data *data,
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 0);
 
+        will_return(os_alloc_reset_cores, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_umount, PQOS_RETVAL_OK);
+}
+
+/**
+ * Queues one os_alloc_mount() of the configuration given, and its result
+ */
+static void
+expect_os_alloc_mount(enum pqos_cdp_config l3_cdp,
+                      enum pqos_cdp_config l2_cdp,
+                      enum pqos_mba_config mba,
+                      int ret)
+{
+        expect_value(os_alloc_mount, l3_cdp_cfg, l3_cdp);
+        expect_value(os_alloc_mount, l2_cdp_cfg, l2_cdp);
+        expect_value(os_alloc_mount, mba_cfg, mba);
+        will_return(os_alloc_mount, ret);
+}
+
+static void
+test_os_alloc_reset_full(struct test_data *data,
+                         enum pqos_cdp_config l3_cdp_cfg,
+                         enum pqos_cdp_config l2_cdp_cfg,
+                         enum pqos_mba_config mba_cfg)
+{
+        expect_os_alloc_reset_full_start(data);
+
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
                 l3_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
@@ -1248,15 +1276,11 @@ test_os_alloc_reset_full(struct test_data *data,
         expect_value(__wrap__pqos_cap_l3cdp_change, cdp, l3_cdp_cfg);
         expect_value(__wrap__pqos_cap_l2cdp_change, cdp, l2_cdp_cfg);
         expect_value(__wrap__pqos_cap_mba_change, cfg, mba_cfg);
-
-        will_return(os_alloc_reset_cores, PQOS_RETVAL_OK);
+        /* no SMBA in the fixtures */
+        expect_value(__wrap__pqos_cap_smba_change, cfg, PQOS_MBA_DEFAULT);
 
         /* remount */
-        will_return(__wrap_resctrl_umount, PQOS_RETVAL_OK);
-        expect_value(os_alloc_mount, l3_cdp_cfg, l3_cdp_cfg);
-        expect_value(os_alloc_mount, l2_cdp_cfg, l2_cdp_cfg);
-        expect_value(os_alloc_mount, mba_cfg, mba_cfg);
-        will_return(os_alloc_mount, PQOS_RETVAL_OK);
+        expect_os_alloc_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg, PQOS_RETVAL_OK);
 
         /* init resctrl */
         test_os_alloc_reset_prep(data);
@@ -1445,6 +1469,365 @@ test_os_alloc_reset_mba_ctrl_enable(void **state)
 
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/**
+ * How a full reset goes on once its mount has failed
+ */
+enum mount_back {
+        MOUNT_BACK_OK,           /**< mounted back and prepared */
+        MOUNT_BACK_FAILS,        /**< the mount back fails too */
+        MOUNT_BACK_PREP_FAILS,   /**< mounted back, a class directory not */
+        MOUNT_BACK_LOCK_FAILS,   /**< mounted back, its lock not taken */
+        MOUNT_BACK_LEFT_ALONE,   /**< the failed mount left resctrl mounted */
+        MOUNT_BACK_LEFT_MOUNTED, /**< the mount back is left mounted itself */
+};
+
+/**
+ * Sets the configuration resctrl is found mounted with: CDP supported and on
+ * or off, MBA CTRL on, or off with its support unknown until the kernel is
+ * asked. Only the capabilities in the group's fixture are seen by the library.
+ */
+static void
+mount_found(struct test_data *data, int l3_cdp_on, int l2_cdp_on, int ctrl_on)
+{
+        data->cap_l3ca.cdp = 1;
+        data->cap_l3ca.cdp_on = l3_cdp_on;
+        data->cap_l2ca.cdp = 1;
+        data->cap_l2ca.cdp_on = l2_cdp_on;
+        data->cap_mba.ctrl = ctrl_on ? 1 : -1;
+        data->cap_mba.ctrl_on = ctrl_on;
+}
+
+/**
+ * Queues what follows a failed mount, ending as \a how says: resctrl
+ * mounted with the configuration given, the one it was found with, and its
+ * classes made with the resctrl lock held; or nothing, where the failed mount
+ * left resctrl mounted (os_alloc_mount() answered PQOS_RETVAL_BUSY). Nothing
+ * is unmounted: a call of resctrl_umount() not queued here fails the case
+ */
+static void
+expect_mount_back(struct test_data *data,
+                  enum pqos_cdp_config l3_cdp,
+                  enum pqos_cdp_config l2_cdp,
+                  enum pqos_mba_config mba,
+                  enum mount_back how)
+{
+        if (how == MOUNT_BACK_LEFT_ALONE)
+                return;
+
+        expect_os_alloc_mount(l3_cdp, l2_cdp, mba,
+                              how == MOUNT_BACK_FAILS ? PQOS_RETVAL_ERROR
+                              : how == MOUNT_BACK_LEFT_MOUNTED
+                                  ? PQOS_RETVAL_BUSY
+                                  : PQOS_RETVAL_OK);
+        if (how == MOUNT_BACK_FAILS || how == MOUNT_BACK_LEFT_MOUNTED)
+                return;
+
+        if (how == MOUNT_BACK_LOCK_FAILS) {
+                will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_ERROR);
+                return;
+        }
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        if (how == MOUNT_BACK_PREP_FAILS) {
+                expect_string(__wrap_pqos_dir_exists, path,
+                              "/sys/fs/resctrl/COS1");
+                will_return(__wrap_pqos_dir_exists, 0);
+                expect_string(__wrap_mkdir, path, "/sys/fs/resctrl/COS1");
+                expect_value(__wrap_mkdir, mode, 0755);
+                will_return(__wrap_mkdir, -1);
+                return;
+        }
+
+        test_os_alloc_reset_prep(data);
+}
+
+/**
+ * Runs the reset asked for and checks its result, and that the capabilities
+ * are as found: the four helpers that change them are strict mocks with no
+ * call expected, and the fixture's MBA CTRL support is the one set
+ */
+static void
+assert_reset_refused(struct test_data *data,
+                     enum pqos_cdp_config l3_cdp,
+                     enum pqos_cdp_config l2_cdp,
+                     enum pqos_mba_config mba,
+                     int expected)
+{
+        const int ctrl = data->cap_mba.ctrl;
+        struct pqos_alloc_config cfg;
+        int ret;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp;
+        cfg.l2_cdp = l2_cdp;
+        cfg.mba = mba;
+
+        ret = os_alloc_reset(&cfg);
+        assert_int_equal(ret, expected);
+        assert_int_equal(data->cap_mba.ctrl, ctrl);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_no_mount(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* resctrl cannot be mounted back: a status of its own says so */
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_FAILS);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_with_cdp(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* L3 CDP asked off too: the mount-back still brings it back on */
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_l2_cdp(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* L2 CDP on and kept: the refused mount and the mount-back carry it */
+        mount_found(data, 1, 1, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ON,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ON,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_l2_cdp_off(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* L2 CDP on, asked off with MBA CTRL: the mount-back brings it back */
+        mount_found(data, 1, 1, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ON,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_OFF,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_l3cdp_refused_mba_ctrl_on(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* L3 CDP off and MBA CTRL on, L3 CDP asked on: the mount-back has
+         * L3 CDP off again and keeps MBA CTRL
+         */
+        mount_found(data, 0, 0, 1);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_CTRL, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_ANY, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_prep_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* mounted back, but without its class directories */
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_PREP_FAILS);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_lock_not_taken(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* mounted back, but the resctrl lock, which its classes are made
+         * under, cannot be taken: no class is made, and the reset says that
+         * resctrl is not as it was
+         */
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_LOCK_FAILS);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_left_mounted(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* the failed mount could not unmount what it mounted, and says so.
+         * Whether the mount there is still that one cannot be told - another
+         * manager may have replaced it - so it is not taken down, nothing is
+         * mounted over it, and resctrl is said not to be put back
+         */
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_BUSY);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_LEFT_ALONE);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_os_alloc_reset_first_unmount_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        static const int answers[] = {PQOS_RETVAL_ERROR, PQOS_RETVAL_RESOURCE};
+        unsigned i;
+
+        /* the reset's own unmount fails, whatever resctrl_umount() says of
+         * why: an error, since this reset's RESOURCE says resctrl could not
+         * be mounted back. Nothing is mounted and no capability changed -
+         * neither is queued
+         */
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        for (i = 0; i < DIM(answers); i++) {
+                mount_found(data, 1, 0, 0);
+                will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_mon_active, 0);
+                will_return(os_alloc_reset_cores, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_umount, answers[i]);
+
+                assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY,
+                                     PQOS_REQUIRE_CDP_ANY, PQOS_MBA_CTRL,
+                                     PQOS_RETVAL_ERROR);
+        }
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_mount_back_left_mounted(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* the mount-back is mounted and did not take: not as it was */
+        mount_found(data, 1, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_LEFT_MOUNTED);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_os_alloc_reset_l3cdp_refused(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* L3 CAT alone: L2 CDP and MBA CTRL, which the platform lacks, are
+         * mounted off both times
+         */
+        mount_found(data, 0, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_DEFAULT, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_ANY, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_l2cdp_refused(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* L2 CAT alone: L3 CDP and MBA CTRL off both times */
+        mount_found(data, 0, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_ON,
+                              PQOS_MBA_DEFAULT, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON,
+                             PQOS_MBA_ANY, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_os_alloc_reset_mba_ctrl_refused_mba_only(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        /* MBA alone: CDP off both times */
+        mount_found(data, 0, 0, 0);
+        expect_os_alloc_reset_full_start(data);
+        expect_os_alloc_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                              PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
+        expect_mount_back(data, PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                          PQOS_MBA_DEFAULT, MOUNT_BACK_OK);
+
+        assert_reset_refused(data, PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+                             PQOS_MBA_CTRL, PQOS_RETVAL_ERROR);
 }
 
 static void
@@ -1803,6 +2186,7 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_l3cdp_enable),
             cmocka_unit_test(test_os_alloc_reset_l3cdp_disable),
             cmocka_unit_test(test_os_alloc_reset_l3cdp_mon),
+            cmocka_unit_test(test_os_alloc_reset_l3cdp_refused),
             cmocka_unit_test(test_os_alloc_init_mounted),
             cmocka_unit_test(test_os_alloc_init_unmounted),
             cmocka_unit_test(test_os_l3ca_get_min_cbm_bits),
@@ -1826,6 +2210,7 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_l2cdp_enable),
             cmocka_unit_test(test_os_alloc_reset_l2cdp_disable),
             cmocka_unit_test(test_os_alloc_reset_l2cdp_mon),
+            cmocka_unit_test(test_os_alloc_reset_l2cdp_refused),
             cmocka_unit_test(test_os_l3ca_get_min_cbm_bits_unsupported),
             cmocka_unit_test(test_os_l2ca_get_min_cbm_bits)};
 
@@ -1844,10 +2229,24 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_enable),
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_disable),
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_mon),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_mba_only),
             cmocka_unit_test(test_os_l3ca_get_min_cbm_bits_unsupported),
             cmocka_unit_test(test_os_l2ca_get_min_cbm_bits_unsupported)};
 
         const struct CMUnitTest tests_all[] = {
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_no_mount),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_with_cdp),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_l2_cdp),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_l2_cdp_off),
+            cmocka_unit_test(test_os_alloc_reset_l3cdp_refused_mba_ctrl_on),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_prep_fails),
+            cmocka_unit_test(
+                test_os_alloc_reset_mba_ctrl_refused_lock_not_taken),
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_refused_left_mounted),
+            cmocka_unit_test(test_os_alloc_reset_first_unmount_fails),
+            cmocka_unit_test(
+                test_os_alloc_reset_mba_ctrl_mount_back_left_mounted),
             cmocka_unit_test(test_os_alloc_assoc_get),
             cmocka_unit_test(test_os_alloc_assoc_get_param),
             cmocka_unit_test(test_os_alloc_assign),

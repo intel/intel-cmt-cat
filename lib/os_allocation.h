@@ -72,8 +72,15 @@ PQOS_LOCAL int os_alloc_fini(void);
  * @param l2_cdp_cfg L2 CDP option
  * @param mba_cfg requested MBA config
  *
+ * A mount that does not take - MBA CTRL asked for and not enabled - is
+ * unmounted again.
+ *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_BUSY resctrl was mounted with the options asked for, the
+ *         mount could not be shown to have taken them - MBA CTRL found not
+ *         enabled, or its schemata not read - and it could not be unmounted
+ *         again: it is still mounted
  */
 PQOS_LOCAL int os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,
                               const enum pqos_cdp_config l2_cdp_cfg,

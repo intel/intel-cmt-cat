@@ -2300,8 +2300,23 @@ struct pqos_alloc_config {
  *
  * @param [in] cfg requested configuration
  *
+ * On the OS interface a change of CDP or MBA CTRL remounts resctrl. Where the
+ * kernel does not mount the configuration requested, resctrl is mounted back
+ * with the CDP and MBA CTRL options it had and empty class directories, and
+ * the remount's error is returned.
+ *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM on a configuration the platform does not support
+ * @retval PQOS_RETVAL_RESOURCE on a technology the platform lacks, or, on the
+ *         OS interface, where resctrl could not be mounted back after a
+ *         refused remount, or was mounted back with its old options and its
+ *         class directories could not all be made
+ * @retval PQOS_RETVAL_BUSY on the OS interface, where the configuration
+ *         requested is mounted and the class directories could not all be
+ *         made: the reset is part done
+ * @retval PQOS_RETVAL_ERROR on another failure, a remount refused and resctrl
+ *         mounted back among them
  */
 int pqos_alloc_reset_config(const struct pqos_alloc_config *cfg);
 

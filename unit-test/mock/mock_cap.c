@@ -102,6 +102,12 @@ __wrap__pqos_cap_mba40_refresh(void)
         function_called();
 }
 
+void
+__wrap__pqos_cap_smba_change(const enum pqos_mba_config cfg)
+{
+        check_expected(cfg);
+}
+
 int
 __wrap_pqos_sysconfig_get(const struct pqos_sysconfig **sysconf)
 {

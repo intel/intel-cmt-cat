@@ -192,13 +192,22 @@ __wrap_mount(const char *source,
         return mock_type(int);
 }
 
+/* umount2(2) as the kernel answers it: 0, or -1 and the errno queued after
+ * it
+ */
 int
 __wrap_umount2(const char *target, int flags)
 {
+        int ret;
+
         check_expected(target);
         assert_int_equal(flags, 0);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret < 0)
+                errno = mock_type(int);
+
+        return ret;
 }
 
 /* ======== resctrl_mount ======== */
@@ -301,11 +310,28 @@ test_resctrl_umount_error(void **state __attribute__((unused)))
 {
         int ret;
 
+        /* the mount is still there */
         expect_string(__wrap_umount2, target, "/sys/fs/resctrl");
         will_return(__wrap_umount2, -1);
+        will_return(__wrap_umount2, EBUSY);
 
         ret = resctrl_umount();
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+
+        /* nothing is mounted there, or there is no such path */
+        expect_string(__wrap_umount2, target, "/sys/fs/resctrl");
+        will_return(__wrap_umount2, -1);
+        will_return(__wrap_umount2, EINVAL);
+
+        ret = resctrl_umount();
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        expect_string(__wrap_umount2, target, "/sys/fs/resctrl");
+        will_return(__wrap_umount2, -1);
+        will_return(__wrap_umount2, ENOENT);
+
+        ret = resctrl_umount();
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 /* ======== resctrl_cpumask_set ======== */

@@ -304,8 +304,11 @@ int
 resctrl_umount(void)
 {
         if (umount2(RESCTRL_PATH, 0) != 0) {
+                /* EINVAL: not a mount point, ENOENT: no such path */
+                const int none = errno == EINVAL || errno == ENOENT;
+
                 LOG_ERROR("Could not umount resctrl filesystem!\n");
-                return PQOS_RETVAL_ERROR;
+                return none ? PQOS_RETVAL_RESOURCE : PQOS_RETVAL_ERROR;
         }
 
         return PQOS_RETVAL_OK;

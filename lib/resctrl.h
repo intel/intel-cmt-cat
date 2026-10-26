@@ -110,6 +110,8 @@ PQOS_LOCAL int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE where nothing is mounted there to take down
+ * @retval PQOS_RETVAL_ERROR where the mount could not be taken down
  */
 PQOS_LOCAL int resctrl_umount(void);
 

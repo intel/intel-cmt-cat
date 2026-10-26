@@ -840,6 +840,7 @@ $(BIN_DIR)/test_os_allocation: test_os_allocation.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_l3cdp_change \
 		-Wl,--wrap=_pqos_cap_l2cdp_change \
 		-Wl,--wrap=_pqos_cap_mba_change \
+		-Wl,--wrap=_pqos_cap_smba_change \
 		-Wl,--wrap=mkdir \
 		-Wl,--wrap=pqos_file_exists \
 		-Wl,--wrap=pqos_dir_exists \

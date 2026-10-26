@@ -49,6 +49,7 @@ void __wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg);
 void __wrap__pqos_cap_mba40_change(const enum pqos_feature_cfg cfg);
 void __wrap__pqos_cap_mba40_refresh(void);
+void __wrap__pqos_cap_smba_change(const enum pqos_mba_config cfg);
 int __wrap_pqos_sysconfig_get(const struct pqos_sysconfig **sysconf);
 enum pqos_interface __wrap__pqos_get_inter(void);
 
