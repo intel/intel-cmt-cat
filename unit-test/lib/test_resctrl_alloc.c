@@ -280,6 +280,55 @@ test_resctrl_alloc_cpumask_read_fopen(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+/* ======== resctrl_alloc_assoc_get ======== */
+
+/* a core that no class's cpus file holds, as an offline CPU is */
+static void
+test_resctrl_alloc_assoc_get_core_in_no_class(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        unsigned class_id = 0xdead;
+        unsigned grps;
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        ret = resctrl_alloc_get_grps_num(data->cap, &grps);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_true(grps > 1);
+
+        /* every class's cpus file is read, and lists no core: the mock
+         * resctrl_cpumask_read() leaves the mask empty
+         */
+        for (i = 0; i < grps; i++) {
+                expect_value(resctrl_alloc_fopen, class_id, i);
+                expect_string(resctrl_alloc_fopen, name, "cpus");
+                expect_string(resctrl_alloc_fopen, mode, "r");
+                will_return(resctrl_alloc_fopen, (FILE *)1);
+                will_return(__wrap_resctrl_cpumask_read, PQOS_RETVAL_OK);
+        }
+
+        ret = resctrl_alloc_assoc_get(3, &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(class_id, 0xdead);
+}
+
+/* no allocation technology, so no class: nothing is read */
+static void
+test_resctrl_alloc_assoc_get_no_class(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        unsigned class_id = 0xdead;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        ret = resctrl_alloc_assoc_get(3, &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(class_id, 0xdead);
+}
+
 /* ========= resctrl_alloc_schemata_read ======== */
 
 static void
@@ -620,6 +669,7 @@ main(void)
 
         const struct CMUnitTest tests_l3ca[] = {
             cmocka_unit_test(test_resctrl_alloc_get_grps_num_l3),
+            cmocka_unit_test(test_resctrl_alloc_assoc_get_core_in_no_class),
             cmocka_unit_test(test_resctrl_alloc_task_search_found),
             cmocka_unit_test(test_resctrl_alloc_task_search_ended_before),
             cmocka_unit_test(test_resctrl_alloc_task_search_ended_during),
@@ -643,6 +693,7 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_cpumask_write_fopen),
             cmocka_unit_test(test_resctrl_alloc_cpumask_read),
             cmocka_unit_test(test_resctrl_alloc_cpumask_read_fopen),
+            cmocka_unit_test(test_resctrl_alloc_assoc_get_no_class),
             cmocka_unit_test(test_resctrl_alloc_schemata_read),
             cmocka_unit_test(test_resctrl_alloc_schemata_read_fopen),
             cmocka_unit_test(test_resctrl_alloc_schemata_write_fopen),

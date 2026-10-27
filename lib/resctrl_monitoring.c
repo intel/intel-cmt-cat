@@ -235,6 +235,9 @@ resctrl_mon_fini(void)
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if no class holds the core, as none holds an
+ *         offline one, which is not said here: the callers say what it is to
+ *         them
  */
 static int
 alloc_assoc_get(const unsigned lcore, unsigned *class_id)
@@ -255,7 +258,7 @@ alloc_assoc_get(const unsigned lcore, unsigned *class_id)
         }
 
         ret = resctrl_alloc_assoc_get(lcore, class_id);
-        if (ret != PQOS_RETVAL_OK)
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 LOG_ERROR("Failed to retrieve core %u association\n", lcore);
 
         return ret;
@@ -921,7 +924,7 @@ resctrl_mon_assoc_get(const unsigned lcore,
                       const unsigned name_size)
 {
         int ret;
-        unsigned class_id;
+        unsigned class_id = 0;
         char dir[256];
         struct dirent **namelist = NULL;
         int num_groups;
@@ -932,6 +935,9 @@ resctrl_mon_assoc_get(const unsigned lcore,
         if (!resctrl_mon_is_supported())
                 return PQOS_RETVAL_RESOURCE;
 
+        /* a core in no class is in no group either, which the RESOURCE
+         * returned says, as it does below for a core in a class
+         */
         ret = alloc_assoc_get(lcore, &class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -985,6 +991,10 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
                 return PQOS_RETVAL_RESOURCE;
 
         ret = alloc_assoc_get(lcore, &class_id);
+        if (ret == PQOS_RETVAL_RESOURCE)
+                LOG_ERROR("Could not assign core %u to resctrl monitoring "
+                          "group: it is in no class, as an offline core is\n",
+                          lcore);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1020,12 +1030,19 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
 {
         int ret;
         char buf[RESCTRL_MON_GROUP_NAME_SIZE];
-        unsigned class_id;
+        unsigned class_id = 0;
         struct resctrl_cpumask mask;
 
         ASSERT(name != NULL);
 
+        /* a core in no class, as an offline one is, has no group to be put
+         * back in, and the poll goes on without it: when it comes back online
+         * the kernel puts it in the default class, which a poll then takes as
+         * it does a core moved to another class
+         */
         ret = alloc_assoc_get(lcore, &class_id);
+        if (ret == PQOS_RETVAL_RESOURCE)
+                return PQOS_RETVAL_OK;
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1043,27 +1060,23 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         if (ret == PQOS_RETVAL_OK)
                 return PQOS_RETVAL_OK;
 
-        /* the class again, which the search looked the core up in too: a
-         * writer to resctrl, which the library's lock does not hold off, may
-         * have moved the core to another since the lookup above
+        /* the core may have gone offline since the lookup above, which
+         * leaves nothing to restore either
          */
         ret = alloc_assoc_get(lcore, &class_id);
+        if (ret == PQOS_RETVAL_RESOURCE)
+                return PQOS_RETVAL_OK;
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        ret = resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-        if (!pqos_dir_exists(buf)) {
-                LOG_WARN("Could not restore core association with mon "
-                         "group %s does not exists\n",
-                         buf);
-                return PQOS_RETVAL_RESOURCE;
-        }
-
-        ret = resctrl_mon_assoc_set(lcore, name);
-
-        return ret;
+        /* put back in the group, whose directory in the core's class is made
+         * where there is none: the core came back online in the default class
+         * after the poll removed the directory it had left empty, or a writer
+         * to resctrl, which the library's lock does not hold off, moved it to
+         * a class the group has no directory in. The set looks the class up
+         * itself, so a move between the two lookups is followed too
+         */
+        return resctrl_mon_assoc_set(lcore, name);
 }
 
 int

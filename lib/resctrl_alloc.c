@@ -652,7 +652,11 @@ resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
                 }
         }
 
-        return ret;
+        /* no class holds the core, as none holds an offline one: the kernel
+         * takes a CPU going offline out of its group, and puts it in the
+         * default group when it comes back online
+         */
+        return PQOS_RETVAL_RESOURCE;
 }
 
 int
