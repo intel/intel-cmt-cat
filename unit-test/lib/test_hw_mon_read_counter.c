@@ -238,6 +238,163 @@ test_hw_mon_read_counter_llc(void **state)
         assert_int_equal(group.values.llc, 5 * pmon->scale_factor);
 }
 
+/* ======== MBM counter rollover ======== */
+
+static void
+set_mbm_counter_length(struct pqos_cap_mon *mon, const unsigned length)
+{
+        unsigned i;
+
+        for (i = 0; i < mon->num_events; i++)
+                if (mon->events[i].type == PQOS_MON_EVENT_LMEM_BW ||
+                    mon->events[i].type == PQOS_MON_EVENT_TMEM_BW)
+                        mon->events[i].counter_length = length;
+}
+
+/**
+ * Teardown of the rollover cases: the MBM counters back to the fixture's 24
+ * bits, which runs after a case that failed as well, so that the cases after it
+ * do not read counters of another width
+ */
+static int
+mbm_counter_length_back(void **state)
+{
+        const struct test_data *data = (struct test_data *)*state;
+
+        set_mbm_counter_length(data->cap_mon, 24);
+        return 0;
+}
+
+struct mbm_read {
+        int ret;
+        int valid_mbm_read;
+        struct pqos_event_values values;
+};
+
+/**
+ * Reads one MBM event of a group whose previous poll left the local and total
+ * counters at prev_local and prev_total, with the counters \a width bits wide,
+ * which mbm_counter_length_back() puts back
+ */
+static struct mbm_read
+read_mbm(const struct test_data *data,
+         const enum pqos_mon_event event,
+         const unsigned width,
+         const uint64_t prev_local,
+         const uint64_t prev_total,
+         const int value)
+{
+        unsigned cores[] = {1};
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        struct pqos_mon_poll_ctx ctx;
+        struct mbm_read result;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        memset(&ctx, 0, sizeof(ctx));
+        group.intl = &intl;
+        group.num_cores = 1;
+        group.cores = cores;
+        group.values.mbm_local = prev_local;
+        group.values.mbm_total = prev_total;
+        intl.hw.ctx = &ctx;
+        intl.hw.num_ctx = 1;
+        intl.valid_mbm_read = 1;
+        ctx.lcore = cores[0];
+        ctx.rmid = 2;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        expect_value(hw_mon_read, lcore, cores[0]);
+        expect_value(hw_mon_read, rmid, ctx.rmid);
+        expect_value(hw_mon_read, event,
+                     event == PQOS_MON_EVENT_TMEM_BW ? 2 : 3);
+        will_return(hw_mon_read, value);
+        will_return(hw_mon_read, PQOS_RETVAL_OK);
+
+        set_mbm_counter_length(data->cap_mon, width);
+        result.ret = hw_mon_read_counter(&group, event);
+
+        result.valid_mbm_read = intl.valid_mbm_read;
+        result.values = group.values;
+
+        return result;
+}
+
+/*
+ * The total counter rolled over in an earlier poll and the local one has not
+ * yet: total is below local, but it has not rolled over since the last poll.
+ */
+static void
+test_hw_mon_read_counter_tmem_32bit_below_local(void **state)
+{
+        const struct test_data *data = (struct test_data *)*state;
+        const struct pqos_monitor *pmon;
+        struct mbm_read r;
+
+        pqos_cap_get_event(data->cap, PQOS_MON_EVENT_TMEM_BW, &pmon);
+
+        r = read_mbm(data, PQOS_MON_EVENT_TMEM_BW, 32, 0xFFFFFF00, 0x100,
+                     0x200);
+        assert_int_equal(r.ret, PQOS_RETVAL_OK);
+        assert_int_equal(r.valid_mbm_read, 1);
+        assert_int_equal(r.values.mbm_total, 0x200);
+        assert_int_equal(r.values.mbm_total_delta, 0x100 * pmon->scale_factor);
+}
+
+/*
+ * Total memory bandwidth monitored alone, so the local counter is never read:
+ * the total counter rolls over since the last poll.
+ */
+static void
+test_hw_mon_read_counter_tmem_32bit_rollover(void **state)
+{
+        const struct test_data *data = (struct test_data *)*state;
+        struct mbm_read r;
+
+        r = read_mbm(data, PQOS_MON_EVENT_TMEM_BW, 32, 0, 0xFFFFFFF0, 0x10);
+        assert_int_equal(r.ret, PQOS_RETVAL_OVERFLOW);
+        assert_int_equal(r.valid_mbm_read, 0);
+        assert_int_equal(r.values.mbm_total, 0x10);
+}
+
+/*
+ * The same rollover of the local counter, which the LMEM case reports.
+ */
+static void
+test_hw_mon_read_counter_lmem_32bit_rollover(void **state)
+{
+        const struct test_data *data = (struct test_data *)*state;
+        struct mbm_read r;
+
+        r = read_mbm(data, PQOS_MON_EVENT_LMEM_BW, 32, 0xFFFFFFF0, 0, 0x10);
+        assert_int_equal(r.ret, PQOS_RETVAL_OVERFLOW);
+        assert_int_equal(r.valid_mbm_read, 0);
+        assert_int_equal(r.values.mbm_local, 0x10);
+}
+
+/*
+ * A 24-bit counter that rolls over is not reported: the check is for 32-bit
+ * counters, and get_delta() takes the rollover of a 24-bit one into account.
+ */
+static void
+test_hw_mon_read_counter_tmem_24bit_rollover(void **state)
+{
+        const struct test_data *data = (struct test_data *)*state;
+        const struct pqos_monitor *pmon;
+        struct mbm_read r;
+
+        pqos_cap_get_event(data->cap, PQOS_MON_EVENT_TMEM_BW, &pmon);
+
+        r = read_mbm(data, PQOS_MON_EVENT_TMEM_BW, 24, 0, 0xFFFFF0, 0x10);
+        assert_int_equal(r.ret, PQOS_RETVAL_OK);
+        assert_int_equal(r.valid_mbm_read, 1);
+        assert_int_equal(r.values.mbm_total, 0x10);
+        assert_int_equal(r.values.mbm_total_delta, 0x20 * pmon->scale_factor);
+}
+
 int
 main(void)
 {
@@ -246,7 +403,19 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_hw_mon_read_counter_tmem),
             cmocka_unit_test(test_hw_mon_read_counter_lmem),
-            cmocka_unit_test(test_hw_mon_read_counter_llc)};
+            cmocka_unit_test(test_hw_mon_read_counter_llc),
+            cmocka_unit_test_teardown(
+                test_hw_mon_read_counter_tmem_32bit_below_local,
+                mbm_counter_length_back),
+            cmocka_unit_test_teardown(
+                test_hw_mon_read_counter_tmem_32bit_rollover,
+                mbm_counter_length_back),
+            cmocka_unit_test_teardown(
+                test_hw_mon_read_counter_lmem_32bit_rollover,
+                mbm_counter_length_back),
+            cmocka_unit_test_teardown(
+                test_hw_mon_read_counter_tmem_24bit_rollover,
+                mbm_counter_length_back)};
 
         result += cmocka_run_group_tests(tests, wrap_init_mon, wrap_fini_mon);
 

@@ -1269,7 +1269,7 @@ hw_mon_read_counter(struct pqos_mon_data *group,
                 pv->mbm_local = value;
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
-                if (pmon->counter_length == 32 && pv->mbm_local > value)
+                if (pmon->counter_length == 32 && pv->mbm_total > value)
                         ret = PQOS_RETVAL_OVERFLOW;
                 if (group->intl->valid_mbm_read) {
                         pv->mbm_total_delta =
