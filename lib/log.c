@@ -67,6 +67,18 @@
  *
  * A process that exits with the log still installed leaves one allocated, the
  * way it leaves every other module's state at exit.
+ *
+ * A write to the descriptor that failed is said on stderr once for each run of
+ * failed writes, by the first of them, which \a write_failed records; a write
+ * that works ends the run. Like \a refs, it changes after the destination is
+ * published - but atomically, without the mutex, which is not held across a
+ * write. A descriptor that failed one write mostly fails the writes after it
+ * as well - a pipe whose reader has gone, a terminal that has hung up - and a
+ * line on stderr for each of them filled a pipe there that was not read, until
+ * the write of the next line blocked, inside the API that was logging and with
+ * its lock held. Some failures pass, though, as a full pipe's EAGAIN on a
+ * non-blocking descriptor or a full file system's ENOSPC can, and a failure
+ * after that is said again.
  */
 struct log_destination {
         int opt; /**< which message types reach it */
@@ -78,6 +90,7 @@ struct log_destination {
         void *context;                /**< handed back to \a callback */
         unsigned refs;                /**< messages using it right now */
         int retired;                  /**< taken out of service */
+        int write_failed;             /**< the last write to \a fd failed */
         struct log_destination *next; /**< the retired list */
 };
 
@@ -526,16 +539,13 @@ log_emission_cleanup(void *arg)
  * may return wherever it likes without jumping out of that handler's scope -
  * which pthread_cleanup_push() does not permit.
  *
- * @param [in] dest the destination, or NULL where there is none
+ * @param [in,out] dest the destination, or NULL where there is none
  * @param [in] type log type to be made
  * @param [in] str format string compatible with printf()
  * @param [in] ap the arguments \a str describes
  */
 static void
-log_emit(const struct log_destination *dest,
-         int type,
-         const char *str,
-         va_list ap)
+log_emit(struct log_destination *dest, int type, const char *str, va_list ap)
 {
         char ap_buffer[AP_BUFFER_SIZE];
         int size;
@@ -570,9 +580,22 @@ log_emit(const struct log_destination *dest,
          * addressed to a descriptor that is closed, or worse, reused
          */
         if (dest->fd >= 0) {
-                if (write(dest->fd, ap_buffer, size) < 0)
-                        fprintf(stderr, "%s: printing to file failed\n",
-                                __func__);
+                /* a write that failed is said once, the first of a run: the
+                 * writes after it mostly fail as well, and a line for each of
+                 * them can fill stderr - see struct log_destination. A write
+                 * that works ends the run; the flag is looked at before it is
+                 * cleared, so that a message on a working descriptor changes
+                 * nothing in the destination
+                 */
+                if (write(dest->fd, ap_buffer, size) < 0) {
+                        if (!__atomic_exchange_n(&dest->write_failed, 1,
+                                                 __ATOMIC_RELAXED))
+                                fprintf(stderr, "%s: printing to file failed\n",
+                                        __func__);
+                } else if (__atomic_load_n(&dest->write_failed,
+                                           __ATOMIC_RELAXED))
+                        __atomic_store_n(&dest->write_failed, 0,
+                                         __ATOMIC_RELAXED);
         }
 
         /* and the callback with nothing held, so that what it does with the

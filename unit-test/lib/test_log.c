@@ -36,6 +36,7 @@
 
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -664,6 +665,196 @@ test_a_cancelled_emission_gives_back_what_it_held(void **state
         blocked_pipe[1] = -1;
 }
 
+/** what log_emit() says on stderr where a write to the descriptor failed */
+#define WRITE_FAILED "log_emit: printing to file failed\n"
+
+/**
+ * stderr on a pipe of a case's own, for what log_emit() says there.
+ *
+ * stderr is the process's, and the cases after one that moves it get it as
+ * that case leaves it: between stderr_to_pipe() and stderr_back() a case
+ * asserts nothing, so that no failure can leave it with stderr moved, nor say
+ * so into the pipe. Neither of the two asserts; they record what they did.
+ */
+struct stderr_pipe {
+        int fds[2];      /**< the pipe */
+        int saved;       /**< stderr's own descriptor, kept while it is moved */
+        int moved;       /**< what dup2() returned, moving stderr to the pipe */
+        int restored;    /**< what dup2() returned, putting stderr back */
+        char text[1024]; /**< what the pipe got */
+};
+
+/** makes the pipe and keeps stderr's descriptor, changing nothing global */
+static void
+stderr_pipe_ready(struct stderr_pipe *sp)
+{
+        memset(sp, 0, sizeof(*sp));
+        assert_int_equal(pipe(sp->fds), 0);
+        sp->saved = dup(STDERR_FILENO);
+        assert_true(sp->saved >= 0);
+}
+
+static void
+stderr_to_pipe(struct stderr_pipe *sp)
+{
+        sp->moved = dup2(sp->fds[1], STDERR_FILENO);
+}
+
+/** puts stderr back, and reads what the pipe got */
+static void
+stderr_back(struct stderr_pipe *sp)
+{
+        size_t length = 0;
+        ssize_t got;
+
+        sp->restored = dup2(sp->saved, STDERR_FILENO);
+        close(sp->saved);
+        close(sp->fds[1]);
+        while (length < sizeof(sp->text) - 1) {
+                got = read(sp->fds[0], sp->text + length,
+                           sizeof(sp->text) - 1 - length);
+                if (got <= 0)
+                        break;
+                length += (size_t)got;
+        }
+        sp->text[length] = '\0';
+        close(sp->fds[0]);
+}
+
+static void
+test_a_write_that_failed_is_said_once(void **state __attribute__((unused)))
+{
+        struct sigaction ignore, saved_sigpipe;
+        struct stderr_pipe sp;
+        int dead[2];
+        int ignored, unignored = 0;
+        int first, second;
+
+        /* The descriptor is a pipe whose reader has gone, with SIGPIPE ignored
+         * as pqos's monitoring has it, so every write to it fails with EPIPE.
+         * Each failure was said on stderr, a line for every message, and a
+         * pipe there that was not read filled with them, until the next line
+         * blocked inside the API that was logging, with its lock held.
+         */
+        assert_int_equal(pipe(dead), 0);
+        close(dead[0]);
+        stderr_pipe_ready(&sp);
+        memset(&ignore, 0, sizeof(ignore));
+        ignore.sa_handler = SIG_IGN;
+        sigemptyset(&ignore.sa_mask);
+
+        /* SIGPIPE's action is the process's too: from here until it and
+         * stderr are back, nothing is asserted
+         */
+        ignored = sigaction(SIGPIPE, &ignore, &saved_sigpipe);
+        stderr_to_pipe(&sp);
+
+        first = log_init(dead[1], NULL, NULL, LOG_VER_VERBOSE);
+        log_printf(LOG_OPT_INFO, "a message\n");
+        log_printf(LOG_OPT_WARN, "another\n");
+        log_printf(LOG_OPT_ERROR, "and a third\n");
+
+        /* and a destination installed after it, as the next pqos_init() makes
+         * one, says the first write of its own that failed
+         */
+        second = log_init(dead[1], NULL, NULL, LOG_VER_VERBOSE);
+        log_printf(LOG_OPT_INFO, "a message of the next\n");
+        log_printf(LOG_OPT_INFO, "and another\n");
+        log_fini();
+
+        stderr_back(&sp);
+        if (ignored == 0)
+                unignored = sigaction(SIGPIPE, &saved_sigpipe, NULL);
+        close(dead[1]);
+
+        /* the silent log back, for the reason the uninitialized case gives */
+        test_log_init_silent();
+
+        assert_int_equal(ignored, 0);
+        assert_int_equal(sp.moved, STDERR_FILENO);
+        assert_int_equal(sp.restored, STDERR_FILENO);
+        assert_int_equal(unignored, 0);
+        assert_int_equal(first, LOG_RETVAL_OK);
+        assert_int_equal(second, LOG_RETVAL_OK);
+        assert_string_equal(sp.text, WRITE_FAILED WRITE_FAILED);
+}
+
+/**
+ * @brief Fills a pipe to its last byte
+ *
+ * @param [in] fd its write end, which is non-blocking
+ */
+static void
+fill_pipe(const int fd)
+{
+        char block[4096];
+        size_t size = sizeof(block);
+
+        memset(block, 'x', sizeof(block));
+        while (size > 0)
+                if (write(fd, block, size) < 0)
+                        size /= 2;
+}
+
+/**
+ * @brief Reads a pipe empty
+ *
+ * @param [in] fd its read end, which is non-blocking
+ */
+static void
+drain_pipe(const int fd)
+{
+        char block[4096];
+
+        while (read(fd, block, sizeof(block)) > 0)
+                ;
+}
+
+static void
+test_a_failure_after_a_write_that_worked_is_said_again(void **state
+                                                       __attribute__((unused)))
+{
+        struct stderr_pipe sp;
+        int full[2];
+        int installed;
+
+        /* Not every failure lasts: a full pipe refuses a write to a
+         * non-blocking descriptor with EAGAIN, and takes the next once it has
+         * been read. A write that works ends the run of failures, so the
+         * failure after it is said as well, once. Here the pipe is full for two
+         * messages, read empty, written to once, and full again for two more.
+         */
+        assert_int_equal(pipe(full), 0);
+        assert_int_equal(
+            fcntl(full[0], F_SETFL, fcntl(full[0], F_GETFL) | O_NONBLOCK), 0);
+        assert_int_equal(
+            fcntl(full[1], F_SETFL, fcntl(full[1], F_GETFL) | O_NONBLOCK), 0);
+        stderr_pipe_ready(&sp);
+
+        /* nothing asserted until stderr is back */
+        stderr_to_pipe(&sp);
+        installed = log_init(full[1], NULL, NULL, LOG_VER_VERBOSE);
+        fill_pipe(full[1]);
+        log_printf(LOG_OPT_INFO, "a message the full pipe refuses\n");
+        log_printf(LOG_OPT_INFO, "and another\n");
+        drain_pipe(full[0]);
+        log_printf(LOG_OPT_INFO, "a message the pipe takes\n");
+        fill_pipe(full[1]);
+        log_printf(LOG_OPT_INFO, "a message the full pipe refuses again\n");
+        log_printf(LOG_OPT_INFO, "and another\n");
+        log_fini();
+        stderr_back(&sp);
+
+        close(full[0]);
+        close(full[1]);
+        test_log_init_silent();
+
+        assert_int_equal(sp.moved, STDERR_FILENO);
+        assert_int_equal(sp.restored, STDERR_FILENO);
+        assert_int_equal(installed, LOG_RETVAL_OK);
+        assert_string_equal(sp.text, WRITE_FAILED WRITE_FAILED);
+}
+
 static int
 log_setup(void **state __attribute__((unused)))
 {
@@ -783,8 +974,10 @@ main(void)
                 test_an_install_and_a_teardown_beside_a_stream_of_messages),
             cmocka_unit_test(
                 test_a_caller_that_may_run_before_the_log_says_nothing),
+            cmocka_unit_test(test_a_cancelled_emission_gives_back_what_it_held),
+            cmocka_unit_test(test_a_write_that_failed_is_said_once),
             cmocka_unit_test(
-                test_a_cancelled_emission_gives_back_what_it_held)};
+                test_a_failure_after_a_write_that_worked_is_said_again)};
 
         result += cmocka_run_group_tests(tests_log, NULL, NULL);
 
