@@ -41,10 +41,12 @@
 #include "pci.h"
 #include "utils.h"
 
+#include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define RMDD_L3_DOMAIN    1
 #define RMDD_IO_L3_DOMAIN 2
@@ -1110,9 +1112,27 @@ erdt_init(const struct pqos_cap *cap,
                 return ret;
         }
 
+        /* no table is a platform without the feature, which pqos_init() says
+         * at debug level: a warning here began the output of every command on
+         * such a platform. Only the kernel's listing of the tables can say
+         * there is none: without it the tables are looked for in memory, and
+         * that scan says itself when it fails. A table the listing may hold
+         * is said when it cannot be read, as by a user who is not root (the
+         * kernel makes the files 0400) or one who may not look it up, and
+         * when it cannot be used, below
+         */
         table = acpi_get_sig(ACPI_TABLE_SIG_ERDT);
         if (table == NULL) {
-                LOG_WARN("Could not obtain %s table\n", ACPI_TABLE_SIG_ERDT);
+                if (!pqos_dir_exists(ACPI_TABLE_FS_PATH))
+                        LOG_DEBUG("%s table not found in ACPI memory\n",
+                                  ACPI_TABLE_SIG_ERDT);
+                else if (access(ACPI_TABLE_FS_PATH "/" ACPI_TABLE_SIG_ERDT,
+                                F_OK) != 0 &&
+                         (errno == ENOENT || errno == ENOTDIR))
+                        LOG_DEBUG("No %s table\n", ACPI_TABLE_SIG_ERDT);
+                else
+                        LOG_WARN("Could not obtain %s table\n",
+                                 ACPI_TABLE_SIG_ERDT);
                 (void)acpi_fini();
                 return PQOS_RETVAL_RESOURCE;
         }

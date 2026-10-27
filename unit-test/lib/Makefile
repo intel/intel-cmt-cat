@@ -936,7 +936,8 @@ $(BIN_DIR)/test_erdt: test_erdt.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=acpi_init -Wl,--wrap=acpi_fini \
 		-Wl,--wrap=acpi_free -Wl,--wrap=acpi_get_sig \
-		-Wl,--wrap=acpi_print \
+		-Wl,--wrap=acpi_print -Wl,--wrap=pqos_dir_exists \
+		-Wl,--wrap=access \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

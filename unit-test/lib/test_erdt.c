@@ -31,7 +31,11 @@
  */
 
 #include "erdt.h"
+#include "mock_common.h"
 #include "test.h"
+
+#include <errno.h>
+#include <unistd.h>
 
 #define DASE (ACPI_ERDT_STRUCT_DASE_HEADER_LENGTH + 2)
 #define CPU                                                                    \
@@ -40,7 +44,8 @@
 #define DEV                                                                    \
         (sizeof(struct acpi_table_erdt_rmdd) +                                 \
          sizeof(struct acpi_table_erdt_dacd) + DASE)
-#define SIZE (sizeof(struct acpi_table_erdt_header) + CPU + DEV)
+#define SIZE      (sizeof(struct acpi_table_erdt_header) + CPU + DEV)
+#define ERDT_FILE ACPI_TABLE_FS_PATH "/" ACPI_TABLE_SIG_ERDT
 struct fixture {
         _Alignas(uint64_t) uint8_t data[SIZE];
         struct acpi_table table;
@@ -75,6 +80,32 @@ __wrap_acpi_free(struct acpi_table *table)
 {
         function_called();
         check_expected_ptr(table);
+}
+/* access(), which answers \a errno queued, or 0 for a file that is there */
+int
+__wrap_access(const char *path, int mode)
+{
+        const int err = mock_type(int);
+
+        check_expected(path);
+        assert_int_equal(mode, F_OK);
+        if (err == 0)
+                return 0;
+        errno = err;
+        return -1;
+}
+/* the kernel's listing of the ACPI tables: there or not, and if it is, what
+ * looking up the ERDT file in it answers (an errno, or 0 for a file there)
+ */
+static void
+expect_listing(const int listed, const int file_errno)
+{
+        expect_string(__wrap_pqos_dir_exists, path, ACPI_TABLE_FS_PATH);
+        will_return(__wrap_pqos_dir_exists, listed);
+        if (!listed)
+                return;
+        expect_string(__wrap_access, path, ERDT_FILE);
+        will_return(__wrap_access, file_errno);
 }
 static void
 init(struct fixture *f)
@@ -166,6 +197,7 @@ test_errors(void **state __attribute__((unused)))
         expect_function_call(__wrap_acpi_get_sig);
         expect_string(__wrap_acpi_get_sig, sig, ACPI_TABLE_SIG_ERDT);
         will_return(__wrap_acpi_get_sig, NULL);
+        expect_listing(1, ENOENT);
         expect_function_call(__wrap_acpi_fini);
         will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
         assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_RESOURCE);
@@ -183,10 +215,123 @@ test_errors(void **state __attribute__((unused)))
         will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
         assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_ERROR);
 }
+/* a platform without ERDT, which pqos_init() takes for a feature not there:
+ * nothing is said at the default verbosity
+ */
+static void
+test_no_table_is_said_nothing_of(void **state __attribute__((unused)))
+{
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+
+        expect_function_call(__wrap_acpi_init);
+        will_return(__wrap_acpi_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_acpi_get_sig);
+        expect_string(__wrap_acpi_get_sig, sig, ACPI_TABLE_SIG_ERDT);
+        will_return(__wrap_acpi_get_sig, NULL);
+        expect_listing(1, ENOENT);
+        expect_function_call(__wrap_acpi_fini);
+        will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
+        test_log_count_start();
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_RESOURCE);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+/* a table that is there but cannot be read, as by a user who is not root, is
+ * said: the platform has the feature
+ */
+static void
+test_an_unreadable_table_is_said(void **state __attribute__((unused)))
+{
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+
+        expect_function_call(__wrap_acpi_init);
+        will_return(__wrap_acpi_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_acpi_get_sig);
+        expect_string(__wrap_acpi_get_sig, sig, ACPI_TABLE_SIG_ERDT);
+        will_return(__wrap_acpi_get_sig, NULL);
+        expect_listing(1, 0);
+        expect_function_call(__wrap_acpi_fini);
+        will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
+        test_log_count_start();
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_RESOURCE);
+        assert_int_equal(test_log_count_stop(), 1);
+}
+/* a table the listing may hold, but which the caller may not look up, is said
+ * as one that cannot be read is
+ */
+static void
+test_a_table_that_cannot_be_looked_up_is_said(void **state
+                                              __attribute__((unused)))
+{
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+
+        expect_function_call(__wrap_acpi_init);
+        will_return(__wrap_acpi_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_acpi_get_sig);
+        expect_string(__wrap_acpi_get_sig, sig, ACPI_TABLE_SIG_ERDT);
+        will_return(__wrap_acpi_get_sig, NULL);
+        expect_listing(1, EACCES);
+        expect_function_call(__wrap_acpi_fini);
+        will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
+        test_log_count_start();
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_RESOURCE);
+        assert_int_equal(test_log_count_stop(), 1);
+}
+/* no listing of the tables: the scan of ACPI memory found none, and said so
+ * itself if it failed; nothing more is said, and no file is looked up
+ */
+static void
+test_no_listing_is_said_nothing_of(void **state __attribute__((unused)))
+{
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+
+        expect_function_call(__wrap_acpi_init);
+        will_return(__wrap_acpi_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_acpi_get_sig);
+        expect_string(__wrap_acpi_get_sig, sig, ACPI_TABLE_SIG_ERDT);
+        will_return(__wrap_acpi_get_sig, NULL);
+        expect_listing(0, 0);
+        expect_function_call(__wrap_acpi_fini);
+        will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
+        test_log_count_start();
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_RESOURCE);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+/* a table that is there but cannot be used is an error, which is said */
+static void
+test_an_unusable_table_is_said(void **state __attribute__((unused)))
+{
+        struct fixture f;
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+
+        init(&f);
+        f.table.erdt->header.header.revision++;
+        expect_table(&f);
+        expect_function_call(__wrap_acpi_fini);
+        will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
+        test_log_count_start();
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 1);
+}
 int
 main(void)
 {
-        const struct CMUnitTest tests[] = {cmocka_unit_test(test_valid),
-                                           cmocka_unit_test(test_errors)};
+        const struct CMUnitTest tests[] = {
+            cmocka_unit_test(test_valid),
+            cmocka_unit_test(test_errors),
+            cmocka_unit_test(test_no_table_is_said_nothing_of),
+            cmocka_unit_test(test_an_unreadable_table_is_said),
+            cmocka_unit_test(test_a_table_that_cannot_be_looked_up_is_said),
+            cmocka_unit_test(test_no_listing_is_said_nothing_of),
+            cmocka_unit_test(test_an_unusable_table_is_said)};
         return cmocka_run_group_tests(tests, NULL, NULL);
 }
