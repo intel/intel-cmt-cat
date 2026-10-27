@@ -1200,6 +1200,7 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
         return PQOS_RETVAL_OK;
 }
 
+/* the highest L3 ID that the 64-bit l3ids masks below hold */
 #define RESCTRL_CORE_MAX_L3ID 63
 struct resctrl_core_group {
         char name[32];
@@ -1323,7 +1324,7 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
 
                                 if (resctrl_cpumask_get(coreinfo->lcore,
                                                         &cpumask)) {
-                                        if (coreinfo->l3cat_id >=
+                                        if (coreinfo->l3cat_id >
                                             RESCTRL_CORE_MAX_L3ID) {
                                                 grp->valid = 0;
                                                 break;
@@ -1488,7 +1489,7 @@ resctrl_mon_assign(struct pqos_mon_data *group)
             group->num_cores > 0) {
                 int ret;
                 unsigned i;
-                unsigned l3ids = 0;
+                uint64_t l3ids = 0;
                 unsigned cgrp_num;
                 const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
                 const struct pqos_cap *cap = _pqos_get_cap();
@@ -1548,7 +1549,7 @@ resctrl_mon_assign(struct pqos_mon_data *group)
                         /* check if llc doesn't exceed occupancy threshold */
                         if (resctrl_mon_is_event_supported(
                                 PQOS_MON_EVENT_L3_OCCUP)) {
-                                for (l3id = 0; l3id < RESCTRL_CORE_MAX_L3ID;
+                                for (l3id = 0; l3id <= RESCTRL_CORE_MAX_L3ID;
                                      l3id++) {
                                         unsigned clos = 0;
 

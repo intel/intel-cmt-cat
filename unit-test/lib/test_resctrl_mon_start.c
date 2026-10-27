@@ -209,6 +209,18 @@ __wrap_pqos_fopen(const char *name, const char *mode)
              "/mon_groups/pqos-other/mon_data/mon_L3_00/llc_occupancy",
              .mode = "r",
              .text = "100\n"},
+            {.path = RESCTRL_PATH
+             "/mon_groups/pqos-other/mon_data/mon_L3_40/llc_occupancy",
+             .mode = "r",
+             .text = "100\n"},
+            {.path = RESCTRL_PATH
+             "/mon_groups/pqos-other/mon_data/mon_L3_62/llc_occupancy",
+             .mode = "r",
+             .text = "100\n"},
+            {.path = RESCTRL_PATH
+             "/mon_groups/pqos-other/mon_data/mon_L3_63/llc_occupancy",
+             .mode = "r",
+             .text = "100\n"},
         };
 
         for (i = 0; i < DIM(file); i++) {
@@ -338,14 +350,25 @@ expect_group_cores(const struct pqos_cpuinfo *cpu,
         }
 }
 
+/**
+ * @brief Starts core \a core where pqos-same, with core \a same on the same
+ *        L3, and pqos-other, with core \a other on another L3, are listed
+ *
+ * pqos-same has a core of the L3 asked for, so its tasks are not listed (the
+ * fopen mock fails a file it does not know): only those of pqos-other are,
+ * which then has its occupancy read on the L3 of \a core, and is given the
+ * core
+ */
 static void
-test_resctrl_mon_start_core_shares_group_of_other_l3(void **state)
+start_shares_group_of_other_l3(void **state,
+                               const unsigned core,
+                               const unsigned same,
+                               const unsigned other)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_mon_data group;
         struct pqos_mon_data_internal intl;
-        /* core 2 is on L3 0, core 1 too, and core 5 on L3 1 */
-        unsigned cores[] = {2};
+        unsigned cores[] = {core};
         const char *const listed[] = {"pqos-same", "pqos-other", NULL};
         int ret;
 
@@ -366,13 +389,9 @@ test_resctrl_mon_start_core_shares_group_of_other_l3(void **state)
         will_return(__wrap_resctrl_alloc_get_grps_num, 1);
 
         mon_groups_listed[0] = listed;
-        expect_group_cores(data->cpu, 0, "pqos-same", 1);
-        expect_group_cores(data->cpu, 0, "pqos-other", 5);
+        expect_group_cores(data->cpu, 0, "pqos-same", same);
+        expect_group_cores(data->cpu, 0, "pqos-other", other);
 
-        /* pqos-same has a core of the L3 asked for, so its tasks are not
-         * listed (the fopen mock fails a file it does not know): only those
-         * of pqos-other are, which then has its occupancy read
-         */
         expect_string(__wrap_pqos_dir_exists, path,
                       RESCTRL_PATH "/mon_groups/pqos-other");
         will_return(__wrap_pqos_dir_exists, 1);
@@ -390,6 +409,89 @@ test_resctrl_mon_start_core_shares_group_of_other_l3(void **state)
 
         free(intl.resctrl.mon_group);
         free(intl.resctrl.l3id);
+}
+
+static void
+test_resctrl_mon_start_core_shares_group_of_other_l3(void **state)
+{
+        /* core 2 is on L3 0, core 1 too, and core 5 on L3 1 */
+        start_shares_group_of_other_l3(state, 2, 1, 5);
+}
+
+/* how far the setups below move the test topology's L3 IDs up: cores 0 to 3
+ * on L3 l3_shift, and cores 4 to 7 on L3 l3_shift + 1. l3ids_back(), their
+ * teardown, which cmocka runs after a failed case too, moves them back
+ */
+static unsigned l3_shift;
+
+static int
+l3ids_shift(void **state, const unsigned by)
+{
+        struct test_data *data = (struct test_data *)*state;
+        unsigned i;
+
+        for (i = 0; i < data->cpu->num_cores; i++) {
+                data->cpu->cores[i].l3_id += by;
+                data->cpu->cores[i].l3cat_id += by;
+        }
+        l3_shift = by;
+
+        return 0;
+}
+
+static int
+l3ids_from_40(void **state)
+{
+        return l3ids_shift(state, 40);
+}
+
+static int
+l3ids_from_62(void **state)
+{
+        return l3ids_shift(state, 62);
+}
+
+static int
+l3ids_back(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        unsigned i;
+
+        for (i = 0; i < data->cpu->num_cores; i++) {
+                data->cpu->cores[i].l3_id -= l3_shift;
+                data->cpu->cores[i].l3cat_id -= l3_shift;
+        }
+        l3_shift = 0;
+
+        return mon_groups_unlist(state);
+}
+
+static void
+test_resctrl_mon_start_core_shares_group_of_other_l3_above_31(void **state)
+{
+        /* core 2 is on L3 40, core 1 too, and core 5 on L3 41: a mask of 32
+         * bits lost both, and the start took pqos-same
+         */
+        start_shares_group_of_other_l3(state, 2, 1, 5);
+}
+
+static void
+test_resctrl_mon_start_core_shares_group_on_l3_63(void **state)
+{
+        /* core 2 is on L3 62, core 1 too, and core 5 on L3 63: the parse
+         * took a group with a core on L3 63 for one it cannot describe, and
+         * the start made a new group
+         */
+        start_shares_group_of_other_l3(state, 2, 1, 5);
+}
+
+static void
+test_resctrl_mon_start_core_on_l3_63_has_occupancy_read(void **state)
+{
+        /* core 6 is on L3 63, core 5 too, and core 1 on L3 62: the occupancy
+         * of pqos-other was not read on L3 63, whose threshold went unchecked
+         */
+        start_shares_group_of_other_l3(state, 6, 5, 1);
 }
 
 /**
@@ -1196,6 +1298,15 @@ main(void)
             cmocka_unit_test_teardown(
                 test_resctrl_mon_start_core_shares_group_of_other_l3,
                 mon_groups_unlist),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_mon_start_core_shares_group_of_other_l3_above_31,
+                l3ids_from_40, l3ids_back),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_mon_start_core_shares_group_on_l3_63,
+                l3ids_from_62, l3ids_back),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_mon_start_core_on_l3_63_has_occupancy_read,
+                l3ids_from_62, l3ids_back),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_start_core_not_in_group_with_tasks,
                 mon_groups_unlist),
