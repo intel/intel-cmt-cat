@@ -44,9 +44,6 @@
 #include "resctrl_monitoring.h"
 #include "resctrl_utils.h"
 
-#include <ctype.h>
-#include <dirent.h> /**< scandir() */
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -562,90 +559,77 @@ os_alloc_reset_light_schematas_exit:
         return ret;
 }
 
-/**
- * @brief filter for scandir.
- *
- * Skips entries starting with "."
- * Skips non-numeric entries
- *
- * @param[in] dir scandir dirent entry
- *
- * @retval 0 for entries to be skipped
- * @retval 1 otherwise
- */
-static int
-filter_pids(const struct dirent *dir)
-{
-        size_t char_idx;
-        size_t name_len;
-
-        if (dir->d_name[0] == '.')
-                return 0;
-
-        name_len = strlen(dir->d_name);
-        for (char_idx = 0; char_idx < name_len; ++char_idx) {
-                if (!isdigit((unsigned char)dir->d_name[char_idx]))
-                        return 0;
-        }
-
-        return 1;
-}
-
 int
 os_alloc_reset_tasks(void)
 {
-        struct dirent **pids_list = NULL;
-        int pid_count;
-        int pid_idx;
-        int alloc_result = PQOS_RETVAL_ERROR;
-        pid_t pid;
+        unsigned grps;
+        unsigned class_id;
+        int alloc_result;
         const int clos0 = 0;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         LOG_INFO("OS alloc reset - tasks\n");
 
-        pid_count = scandir("/proc", &pids_list, filter_pids, NULL);
-        if (pid_count < 0) {
-                LOG_ERROR("Failed to scan /proc for tasks: %s\n",
-                          strerror(errno));
-                if (pids_list != NULL)
-                        free(pids_list);
-                return PQOS_RETVAL_ERROR;
-        }
+        alloc_result = resctrl_alloc_get_grps_num(cap, &grps);
+        if (alloc_result != PQOS_RETVAL_OK)
+                return alloc_result;
 
-        for (pid_idx = 0; pid_idx < pid_count; ++pid_idx) {
-                pid = atoi(pids_list[pid_idx]->d_name);
-                /*
-                 * Tasks listed in /proc may exit between scandir() and the
-                 * resctrl association call below. This is expected during a
-                 * global reset, not an error. Skip silently if the task is
-                 * already gone. A small TOCTOU window remains between this
-                 * check and the actual resctrl write; that residual case is
-                 * handled by the callees and logged at DEBUG level.
-                 */
-                if (resctrl_alloc_task_validate(pid) != PQOS_RETVAL_OK) {
-                        LOG_DEBUG("Task %d exited before reset; skipping "
-                                  "(benign race with short-lived process)\n",
-                                  pid);
-                        continue;
+        /*
+         * Only the tasks of the other classes are moved: those of the default
+         * class, nearly every task on the system, are where the reset puts
+         * them. A class's tasks file lists each thread, which is moved on its
+         * own.
+         */
+        for (class_id = 1; class_id < grps; class_id++) {
+                unsigned count = 0;
+                unsigned i;
+                unsigned *tasks = os_pid_get_pid_assoc(class_id, &count);
+
+                if (tasks == NULL) {
+                        LOG_ERROR("Failed to read the tasks of CLOS%u\n",
+                                  class_id);
+                        return PQOS_RETVAL_ERROR;
                 }
-                alloc_result = os_alloc_assoc_set_pid(pid, clos0);
-                if (alloc_result == PQOS_RETVAL_PARAM) {
-                        LOG_DEBUG("Task %d no longer exists\n", pid);
-                        alloc_result = PQOS_RETVAL_OK;
-                } else if (alloc_result != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Error allocating task %d to CLOS%u\n", pid,
-                                  clos0);
-                        break;
+
+                for (i = 0; i < count; i++) {
+                        const pid_t pid = (pid_t)tasks[i];
+
+                        /*
+                         * Tasks listed may exit between the read and the
+                         * resctrl association call below. This is expected
+                         * during a global reset, not an error. Skip silently
+                         * if the task is already gone. A small TOCTOU window
+                         * remains between this check and the actual resctrl
+                         * write; the callees return PQOS_RETVAL_PARAM for that
+                         * case too, below, though resctrl_alloc_fclose() logs
+                         * an error for the failed close first.
+                         */
+                        if (resctrl_alloc_task_validate(pid) !=
+                            PQOS_RETVAL_OK) {
+                                LOG_DEBUG("Task %d exited before reset; "
+                                          "skipping (benign race with "
+                                          "short-lived process)\n",
+                                          pid);
+                                continue;
+                        }
+                        alloc_result = os_alloc_assoc_set_pid(pid, clos0);
+                        if (alloc_result == PQOS_RETVAL_PARAM) {
+                                LOG_DEBUG("Task %d no longer exists\n", pid);
+                                alloc_result = PQOS_RETVAL_OK;
+                        } else if (alloc_result != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Error allocating task %d to "
+                                          "CLOS%u\n",
+                                          pid, clos0);
+                                break;
+                        }
                 }
+
+                free(tasks);
+                if (alloc_result != PQOS_RETVAL_OK)
+                        return alloc_result;
         }
 
-        if (pid_count > 0 && pids_list) {
-                while (pid_count--)
-                        free(pids_list[pid_count]);
-                free(pids_list);
-        }
-
-        return alloc_result;
+        return PQOS_RETVAL_OK;
 }
 
 /**

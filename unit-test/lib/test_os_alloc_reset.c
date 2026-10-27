@@ -33,6 +33,8 @@
 #include "allocation.h"
 #include "mock_cap.h"
 #include "mock_resctrl.h"
+#include "mock_resctrl_alloc.h"
+#include "mock_resctrl_monitoring.h"
 #include "mock_resctrl_schemata.h"
 #include "os_allocation.h"
 #include "resctrl_alloc.h"
@@ -106,6 +108,191 @@ test_os_alloc_reset_schematas(void **state)
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* ======== os_alloc_reset_tasks ======== */
+
+/* the tasks that the tasks file of a class lists, which a test queues as
+ * their number and an array of them: a negative number is a file that cannot
+ * be read
+ */
+unsigned *
+__wrap_resctrl_alloc_task_read(unsigned class_id, unsigned *count)
+{
+        const int num = mock_type(int);
+        const unsigned *listed = mock_ptr_type(const unsigned *);
+        unsigned *tasks;
+
+        check_expected(class_id);
+        if (num < 0)
+                return NULL;
+
+        tasks = calloc(num + 1, sizeof(*tasks));
+        assert_non_null(tasks);
+        if (num > 0)
+                memcpy(tasks, listed, num * sizeof(*tasks));
+        *count = num;
+
+        return tasks;
+}
+
+/* the tasks file of \a class_id read, under a shared lock */
+static void
+expect_class_read(const unsigned class_id, const unsigned *tasks, const int num)
+{
+        will_return(__wrap_resctrl_lock_shared, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_alloc_task_read, class_id, class_id);
+        will_return(__wrap_resctrl_alloc_task_read, num);
+        will_return(__wrap_resctrl_alloc_task_read, tasks);
+}
+
+/* \a task written to the tasks file of class 0, which answers \a ret, and
+ * put back in its monitoring group, "test", if \a monitored and the write
+ * succeeded
+ */
+static void
+expect_task_moved(const pid_t task, const int monitored, const int ret)
+{
+        expect_value(__wrap_resctrl_alloc_task_validate, task, task);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_get_pid, task, task);
+        will_return(__wrap_resctrl_mon_assoc_get_pid,
+                    monitored ? PQOS_RETVAL_OK : PQOS_RETVAL_RESOURCE);
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, task, task);
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, class_id, 0);
+        will_return(__wrap_resctrl_alloc_assoc_set_pid, ret);
+        if (monitored && ret == PQOS_RETVAL_OK) {
+                expect_value(__wrap_resctrl_mon_assoc_set_pid, task, task);
+                expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+                will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        }
+}
+
+/* the classes from \a first on, read and found to list no task */
+static void
+expect_classes_empty(void **state, const unsigned first)
+{
+        struct test_data *data = (struct test_data *)*state;
+        unsigned grps;
+        unsigned class_id;
+
+        assert_int_equal(resctrl_alloc_get_grps_num(data->cap, &grps),
+                         PQOS_RETVAL_OK);
+        for (class_id = first; class_id < grps; class_id++)
+                expect_class_read(class_id, NULL, 0);
+}
+
+/* the tasks of classes 1 and 2 are moved, a thread as a process is, and the
+ * tasks of class 0, which nearly every task on the system is in, are not
+ * looked at: no task is validated or written that a class does not list
+ */
+static void
+test_os_alloc_reset_tasks_other_classes(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned cos1[] = {11, 12};
+        const unsigned cos2[] = {2101};
+        unsigned grps;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        assert_int_equal(resctrl_alloc_get_grps_num(data->cap, &grps),
+                         PQOS_RETVAL_OK);
+        assert_true(grps >= 3);
+
+        expect_class_read(1, cos1, DIM(cos1));
+        expect_task_moved(11, 0, PQOS_RETVAL_OK);
+        expect_task_moved(12, 1, PQOS_RETVAL_OK);
+        expect_class_read(2, cos2, DIM(cos2));
+        expect_task_moved(2101, 0, PQOS_RETVAL_OK);
+        expect_classes_empty(state, 3);
+
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* no class but the default one has a task: nothing is written */
+static void
+test_os_alloc_reset_tasks_none(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        expect_classes_empty(state, 1);
+
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* a task that has exited since the read is skipped, before it is written or
+ * after, and the reset goes on. The one gone at the write is the class's last,
+ * so that its PARAM, if not cleared, would end the reset before class 2
+ */
+static void
+test_os_alloc_reset_tasks_exited(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned cos1[] = {11, 13, 12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, cos1, DIM(cos1));
+        expect_value(__wrap_resctrl_alloc_task_validate, task, 11);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
+        expect_task_moved(13, 0, PQOS_RETVAL_OK);
+        expect_task_moved(12, 0, PQOS_RETVAL_PARAM);
+        expect_classes_empty(state, 2);
+
+        /* a race the reset takes in its stride, which is not said */
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* a class whose tasks cannot be read fails the reset, which is said, and the
+ * classes after it are not read: class 2 would find no lock queued
+ */
+static void
+test_os_alloc_reset_tasks_unreadable(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, NULL, -1);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 1);
+}
+
+/* a task that cannot be moved fails the reset, which is said: the tasks and
+ * classes after it are left
+ */
+static void
+test_os_alloc_reset_tasks_move_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned cos1[] = {11, 12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, cos1, DIM(cos1));
+        expect_task_moved(11, 0, PQOS_RETVAL_ERROR);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 1);
+}
+
 int
 main(void)
 {
@@ -119,7 +306,12 @@ main(void)
 
         const struct CMUnitTest tests_all[] = {
             cmocka_unit_test(test_os_alloc_reset_cores),
-            cmocka_unit_test(test_os_alloc_reset_schematas)};
+            cmocka_unit_test(test_os_alloc_reset_schematas),
+            cmocka_unit_test(test_os_alloc_reset_tasks_other_classes),
+            cmocka_unit_test(test_os_alloc_reset_tasks_none),
+            cmocka_unit_test(test_os_alloc_reset_tasks_exited),
+            cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
+            cmocka_unit_test(test_os_alloc_reset_tasks_move_fails)};
 
         const struct CMUnitTest tests_unsupported[] = {};
 

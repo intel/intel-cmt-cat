@@ -177,6 +177,8 @@ PQOS_LOCAL int os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 /**
  * @brief Move all tasks to CLOS0 (default)
  *
+ * Only the tasks listed in the other classes' tasks files are moved
+ *
  * @return Operation status
  */
 PQOS_LOCAL int os_alloc_reset_tasks(void);

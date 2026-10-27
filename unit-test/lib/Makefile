@@ -832,6 +832,11 @@ $(BIN_DIR)/test_os_alloc_reset: test_os_alloc_reset.c $(LIB_OBJS)
 		-Wl,--wrap=resctrl_alloc_cpumask_read \
 		-Wl,--wrap=resctrl_alloc_cpumask_write \
 		-Wl,--wrap=resctrl_alloc_schemata_write \
+		-Wl,--wrap=resctrl_alloc_task_read \
+		-Wl,--wrap=resctrl_alloc_task_validate \
+		-Wl,--wrap=resctrl_alloc_assoc_set_pid \
+		-Wl,--wrap=resctrl_mon_assoc_get_pid \
+		-Wl,--wrap=resctrl_mon_assoc_set_pid \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

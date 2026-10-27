@@ -483,6 +483,12 @@ resctrl_alloc_task_read(unsigned class_id, unsigned *count)
                 idx++;
         }
 
+        /* a read that failed is not the end of the file: the class's tasks
+         * are not all known, which a shorter list would say they are
+         */
+        if (ferror(fd))
+                goto resctrl_alloc_task_read_exit_clean;
+
         /* if no pids found then allocate empty buffer to be returned */
         if (idx == 0)
                 tasks = (unsigned *)calloc(1, sizeof(tasks[0]));

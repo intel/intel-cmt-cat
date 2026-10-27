@@ -329,6 +329,57 @@ test_resctrl_alloc_assoc_get_no_class(void **state)
         assert_int_equal(class_id, 0xdead);
 }
 
+/* ======== resctrl_alloc_task_read ======== */
+
+static void
+test_resctrl_alloc_task_read(void **state __attribute__((unused)))
+{
+        FILE *fd = tmpfile();
+        unsigned count = 0;
+        unsigned *tasks;
+
+        assert_non_null(fd);
+        fprintf(fd, "11\n12\n");
+        rewind(fd);
+        expect_value(resctrl_alloc_fopen, class_id, 1);
+        expect_string(resctrl_alloc_fopen, name, "tasks");
+        expect_string(resctrl_alloc_fopen, mode, "r");
+        will_return(resctrl_alloc_fopen, fd);
+
+        tasks = resctrl_alloc_task_read(1, &count);
+        assert_non_null(tasks);
+        assert_int_equal(count, 2);
+        assert_int_equal(tasks[0], 11);
+        assert_int_equal(tasks[1], 12);
+
+        free(tasks);
+        fclose(fd);
+}
+
+/* a read that fails is not the end of the file: a class whose tasks cannot
+ * be read is not taken for an empty one
+ */
+static void
+test_resctrl_alloc_task_read_error(void **state __attribute__((unused)))
+{
+        /* open for writing only: fgets() fails on it, and sets the stream's
+         * error indicator, as a read() that fails does
+         */
+        FILE *fd = fopen("/dev/null", "w");
+        unsigned count = 0xdead;
+
+        assert_non_null(fd);
+        expect_value(resctrl_alloc_fopen, class_id, 1);
+        expect_string(resctrl_alloc_fopen, name, "tasks");
+        expect_string(resctrl_alloc_fopen, mode, "r");
+        will_return(resctrl_alloc_fopen, fd);
+
+        assert_null(resctrl_alloc_task_read(1, &count));
+        assert_int_equal(count, 0xdead);
+
+        fclose(fd);
+}
+
 /* ========= resctrl_alloc_schemata_read ======== */
 
 static void
@@ -694,6 +745,8 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_cpumask_read),
             cmocka_unit_test(test_resctrl_alloc_cpumask_read_fopen),
             cmocka_unit_test(test_resctrl_alloc_assoc_get_no_class),
+            cmocka_unit_test(test_resctrl_alloc_task_read),
+            cmocka_unit_test(test_resctrl_alloc_task_read_error),
             cmocka_unit_test(test_resctrl_alloc_schemata_read),
             cmocka_unit_test(test_resctrl_alloc_schemata_read_fopen),
             cmocka_unit_test(test_resctrl_alloc_schemata_write_fopen),
