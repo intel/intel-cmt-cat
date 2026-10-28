@@ -2411,21 +2411,25 @@ resctrl_mon_count_delta(const uint64_t old_value,
 }
 
 /**
- * @brief Saves the telemetry totals of \a group's directory in class
+ * @brief Reads the telemetry totals of \a group's directory in class
  *        \a class_id, which the purge is about to remove
  *
- * The poll's totals go on from what is saved, as they do from the MBM counts
- * saved, so that a directory removed while its cores are offline, and made
+ * The purge saves them once the directory is removed, as it does the MBM
+ * counts, so that a directory removed while its cores are offline, and made
  * again when they are back, does not make CORE_ENERGY or ACTIVITY start again
  *
- * @param [in,out] group monitoring structure
+ * @param [in] group monitoring structure
  * @param [in] class_id class of the directory
+ * @param [out] totals each telemetry slot's total, for the events the group
+ *                     monitors, and 0 for the others
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-resctrl_mon_tel_save(struct pqos_mon_data *group, const unsigned class_id)
+resctrl_mon_tel_read(const struct pqos_mon_data *group,
+                     const unsigned class_id,
+                     double totals[PQOS_TEL_NUM_SLOTS])
 {
         static const struct {
                 enum pqos_mon_event event;
@@ -2438,8 +2442,10 @@ resctrl_mon_tel_save(struct pqos_mon_data *group, const unsigned class_id)
         };
         unsigned i;
 
+        for (i = 0; i < PQOS_TEL_NUM_SLOTS; i++)
+                totals[i] = 0.0;
+
         for (i = 0; i < DIM(tel); i++) {
-                double value;
                 int ret;
 
                 if (!(group->intl->resctrl.event & tel[i].event))
@@ -2448,10 +2454,9 @@ resctrl_mon_tel_save(struct pqos_mon_data *group, const unsigned class_id)
                 ret = resctrl_mon_read_tel_pkgs(
                     class_id, group->intl->resctrl.mon_group, tel[i].file,
                     group->intl->resctrl.pkgids,
-                    group->intl->resctrl.num_pkgids, &value);
+                    group->intl->resctrl.num_pkgids, &totals[tel[i].slot]);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
-                group->intl->resctrl.tel[tel[i].slot].saved += value;
         }
 
         return PQOS_RETVAL_OK;
@@ -2498,6 +2503,10 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         do {
                 int empty;
                 uint64_t value;
+                uint64_t mbm_local = 0;
+                uint64_t mbm_total = 0;
+                double tel_totals[PQOS_TEL_NUM_SLOTS];
+                unsigned slot;
                 char buf[128];
                 const char *name = group->intl->resctrl.mon_group;
 
@@ -2519,7 +2528,10 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                         continue;
                 }
 
-                /* store counter values */
+                /* read counter values, stored only once the directory is
+                 * removed: a directory left by a failed removal goes on
+                 * counting them
+                 */
                 if (resctrl_mon_is_event_supported(PQOS_MON_EVENT_LMEM_BW)) {
                         ret = resctrl_mon_read_counters(
                             clos, group->intl->resctrl.mon_group,
@@ -2527,8 +2539,7 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                             group->intl->resctrl.num_l3id,
                             PQOS_MON_EVENT_LMEM_BW, &value);
                         if (ret == PQOS_RETVAL_OK)
-                                group->intl->resctrl.values_storage.mbm_local +=
-                                    value;
+                                mbm_local = value;
                         else if (ret != PQOS_RETVAL_UNAVAILABLE)
                                 return ret;
                         /* UNAVAILABLE: skip saving partial/stale MBM data */
@@ -2540,15 +2551,12 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                             group->intl->resctrl.num_l3id,
                             PQOS_MON_EVENT_TMEM_BW, &value);
                         if (ret == PQOS_RETVAL_OK)
-                                group->intl->resctrl.values_storage.mbm_total +=
-                                    value;
+                                mbm_total = value;
                         else if (ret != PQOS_RETVAL_UNAVAILABLE)
                                 return ret;
                         /* UNAVAILABLE: skip saving partial/stale MBM data */
                 }
-
-                /* and the telemetry totals, as for the MBM counts */
-                ret = resctrl_mon_tel_save(group, clos);
+                ret = resctrl_mon_tel_read(group, clos, tel_totals);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
@@ -2558,6 +2566,12 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                                  buf);
                         return ret;
                 }
+
+                group->intl->resctrl.values_storage.mbm_local += mbm_local;
+                group->intl->resctrl.values_storage.mbm_total += mbm_total;
+                for (slot = 0; slot < PQOS_TEL_NUM_SLOTS; slot++)
+                        group->intl->resctrl.tel[slot].saved +=
+                            tel_totals[slot];
 
                 LOG_INFO("Deleted empty mon group %s\n", buf);
                 removed++;
