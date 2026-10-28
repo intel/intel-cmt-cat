@@ -114,12 +114,45 @@ test_os_alloc_reset_schematas(void **state)
  * their number and an array of them: a negative number is a file that cannot
  * be read
  */
+/* the reads of a class's tasks file so far, which a case that has a task
+ * take the TID of one gone counts from
+ */
+static unsigned reads;
+
+/* the TID a case has another task take from read reused_from on, 0 for none */
+static pid_t reused_tid;
+static unsigned reused_from;
+
+/* when a task started: ten times its TID, so that a TID listed again is the
+ * same task, unless the case has another task take it since
+ */
+int
+os_alloc_task_start(const pid_t tid, unsigned long long *start)
+{
+        *start = (unsigned long long)tid * 10;
+        if (tid == reused_tid && reads >= reused_from)
+                *start += 1;
+
+        return PQOS_RETVAL_OK;
+}
+
+static int
+tid_back(void **state __attribute__((unused)))
+{
+        reused_tid = 0;
+        reused_from = 0;
+
+        return 0;
+}
+
 unsigned *
 __wrap_resctrl_alloc_task_read(unsigned class_id, unsigned *count)
 {
         const int num = mock_type(int);
         const unsigned *listed = mock_ptr_type(const unsigned *);
         unsigned *tasks;
+
+        reads++;
 
         check_expected(class_id);
         if (num < 0)
@@ -648,6 +681,70 @@ test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved(void **state)
         assert_int_equal(test_log_count_stop(), 0);
 }
 
+/* task 11 cannot be moved, is reaped, and another task takes its TID before
+ * the next read, then forks a child into the class and cannot be moved either:
+ * the read that lists TID 11 again is not of the task kept, by its start time,
+ * so that the class is read again, and the child is moved
+ */
+static void
+test_os_alloc_reset_tasks_kept_tid_taken_by_another_task(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {11};
+        const unsigned read3[] = {11, 12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        reads = 0;
+        reused_tid = 11;
+        reused_from = 2;
+
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_class_read(1, read3, DIM(read3));
+        expect_task_not_moved(11);
+        expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* the tasks a pass keeps are looked up by TID whatever order a read lists
+ * them in: a read that lists the three kept, in another order, has their
+ * writes fail again, which ends the class
+ */
+static void
+test_os_alloc_reset_tasks_kept_tasks_in_another_order(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {15, 11, 13};
+        const unsigned read2[] = {13, 15, 11};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, read1, DIM(read1));
+        for (i = 0; i < DIM(read1); i++)
+                expect_task_not_moved((pid_t)read1[i]);
+        expect_class_read(1, read2, DIM(read2));
+        for (i = 0; i < DIM(read2); i++)
+                expect_task_not_moved((pid_t)read2[i]);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
 /* a class whose tasks cannot be read fails the reset, which is said once,
  * after the classes after it are reset
  */
@@ -746,6 +843,11 @@ main(void)
                 test_os_alloc_reset_tasks_unmovable_child_reads_class_again),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved),
+            cmocka_unit_test_teardown(
+                test_os_alloc_reset_tasks_kept_tid_taken_by_another_task,
+                tid_back),
+            cmocka_unit_test(
+                test_os_alloc_reset_tasks_kept_tasks_in_another_order),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
             cmocka_unit_test(test_os_alloc_reset_tasks_move_fails)};
 

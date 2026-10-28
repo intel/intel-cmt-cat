@@ -44,6 +44,7 @@
 #include "resctrl_monitoring.h"
 #include "resctrl_utils.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -569,12 +570,88 @@ os_alloc_reset_light_schematas_exit:
 #define RESET_TASKS_PASSES 10
 
 /**
+ * A task the reset could not move, and when it started, which tells it from a
+ * task that has its TID since
+ */
+struct reset_kept_task {
+        unsigned tid;             /**< its TID */
+        unsigned long long start; /**< its start time, in clock ticks */
+};
+
+/**
+ * @brief Reads when task \a tid started
+ *
+ * Field 22 of /proc/<tid>/stat, which a task that has exited and waits to be
+ * reaped still has. The fields are counted from the record's last ')', which
+ * ends field 2, the task's name: the name may hold a ')' or a space itself.
+ *
+ * @param [in] tid task
+ * @param [out] start its start time, in clock ticks since boot
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if its record cannot be read, as once it has gone
+ */
+PQOS_STATIC int
+os_alloc_task_start(const pid_t tid, unsigned long long *start)
+{
+        char path[64];
+        char buf[1024];
+        size_t nread;
+        const char *p;
+        char *end;
+        unsigned i;
+        FILE *fd;
+
+        snprintf(path, sizeof(path), "/proc/%d/stat", (int)tid);
+        fd = pqos_fopen(path, "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        nread = fread(buf, 1, sizeof(buf) - 1, fd);
+        if (ferror(fd)) {
+                fclose(fd);
+                return PQOS_RETVAL_ERROR;
+        }
+        fclose(fd);
+        buf[nread] = '\0';
+
+        p = strrchr(buf, ')');
+        if (p == NULL)
+                return PQOS_RETVAL_ERROR;
+        /* to the space before field 22, the 20th after the name */
+        for (i = 0; i < 20; i++) {
+                p = strchr(p + 1, ' ');
+                if (p == NULL)
+                        return PQOS_RETVAL_ERROR;
+        }
+        errno = 0;
+        *start = strtoull(p + 1, &end, 10);
+        if (end == p + 1 || errno != 0)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
+static int
+reset_kept_compare(const void *a, const void *b)
+{
+        const unsigned x = ((const struct reset_kept_task *)a)->tid;
+        const unsigned y = ((const struct reset_kept_task *)b)->tid;
+
+        return (x > y) - (x < y);
+}
+
+/**
  * @brief Tells if each of \a count tasks is one of the \a num_kept tasks
- *        that the pass before could not move
+ *        that the pass before could not move: the same task, by its start
+ *        time, and not one that has its TID since
+ *
+ * \a kept is sorted by TID, so that each task is looked up in it rather than
+ * compared with each kept task.
  *
  * @param [in] tasks tasks a read of the class lists
  * @param [in] count number of \a tasks
- * @param [in] kept tasks the pass before could not move
+ * @param [in] kept tasks the pass before could not move, sorted by TID
  * @param [in] num_kept number of \a kept
  *
  * @return 1 if each is, 0 if not
@@ -582,17 +659,26 @@ os_alloc_reset_light_schematas_exit:
 static int
 os_alloc_reset_only_kept(const unsigned *tasks,
                          const unsigned count,
-                         const unsigned *kept,
+                         const struct reset_kept_task *kept,
                          const unsigned num_kept)
 {
         unsigned i;
 
-        for (i = 0; i < count; i++) {
-                unsigned j;
+        if (num_kept == 0)
+                return 0;
 
-                for (j = 0; j < num_kept && kept[j] != tasks[i]; j++)
-                        ;
-                if (j == num_kept)
+        for (i = 0; i < count; i++) {
+                const struct reset_kept_task key = {tasks[i], 0};
+                const struct reset_kept_task *found;
+                unsigned long long start;
+
+                found = bsearch(&key, kept, num_kept, sizeof(*kept),
+                                reset_kept_compare);
+                if (found == NULL)
+                        return 0;
+                if (os_alloc_task_start((pid_t)tasks[i], &start) !=
+                        PQOS_RETVAL_OK ||
+                    start != found->start)
                         return 0;
         }
 
@@ -605,10 +691,10 @@ os_alloc_reset_only_kept(const unsigned *tasks,
  * The class is read again after each pass, as a task it moved, found gone or
  * could not move may have forked into the class first. A task that cannot be
  * moved, as one that is exiting cannot on some kernels, is left as it is: a
- * read that lists no task but those the pass before could not move has them
- * written once more, and if none of them moves then either, that ends the
- * class. The write, rather than the TID, tells that a task is still the one
- * that could not be moved, and not a task that has its TID since. A class
+ * read that lists no task but those the pass before could not move, each the
+ * same task by its start time, has them written once more, and if none of
+ * them moves then either, that ends the class. A task that has the TID of a
+ * kept one since is not one of them, and is moved, or kept itself. A class
  * still listing other tasks after RESET_TASKS_PASSES passes fails. Tasks the
  * last of those passes could not move get their one more write, and a class
  * that lists any task after that fails too.
@@ -623,7 +709,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
 {
         const int clos0 = 0;
         unsigned pass;
-        unsigned *kept = NULL;
+        struct reset_kept_task *kept = NULL;
         unsigned num_kept = 0;
         int ret = PQOS_RETVAL_OK;
 
@@ -660,10 +746,17 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         break;
                 }
 
-                /* the tasks that this pass cannot move are kept in its list */
+                /* the tasks that this pass cannot move */
                 free(kept);
-                kept = tasks;
+                kept = malloc(count * sizeof(*kept));
                 num_kept = 0;
+                if (kept == NULL) {
+                        free(tasks);
+                        LOG_ERROR("Failed to allocate the tasks of CLOS%u\n",
+                                  class_id);
+                        ret = PQOS_RETVAL_RESOURCE;
+                        break;
+                }
                 for (i = 0; i < count; i++) {
                         const pid_t pid = (pid_t)tasks[i];
 
@@ -693,7 +786,10 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                  */
                                 alloc_result = PQOS_RETVAL_OK;
                                 if (resctrl_alloc_task_validate(pid) !=
-                                    PQOS_RETVAL_OK) {
+                                        PQOS_RETVAL_OK ||
+                                    os_alloc_task_start(
+                                        pid, &kept[num_kept].start) !=
+                                        PQOS_RETVAL_OK) {
                                         LOG_DEBUG("Task %d exited at its "
                                                   "write\n",
                                                   pid);
@@ -701,7 +797,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                         LOG_DEBUG("Task %d could not be "
                                                   "moved, left in CLOS%u\n",
                                                   pid, class_id);
-                                        kept[num_kept++] = tasks[i];
+                                        kept[num_kept++].tid = tasks[i];
                                 }
                         } else if (alloc_result != PQOS_RETVAL_OK) {
                                 LOG_ERROR("Error allocating task %d to "
@@ -710,6 +806,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                 break;
                         }
                 }
+                free(tasks);
                 if (alloc_result != PQOS_RETVAL_OK) {
                         ret = alloc_result;
                         break;
@@ -717,6 +814,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                 /* none of them moved, again */
                 if (only_kept && num_kept == count)
                         break;
+                qsort(kept, num_kept, sizeof(*kept), reset_kept_compare);
         }
 
         free(kept);

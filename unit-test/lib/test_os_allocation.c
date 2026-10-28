@@ -40,6 +40,11 @@
 #include "os_allocation.h"
 #include "test.h"
 
+#include <signal.h>
+#include <sys/prctl.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 /* ======== mock ======== */
 
 int
@@ -1640,6 +1645,52 @@ test_os_l2ca_get_min_cbm_bits_unsupported(void **state)
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
+/* ======== os_alloc_task_start ======== */
+
+int os_alloc_task_start(const pid_t tid, unsigned long long *start);
+
+/* a child's start time, read from the real /proc: the same once it has a name
+ * with a ')' and spaces in it and has exited, as a zombie waiting to be
+ * reaped still has its record, and none once it has been reaped
+ */
+static void
+test_os_alloc_task_start(void **state __attribute__((unused)))
+{
+        int go[2];
+        pid_t child;
+        siginfo_t info;
+        unsigned long long before;
+        unsigned long long after;
+
+        assert_int_equal(pipe(go), 0);
+        child = fork();
+        assert_true(child >= 0);
+        if (child == 0) {
+                char c;
+
+                close(go[1]);
+                if (read(go[0], &c, 1) != 1)
+                        _exit(1);
+                (void)prctl(PR_SET_NAME, "a) b c) d");
+                _exit(0);
+        }
+        close(go[0]);
+
+        assert_int_equal(os_alloc_task_start(child, &before), PQOS_RETVAL_OK);
+        assert_true(before > 0);
+
+        assert_int_equal(write(go[1], "g", 1), 1);
+        close(go[1]);
+        memset(&info, 0, sizeof(info));
+        assert_int_equal(waitid(P_PID, child, &info, WEXITED | WNOWAIT), 0);
+
+        assert_int_equal(os_alloc_task_start(child, &after), PQOS_RETVAL_OK);
+        assert_true(after == before);
+
+        assert_int_equal(waitpid(child, NULL, 0), child);
+        assert_int_equal(os_alloc_task_start(child, &after), PQOS_RETVAL_ERROR);
+}
+
 int
 main(void)
 {
@@ -1663,7 +1714,8 @@ main(void)
             cmocka_unit_test(test_os_alloc_init_mounted),
             cmocka_unit_test(test_os_alloc_init_unmounted),
             cmocka_unit_test(test_os_l3ca_get_min_cbm_bits),
-            cmocka_unit_test(test_os_l2ca_get_min_cbm_bits_unsupported)};
+            cmocka_unit_test(test_os_l2ca_get_min_cbm_bits_unsupported),
+            cmocka_unit_test(test_os_alloc_task_start)};
 
         const struct CMUnitTest tests_l2ca[] = {
             cmocka_unit_test(test_os_l2ca_set_param),
