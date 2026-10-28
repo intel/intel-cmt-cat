@@ -204,8 +204,10 @@ test_os_alloc_reset_tasks_other_classes(void **state)
         expect_class_read(1, cos1, DIM(cos1));
         expect_task_moved(11, 0, PQOS_RETVAL_OK);
         expect_task_moved(12, 1, PQOS_RETVAL_OK);
+        expect_class_read(1, NULL, 0);
         expect_class_read(2, cos2, DIM(cos2));
         expect_task_moved(2101, 0, PQOS_RETVAL_OK);
+        expect_class_read(2, NULL, 0);
         expect_classes_empty(state, 3);
 
         ret = os_alloc_reset_tasks();
@@ -244,6 +246,7 @@ test_os_alloc_reset_tasks_exited(void **state)
         will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
         expect_task_moved(13, 0, PQOS_RETVAL_OK);
         expect_task_moved(12, 0, PQOS_RETVAL_PARAM);
+        expect_class_read(1, NULL, 0);
         expect_classes_empty(state, 2);
 
         /* a race the reset takes in its stride, which is not said */
@@ -251,6 +254,60 @@ test_os_alloc_reset_tasks_exited(void **state)
         ret = os_alloc_reset_tasks();
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* a task that task 11 forked after the read, before 11 was moved, is in class
+ * 1 too, and not in the list read: the next read of the class lists it, and
+ * it is moved, and the read after lists none
+ */
+static void
+test_os_alloc_reset_tasks_forked_since_read(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {11};
+        const unsigned read2[] = {12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_moved(11, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, read2, DIM(read2));
+        expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, NULL, 0);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* a class whose every read lists a task forked since the one before keeps it
+ * from being emptied: after ten passes, the reset fails, which it says once,
+ * and moves nothing more; the classes after it are not read
+ */
+static void
+test_os_alloc_reset_tasks_class_never_empty(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        static const unsigned forked[] = {11, 12, 13, 14, 15, 16,
+                                          17, 18, 19, 20, 21};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        for (i = 0; i < 10; i++) {
+                expect_class_read(1, &forked[i], 1);
+                expect_task_moved((pid_t)forked[i], 0, PQOS_RETVAL_OK);
+        }
+        expect_class_read(1, &forked[10], 1);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 1);
 }
 
 /* a class whose tasks cannot be read fails the reset, which is said, and the
@@ -310,6 +367,8 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_tasks_other_classes),
             cmocka_unit_test(test_os_alloc_reset_tasks_none),
             cmocka_unit_test(test_os_alloc_reset_tasks_exited),
+            cmocka_unit_test(test_os_alloc_reset_tasks_forked_since_read),
+            cmocka_unit_test(test_os_alloc_reset_tasks_class_never_empty),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
             cmocka_unit_test(test_os_alloc_reset_tasks_move_fails)};
 

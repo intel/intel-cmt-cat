@@ -559,11 +559,20 @@ os_alloc_reset_light_schematas_exit:
         return ret;
 }
 
+/*
+ * The passes over a class's tasks an allocation reset makes. A member of the
+ * class forks into it until the member is moved, so the class is read again
+ * until it lists no task: a pass that moves the members leaves at most what
+ * they forked meanwhile, and the next pass moves that
+ */
+#define RESET_TASKS_PASSES 10
+
 int
 os_alloc_reset_tasks(void)
 {
         unsigned grps;
         unsigned class_id;
+        unsigned passes = 0;
         int alloc_result;
         const int clos0 = 0;
         const struct pqos_cap *cap = _pqos_get_cap();
@@ -578,9 +587,9 @@ os_alloc_reset_tasks(void)
          * Only the tasks of the other classes are moved: those of the default
          * class, nearly every task on the system, are where the reset puts
          * them. A class's tasks file lists each thread, which is moved on its
-         * own.
+         * own. A class is done once a read of it lists no task.
          */
-        for (class_id = 1; class_id < grps; class_id++) {
+        for (class_id = 1; class_id < grps;) {
                 unsigned count = 0;
                 unsigned i;
                 unsigned *tasks = os_pid_get_pid_assoc(class_id, &count);
@@ -588,6 +597,19 @@ os_alloc_reset_tasks(void)
                 if (tasks == NULL) {
                         LOG_ERROR("Failed to read the tasks of CLOS%u\n",
                                   class_id);
+                        return PQOS_RETVAL_ERROR;
+                }
+                if (count == 0) {
+                        free(tasks);
+                        class_id++;
+                        passes = 0;
+                        continue;
+                }
+                if (++passes > RESET_TASKS_PASSES) {
+                        free(tasks);
+                        LOG_ERROR("CLOS%u still lists tasks after %u passes "
+                                  "of the reset\n",
+                                  class_id, RESET_TASKS_PASSES);
                         return PQOS_RETVAL_ERROR;
                 }
 
