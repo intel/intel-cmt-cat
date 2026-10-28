@@ -48,12 +48,17 @@ __wrap_mkdir(const char *path, mode_t mode)
         return mock_type(int);
 }
 
+/* a case that has rmdir() fail, with -1, queues the errno it fails with */
 int
 __wrap_rmdir(const char *path)
 {
-        check_expected(path);
+        const int ret = mock_type(int);
 
-        return mock_type(int);
+        check_expected(path);
+        if (ret == -1)
+                errno = mock_type(int);
+
+        return ret;
 }
 
 /* ======== resctrl_mon_mkdir ======== */
@@ -103,6 +108,23 @@ test_resctrl_mon_rmdir(void **state __attribute__((unused)))
 
         ret = resctrl_mon_rmdir(1, "test");
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* a directory that is not there is told apart from one removed, and any
+ * other failure is an error
+ */
+static void
+test_resctrl_mon_rmdir_not_there(void **state __attribute__((unused)))
+{
+        expect_string(__wrap_rmdir, path, RESCTRL_PATH "/mon_groups/test");
+        will_return(__wrap_rmdir, -1);
+        will_return(__wrap_rmdir, ENOENT);
+        assert_int_equal(resctrl_mon_rmdir(0, "test"), PQOS_RETVAL_RESOURCE);
+
+        expect_string(__wrap_rmdir, path, RESCTRL_PATH "/mon_groups/test");
+        will_return(__wrap_rmdir, -1);
+        will_return(__wrap_rmdir, EBUSY);
+        assert_int_equal(resctrl_mon_rmdir(0, "test"), PQOS_RETVAL_ERROR);
 }
 
 /* ======== resctrl_mon_read_counter ======== */
@@ -281,6 +303,7 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_resctrl_mon_mkdir),
             cmocka_unit_test(test_resctrl_mon_rmdir),
+            cmocka_unit_test(test_resctrl_mon_rmdir_not_there),
             cmocka_unit_test(test_resctrl_mon_read_counter),
             cmocka_unit_test(test_resctrl_mon_read_counter_error),
             cmocka_unit_test(test_resctrl_mon_read_counter_zero),

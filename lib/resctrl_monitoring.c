@@ -63,13 +63,15 @@ static unsigned resctrl_mon_counter = 0;
  * that are online in it, so what the library tells from the cores a directory
  * lists - the L3s it is in use on, and whether another group is in it - it
  * tells from these as well: a group whose cores are offline is in its
- * directory all the same. An entry is a copy, and \a group only tells it
- * apart, since a group can be freed without its stop being reached
+ * directory all the same. An entry is a copy, and \a intl only tells it
+ * apart: the library allocates it, a copy of the group that its caller makes
+ * carries it, and a group can be freed without its stop being reached
  */
 static struct resctrl_mon_started {
-        const struct pqos_mon_data *group; /**< the group, never read */
-        char name[32];                     /**< its directory's name */
-        uint64_t l3ids;                    /**< the L3s of its cores */
+        /** the group's internal data, never read */
+        const struct pqos_mon_data_internal *intl;
+        char name[32];   /**< its directory's name */
+        uint64_t l3ids;  /**< the L3s of its cores */
         int l3ids_valid; /**< 0 for an L3 ID above RESCTRL_CORE_MAX_L3ID */
 } *mon_started = NULL;
 static unsigned mon_started_num = 0;
@@ -78,7 +80,9 @@ static unsigned mon_started_size = 0;
 /**
  * The monitoring resets this process has made. The purge's mark carries the
  * count it was made at, plus one, and the restore makes a group's directory
- * again from it only while no reset has followed: the reset removed the group
+ * again from it only while no reset has followed: the reset removed the group.
+ * A reset counts once it has removed a directory, or has been through them
+ * all, so that one that fails before it changes anything leaves the marks
  */
 static int mon_resets = 0;
 
@@ -943,6 +947,8 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the directory was not there, which the
+ *         callers that only want it gone take for success
  */
 PQOS_STATIC int
 resctrl_mon_rmdir(const unsigned class_id, const char *name)
@@ -955,8 +961,9 @@ resctrl_mon_rmdir(const unsigned class_id, const char *name)
             PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        if (rmdir(path) == -1 && errno != ENOENT)
-                return PQOS_RETVAL_ERROR;
+        if (rmdir(path) == -1)
+                return errno == ENOENT ? PQOS_RETVAL_RESOURCE
+                                       : PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
 }
@@ -1427,7 +1434,7 @@ mon_started_add(const struct pqos_mon_data *group)
         ASSERT(mon_started_num < mon_started_size);
         entry = &mon_started[mon_started_num++];
 
-        entry->group = group;
+        entry->intl = group->intl;
         strncpy(entry->name, group->intl->resctrl.mon_group,
                 sizeof(entry->name));
         entry->name[sizeof(entry->name) - 1] = '\0';
@@ -1446,7 +1453,8 @@ mon_started_add(const struct pqos_mon_data *group)
 /**
  * @brief Takes core group \a group off the list of those started
  *
- * @param [in] group the group, which is not read
+ * @param [in] group the group, of which only the address of its internal
+ *                   data is read
  */
 static void
 mon_started_remove(const struct pqos_mon_data *group)
@@ -1454,7 +1462,7 @@ mon_started_remove(const struct pqos_mon_data *group)
         unsigned i = 0;
 
         while (i < mon_started_num)
-                if (mon_started[i].group == group)
+                if (mon_started[i].intl == group->intl)
                         mon_started[i] = mon_started[--mon_started_num];
                 else
                         i++;
@@ -2095,7 +2103,7 @@ resctrl_mon_delete(const char *resctrl_group)
 
         do {
                 ret = resctrl_mon_rmdir(clos, resctrl_group);
-                if (ret != PQOS_RETVAL_OK) {
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
                         LOG_ERROR("Failed to remove resctrl "
                                   "monitoring group\n");
                         return PQOS_RETVAL_ERROR;
@@ -2135,7 +2143,7 @@ resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
          * cores are in the cpus files or offline
          */
         for (started = 0; started < mon_started_num; started++)
-                if (mon_started[started].group != group &&
+                if (mon_started[started].intl != group->intl &&
                     strncmp(mon_started[started].name, mon_group,
                             sizeof(mon_started[started].name)) == 0) {
                         *shared = 1;
@@ -2561,6 +2569,14 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                         return ret;
 
                 ret = resctrl_mon_rmdir(clos, name);
+                if (ret == PQOS_RETVAL_RESOURCE) {
+                        /* gone before the purge removed it, which another
+                         * writer did: neither its counts nor the mark are
+                         * the purge's
+                         */
+                        ret = PQOS_RETVAL_OK;
+                        continue;
+                }
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_WARN("Failed to remove empty mon group %s: %m\n",
                                  buf);
@@ -2578,7 +2594,12 @@ resctrl_mon_purge(struct pqos_mon_data *group)
 
         } while (++clos < max_clos);
 
-        if (removed > 0 && kept == 0)
+        /* a directory of the group in use, as one another writer made again
+         * would be, ends the mark as the restore's finding one does
+         */
+        if (kept > 0)
+                group->intl->resctrl.purged = 0;
+        else if (removed > 0)
                 group->intl->resctrl.purged = mon_resets + 1;
 
         return ret;
@@ -2788,15 +2809,11 @@ resctrl_mon_reset(void)
         unsigned grps;
         int num_groups;
         unsigned clos = 0;
+        int counted = 0;
         const struct pqos_cap *cap = _pqos_get_cap();
 
         if (!resctrl_mon_is_supported())
                 return PQOS_RETVAL_RESOURCE;
-
-        /* a group the purge marked before this reset is not made again after
-         * it: the reset removes the group
-         */
-        mon_resets++;
 
         ret = resctrl_alloc_get_grps_num(cap, &grps);
         if (ret != PQOS_RETVAL_OK)
@@ -2820,14 +2837,26 @@ resctrl_mon_reset(void)
 
                 for (i = 0; i < num_groups; i++) {
                         ret = resctrl_mon_rmdir(clos, namelist[i]->d_name);
+                        if (ret == PQOS_RETVAL_RESOURCE)
+                                ret = PQOS_RETVAL_OK;
                         if (ret != PQOS_RETVAL_OK) {
                                 free_scandir(namelist, num_groups);
                                 return ret;
+                        }
+                        /* a group the purge marked before this reset is not
+                         * made again after it: the reset removes the group
+                         */
+                        if (!counted) {
+                                mon_resets++;
+                                counted = 1;
                         }
                 }
 
                 free_scandir(namelist, num_groups);
         } while (++clos < grps);
+
+        if (!counted)
+                mon_resets++;
 
         return ret;
 }

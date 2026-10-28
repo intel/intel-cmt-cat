@@ -152,9 +152,9 @@ pqos_mon_fini(void)
  * @brief Power from the last two energy readings of a group
  *
  * Power needs two valid energy readings and a previous telemetry timestamp.
- * An energy total that fell has started again, as when a group's directory
- * is made again or one it is read from goes: there is no power for that
- * interval, rather than a negative one
+ * An energy total that fell, as when a directory of the group was removed
+ * other than by the library, gives no power for that interval, rather than a
+ * negative one
  *
  * @param intl the group's internal data
  */

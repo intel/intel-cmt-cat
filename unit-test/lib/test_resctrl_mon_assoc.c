@@ -1706,10 +1706,10 @@ expect_purge_to_remove(const struct pqos_cpuinfo *cpu, const int removal)
 }
 
 /* a group of core 2 alone, with no allocation class, polled with the core
- * offline, whose directory the purge fails to remove: the count read is not
- * stored, as the directory goes on counting it, and the next poll's count is
- * the directory's, not twice it. The purge that then removes the directory
- * stores it
+ * offline, whose directory the purge fails to remove: the counts read, total
+ * and local, are not stored, as the directory goes on counting them, and the
+ * next poll's count is the directory's, not twice it. The purge that then
+ * removes the directory stores them
  */
 static void
 test_resctrl_mon_poll_count_after_a_failed_removal(void **state
@@ -1719,6 +1719,9 @@ test_resctrl_mon_poll_count_after_a_failed_removal(void **state
             "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
             "mbm_total_bytes",
             "5000\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
+            "mbm_local_bytes",
+            "3000\n",
             "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list",
             "\n",
             "/sys/fs/resctrl/mon_groups/pqos-g/tasks",
@@ -1728,6 +1731,9 @@ test_resctrl_mon_poll_count_after_a_failed_removal(void **state
             "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
             "mbm_total_bytes",
             "5100\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
+            "mbm_local_bytes",
+            "3050\n",
             "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list",
             "\n",
             "/sys/fs/resctrl/mon_groups/pqos-g/tasks",
@@ -1762,7 +1768,7 @@ test_resctrl_mon_poll_count_after_a_failed_removal(void **state
 
         will_return_maybe(__wrap__pqos_get_cap, &cap);
         will_return_maybe(__wrap__pqos_get_cpu, cpu);
-        events_supported = PQOS_MON_EVENT_TMEM_BW;
+        events_supported = PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_LMEM_BW;
 
         /* core 2 offline: the count read, and the directory not removed */
         served = first;
@@ -1776,6 +1782,7 @@ test_resctrl_mon_poll_count_after_a_failed_removal(void **state
                          PQOS_RETVAL_ERROR);
         assert_int_equal(group.values.mbm_total, 5000);
         assert_int_equal(intl.resctrl.values_storage.mbm_total, 0);
+        assert_int_equal(intl.resctrl.values_storage.mbm_local, 0);
         assert_int_equal(intl.resctrl.purged, 0);
 
         /* the directory still there and counting: read, then removed */
@@ -1791,16 +1798,17 @@ test_resctrl_mon_poll_count_after_a_failed_removal(void **state
         assert_int_equal(group.values.mbm_total, 5100);
         assert_int_equal(group.values.mbm_total_delta, 100);
         assert_int_equal(intl.resctrl.values_storage.mbm_total, 5100);
+        assert_int_equal(intl.resctrl.values_storage.mbm_local, 3050);
         assert_int_equal(intl.resctrl.purged, 1);
 
         free(intl.resctrl.mon_group);
         free(cpu);
 }
 
-/* the CORE_ENERGY group as above, whose directory the purge fails to remove:
- * the energy read is not saved, as the directory goes on counting it, and the
- * next poll's total is the directory's, not twice it. The purge that then
- * removes the directory saves it
+/* the group as above, of CORE_ENERGY and ACTIVITY, whose directory the purge
+ * fails to remove: the totals read are not saved, as the directory goes on
+ * counting them, and the next poll's energy is the directory's, not twice it.
+ * The purge that then removes the directory saves both
  */
 static void
 test_resctrl_mon_poll_energy_after_a_failed_removal(void **state
@@ -1810,6 +1818,9 @@ test_resctrl_mon_poll_energy_after_a_failed_removal(void **state
             "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_PERF_PKG_00/"
             "core_energy",
             "12.5\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_PERF_PKG_00/"
+            "activity",
+            "3.5\n",
             "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list",
             "\n",
             "/sys/fs/resctrl/mon_groups/pqos-g/tasks",
@@ -1823,6 +1834,7 @@ test_resctrl_mon_poll_energy_after_a_failed_removal(void **state
         unsigned pkgids[] = {0};
         unsigned i;
         const int slot = PQOS_TEL_SLOT_CORE_ENERGY;
+        const int activity = PQOS_TEL_SLOT_ACTIVITY;
 
         cpu = calloc(1, sizeof(*cpu) + 4 * sizeof(cpu->cores[0]));
         assert_non_null(cpu);
@@ -1835,8 +1847,8 @@ test_resctrl_mon_poll_energy_after_a_failed_removal(void **state
         group.intl = &intl;
         group.num_cores = DIM(cores);
         group.cores = cores;
-        group.event = PQOS_MON_EVENT_CORE_ENERGY;
-        intl.resctrl.event = PQOS_MON_EVENT_CORE_ENERGY;
+        group.event = PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY;
+        intl.resctrl.event = group.event;
         intl.resctrl.mon_group = strdup("pqos-g");
         assert_non_null(intl.resctrl.mon_group);
         intl.resctrl.pkgids = pkgids;
@@ -1860,6 +1872,7 @@ test_resctrl_mon_poll_energy_after_a_failed_removal(void **state
                          PQOS_RETVAL_ERROR);
         assert_true(intl.resctrl.tel[slot].current == 12.5);
         assert_true(intl.resctrl.tel[slot].saved == 0.0);
+        assert_true(intl.resctrl.tel[activity].saved == 0.0);
         assert_int_equal(intl.resctrl.purged, 0);
 
         /* the directory still there: read, then removed */
@@ -1875,7 +1888,76 @@ test_resctrl_mon_poll_energy_after_a_failed_removal(void **state
                          PQOS_RETVAL_OK);
         assert_true(intl.resctrl.tel[slot].current == 12.5);
         assert_true(intl.resctrl.tel[slot].saved == 12.5);
+        assert_true(intl.resctrl.tel[activity].saved == 3.5);
         assert_int_equal(intl.resctrl.purged, 1);
+
+        free(intl.resctrl.mon_group);
+        free(cpu);
+}
+
+/* a group of offline core 2, marked by a purge, whose directory another
+ * writer has made again with a task in it: the poll's purge finds the
+ * directory in use, keeps it, and ends the mark, so that the restore does not
+ * make the directory again if that writer then removes it
+ */
+static void
+test_resctrl_mon_poll_directory_in_use_ends_the_mark(void **state
+                                                     __attribute__((unused)))
+{
+        static const char *const files[] = {
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
+            "mbm_total_bytes",
+            "100\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list",
+            "\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/tasks",
+            "4242\n",
+            NULL};
+        struct pqos_cap cap;
+        struct pqos_cpuinfo *cpu;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        unsigned l3id[] = {0};
+        unsigned i;
+
+        cpu = calloc(1, sizeof(*cpu) + 4 * sizeof(cpu->cores[0]));
+        assert_non_null(cpu);
+        cpu->num_cores = 4;
+        for (i = 0; i < cpu->num_cores; i++)
+                cpu->cores[i].lcore = i;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        intl.resctrl.mon_group = strdup("pqos-g");
+        assert_non_null(intl.resctrl.mon_group);
+        intl.resctrl.l3id = l3id;
+        intl.resctrl.num_l3id = DIM(l3id);
+        intl.resctrl.purged = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+        will_return_maybe(__wrap__pqos_get_cpu, cpu);
+        events_supported = PQOS_MON_EVENT_TMEM_BW;
+        served = files;
+
+        /* core 2 offline: nothing to restore, and the count read */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_class_lookup(2, 0);
+        expect_group_directory();
+        /* the purge: no other group, and no core, but a task: kept */
+        expect_shared_check(cpu, cpu->num_cores);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_group_directory();
+
+        assert_int_equal(resctrl_mon_poll(&group, PQOS_MON_EVENT_TMEM_BW),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(intl.resctrl.purged, 0);
 
         free(intl.resctrl.mon_group);
         free(cpu);
@@ -2164,6 +2246,9 @@ main(void)
                 poll_case_end),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_poll_energy_after_a_failed_removal,
+                poll_case_end),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_poll_directory_in_use_ends_the_mark,
                 poll_case_end),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write),

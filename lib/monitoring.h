@@ -140,7 +140,8 @@ struct pqos_mon_data_internal {
                 int purged; /**< 0, or one more than the monitoring resets
                                made when the purge removed the group's last
                                directory, which the restore makes again only
-                               while no reset has followed */
+                               while no reset has followed; 0 again once the
+                               group has a directory in use */
 
                 /* AET telemetry state */
                 struct pqos_tel_slot tel[PQOS_TEL_NUM_SLOTS];

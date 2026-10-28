@@ -38,6 +38,7 @@
 #include "test.h"
 
 #include <dirent.h>
+#include <errno.h>
 
 /* ======== mock ======== */
 
@@ -115,10 +116,14 @@ resctrl_mon_rmdir(const unsigned class_id, const char *name)
  */
 static const char *const *mon_groups_listed[2];
 
+/* set, the read of a class's mon_groups fails, as with EMFILE */
+static int mon_groups_unreadable;
+
 static int
 mon_groups_unlist(void **state __attribute__((unused)))
 {
         memset(mon_groups_listed, 0, sizeof(mon_groups_listed));
+        mon_groups_unreadable = 0;
 
         /* and the core groups a case started and did not stop, which the
          * library lists until then
@@ -141,6 +146,10 @@ __wrap_scandir(const char *restrict dirp,
 
         *namelist = NULL;
 
+        if (mon_groups_unreadable) {
+                errno = EMFILE;
+                return -1;
+        }
         if (strcmp(dirp, RESCTRL_PATH "/mon_groups") == 0 ||
             strcmp(dirp, RESCTRL_PATH "/mon_groups/") == 0)
                 listed = mon_groups_listed[0];
@@ -1629,6 +1638,235 @@ test_resctrl_mon_purge_marks_no_group_with_a_directory_left(void **state)
         core_group_free(&intl_a);
 }
 
+/* the purge of a group whose directory, pqos-a in CLOS 0 alone, no other
+ * group, core or task is in, and whose removal gives \a removal
+ */
+static void
+expect_pqos_a_purge(const struct pqos_cpuinfo *cpu, const int removal)
+{
+        unsigned i;
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < cpu->num_cores; ++i) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get, 0);
+        }
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-a");
+        will_return(__wrap_resctrl_mon_rmdir, removal);
+}
+
+/* a group that its caller moved after the start, as one kept by value in an
+ * array that grew, is still the group the list has: the purge of the copy
+ * finds no other group in its directory and removes it, and the copy's
+ * unlisting takes the group off the list, so that another group with a
+ * directory of that name is alone in it
+ */
+static void
+test_resctrl_mon_purge_of_a_group_moved_since_its_start(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a, moved, b;
+        struct pqos_mon_data_internal intl_a, intl_b;
+        unsigned cores_a[] = {2};
+        unsigned cores_b[] = {3};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+        moved = a;
+        memset(&a, 0, sizeof(a));
+
+        expect_pqos_a_purge(data->cpu, PQOS_RETVAL_OK);
+        ret = resctrl_mon_purge(&moved);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 1);
+
+        resctrl_mon_unlist(&moved);
+        core_group(&b, &intl_b, cores_b, DIM(cores_b));
+        intl_b.resctrl.mon_group = strdup("pqos-a");
+        assert_non_null(intl_b.resctrl.mon_group);
+        expect_pqos_a_purge(data->cpu, PQOS_RETVAL_OK);
+        ret = resctrl_mon_purge(&b);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        core_group_free(&intl_a);
+        core_group_free(&intl_b);
+}
+
+/* the group's last directory goes between the purge's look at it and its
+ * removal, as another writer may remove it: the removal finds it gone, which
+ * is not the purge's removal, and the group is not marked
+ */
+static void
+test_resctrl_mon_purge_of_a_directory_already_gone(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        expect_pqos_a_purge(data->cpu, PQOS_RETVAL_RESOURCE);
+        ret = resctrl_mon_purge(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 0);
+
+        core_group_free(&intl_a);
+}
+
+/* a reset that fails before it removes anything, at the read of mon_groups,
+ * leaves the marks as they were: a purge after it marks the group with the
+ * count of no reset
+ */
+static void
+test_resctrl_mon_reset_that_fails_first_leaves_the_marks(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        mon_groups_unreadable = 1;
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        assert_int_equal(resctrl_mon_reset(), PQOS_RETVAL_ERROR);
+        mon_groups_unreadable = 0;
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        expect_pqos_a_purge(data->cpu, PQOS_RETVAL_OK);
+        ret = resctrl_mon_purge(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 1);
+
+        core_group_free(&intl_a);
+}
+
+/* a reset that finds a directory gone at its removal, as another writer may
+ * remove it, goes on, and counts: a purge after it marks the group with the
+ * count of one reset
+ */
+static void
+test_resctrl_mon_reset_of_a_directory_already_gone(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        static const char *const listed[] = {"pqos-x", NULL};
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        mon_groups_listed[0] = listed;
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-x");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(resctrl_mon_reset(), PQOS_RETVAL_OK);
+        mon_groups_listed[0] = NULL;
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        expect_pqos_a_purge(data->cpu, PQOS_RETVAL_OK);
+        ret = resctrl_mon_purge(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 2);
+
+        core_group_free(&intl_a);
+}
+
+/* a stop that finds its group's directory gone at the removal, as another
+ * writer may remove it, has nothing left to do, and succeeds
+ */
+static void
+test_resctrl_mon_stop_of_a_directory_already_gone(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        for (i = 0; i < 3; i++) {
+                will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        }
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_unset, lcore, 2);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group,
+                      "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < data->cpu->num_cores; ++i) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             data->cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get, 0);
+        }
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-a");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_RESOURCE);
+
+        ret = resctrl_mon_stop(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        core_group_free(&intl_a);
+}
+
 /* after a pqos_mon_reset(), the purge marks the group with the count of
  * resets the restore then compares, so that the directory it removes is made
  * again: the mark is 2 after one reset
@@ -1783,6 +2021,21 @@ main(void)
                 mon_groups_unlist),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_purge_after_a_reset_marks_its_count,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_of_a_group_moved_since_its_start,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_of_a_directory_already_gone,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_reset_that_fails_first_leaves_the_marks,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_reset_of_a_directory_already_gone,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_stop_of_a_directory_already_gone,
                 mon_groups_unlist),
         };
 

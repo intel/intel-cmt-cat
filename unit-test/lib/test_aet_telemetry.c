@@ -241,8 +241,9 @@ test_power_from_energy(void **state __attribute__((unused)))
         assert_true(intl.resctrl.tel[PQOS_TEL_SLOT_POWER].current == 20.0);
 }
 
-/* an energy total that fell has started again, as when the group's directory
- * was made again: no power for that interval, rather than a negative one
+/* an energy total that fell, as when a directory of the group was removed
+ * other than by the library: no power for that interval, rather than a
+ * negative one
  */
 static void
 test_power_after_energy_fell(void **state __attribute__((unused)))

@@ -98,7 +98,8 @@ PQOS_LOCAL int resctrl_mon_stop(struct pqos_mon_data *group);
  * when the resctrl lock is not taken: pqos_mon_stop() frees the group anyway,
  * which the list is not to go on counting as in its directory.
  *
- * @param [in] group the group, which is not read
+ * @param [in] group the group, of which only the address of its internal
+ *                   data is read
  */
 PQOS_LOCAL void resctrl_mon_unlist(const struct pqos_mon_data *group);
 
