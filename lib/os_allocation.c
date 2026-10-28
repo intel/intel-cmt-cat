@@ -570,12 +570,12 @@ os_alloc_reset_light_schematas_exit:
 /**
  * @brief Moves the tasks of class \a class_id to CLOS0
  *
- * The class is read again after each pass that moved a task or found one gone
- * before its write, which may have forked into the class first; a task gone
- * is not listed again. A pass that does neither ends it: what that pass
- * listed cannot be moved, as a task that is exiting cannot on some kernels,
- * and is left as it is. A class still listing tasks after RESET_TASKS_PASSES
- * passes fails.
+ * The class is read again after each pass that moved a task or found one gone,
+ * before its write or at it, which may have forked into the class first; a
+ * task gone is not listed again. A pass that does neither ends it: what that
+ * pass listed cannot be moved, as a task that is exiting cannot on some
+ * kernels, and is left as it is. A class still listing tasks after
+ * RESET_TASKS_PASSES passes fails.
  *
  * @param [in] class_id class whose tasks are moved
  *
@@ -641,6 +641,13 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         } else if (alloc_result == PQOS_RETVAL_PARAM) {
                                 LOG_DEBUG("Task %d no longer exists\n", pid);
                                 alloc_result = PQOS_RETVAL_OK;
+                                /* gone at the write, it may have forked into
+                                 * the class first, as one gone before it may;
+                                 * one that is still there could not be moved
+                                 */
+                                if (resctrl_alloc_task_validate(pid) !=
+                                    PQOS_RETVAL_OK)
+                                        gone++;
                         } else {
                                 LOG_ERROR("Error allocating task %d to "
                                           "CLOS%u\n",

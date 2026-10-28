@@ -522,6 +522,24 @@ test_resctrl_alloc_task_validate_error(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+/* a task a security module keeps the null signal from (EACCES) is still
+ * there: only ESRCH says that it has ended
+ */
+static void
+test_resctrl_alloc_task_validate_signal_denied(void **state
+                                               __attribute__((unused)))
+{
+        int ret;
+        pid_t task = 1;
+
+        expect_value(__wrap_kill, pid, task);
+        expect_value(__wrap_kill, sig, 0);
+        will_return(__wrap_kill, -EACCES);
+
+        ret = resctrl_alloc_task_validate(task);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 static void
 test_resctrl_alloc_task_validate_no_permission(void **state
                                                __attribute__((unused)))
@@ -753,6 +771,7 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_task_validate_ok),
             cmocka_unit_test(test_resctrl_alloc_task_validate_error),
             cmocka_unit_test(test_resctrl_alloc_task_validate_no_permission),
+            cmocka_unit_test(test_resctrl_alloc_task_validate_signal_denied),
             cmocka_unit_test(test_resctrl_alloc_get_unused_group_no_groups)};
 
         const struct CMUnitTest tests_num_closids[] = {

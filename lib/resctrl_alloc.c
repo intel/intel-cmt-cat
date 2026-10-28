@@ -393,10 +393,11 @@ resctrl_alloc_schemata_write_exit:
 int
 resctrl_alloc_task_validate(const pid_t task)
 {
-        /* EPERM is a task this process may not signal, which exists all the
-         * same: only ESRCH says that it has ended
+        /* only ESRCH says that the task has ended: EPERM is one this process
+         * may not signal, and EACCES one a security module keeps the null
+         * signal from, which exist all the same
          */
-        if (kill(task, 0) == 0 || errno == EPERM)
+        if (kill(task, 0) == 0 || errno != ESRCH)
                 return PQOS_RETVAL_OK;
 
         return PQOS_RETVAL_ERROR;

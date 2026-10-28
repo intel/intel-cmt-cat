@@ -247,6 +247,8 @@ test_os_alloc_reset_tasks_exited(void **state)
         will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
         expect_task_moved(13, 0, PQOS_RETVAL_OK);
         expect_task_moved(12, 0, PQOS_RETVAL_PARAM);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, 12);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
         expect_class_read(1, NULL, 0);
         expect_classes_empty(state, 2);
 
@@ -321,6 +323,33 @@ test_os_alloc_reset_tasks_class_never_empty(void **state)
         assert_int_equal(test_log_count_stop(), 1);
 }
 
+/* a class that its tenth pass empties is done: ten passes each move a task,
+ * the eleventh read lists none, and the reset succeeds
+ */
+static void
+test_os_alloc_reset_tasks_class_emptied_by_its_tenth_pass(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        static const unsigned forked[] = {11, 12, 13, 14, 15,
+                                          16, 17, 18, 19, 20};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        for (i = 0; i < DIM(forked); i++) {
+                expect_class_read(1, &forked[i], 1);
+                expect_task_moved((pid_t)forked[i], 0, PQOS_RETVAL_OK);
+        }
+        expect_class_read(1, NULL, 0);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
 /* the limit is for each class: class 1 needs six passes and class 2 six more,
  * twelve in all, and the reset succeeds
  */
@@ -346,6 +375,35 @@ test_os_alloc_reset_tasks_passes_count_per_class(void **state)
         }
         expect_class_read(2, NULL, 0);
         expect_classes_empty(state, 3);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* the only task listed goes at its write (PARAM), and is gone when looked at
+ * again, after it forked a child into the class: the class is read again, and
+ * the child, listed then, is moved
+ */
+static void
+test_os_alloc_reset_tasks_task_gone_at_write_reads_class_again(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {11};
+        const unsigned read2[] = {12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_moved(11, 0, PQOS_RETVAL_PARAM);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, 11);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
+        expect_class_read(1, read2, DIM(read2));
+        expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, NULL, 0);
+        expect_classes_empty(state, 2);
 
         test_log_count_start();
         ret = os_alloc_reset_tasks();
@@ -381,9 +439,10 @@ test_os_alloc_reset_tasks_gone_task_reads_class_again(void **state)
         assert_int_equal(test_log_count_stop(), 0);
 }
 
-/* a pass that moves no task ends its class: the task listed is still there
- * but cannot be moved, as an exiting one cannot on some kernels (PARAM), and
- * the class is not read again, so that the task cannot fail the reset
+/* a pass that moves no task and finds none gone ends its class: the task
+ * listed is still there but cannot be moved, as an exiting one cannot on some
+ * kernels (PARAM, and still there when looked at again), and the class is not
+ * read again, so that the task cannot fail the reset
  */
 static void
 test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
@@ -396,6 +455,8 @@ test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
 
         expect_class_read(1, cos1, DIM(cos1));
         expect_task_moved(11, 0, PQOS_RETVAL_PARAM);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, 11);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
         expect_classes_empty(state, 2);
 
         test_log_count_start();
@@ -429,8 +490,9 @@ test_os_alloc_reset_tasks_unreadable(void **state)
         assert_int_equal(test_log_count_stop(), 1);
 }
 
-/* a task that cannot be moved fails the reset, which is said once: the
- * tasks of its class after it are left, and the classes after it are reset
+/* a write that fails, other than for a task gone or exiting, fails the
+ * reset, which is said once: the tasks of its class after it are left, and
+ * the classes after it are reset
  */
 static void
 test_os_alloc_reset_tasks_move_fails(void **state)
@@ -478,6 +540,10 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_tasks_passes_count_per_class),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_gone_task_reads_class_again),
+            cmocka_unit_test(
+                test_os_alloc_reset_tasks_task_gone_at_write_reads_class_again),
+            cmocka_unit_test(
+                test_os_alloc_reset_tasks_class_emptied_by_its_tenth_pass),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_unmovable_task_ends_class),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
