@@ -986,6 +986,37 @@ test_resctrl_mon_assoc_restore_group_made_again(void **state
         assert_int_equal(purged, 0);
 }
 
+/* the purge removed the group's last directory, and something else has made
+ * it again and put the core in it: the core is where it belongs, and the mark
+ * is cleared, so that a later removal of that directory is not undone
+ */
+static void
+test_resctrl_mon_assoc_restore_group_made_elsewhere(void **state
+                                                    __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        int purged = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 0);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 1);
+
+        ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(purged, 0);
+}
+
 /* the group's directories are gone, but not through the purge, as when
  * pqos_mon_reset() or a writer to resctrl removed them: the group is not made
  * again, and the restore fails, which it says once
@@ -1435,6 +1466,8 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_restore_core_in_no_class),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_core_gone_offline),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_group_made_again),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_group_made_elsewhere),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_group_removed_elsewhere),
             cmocka_unit_test(

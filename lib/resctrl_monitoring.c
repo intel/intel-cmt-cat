@@ -1152,11 +1152,14 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
         /* the group's own directory first: a core still where the start put
          * it, as it is at nearly every poll, needs no search through the
          * class's groups, which reads a file of each and so grew with the
-         * groups started
+         * groups started. The directory there, whoever made it again, ends
+         * the purge's mark: the group's last directory is not gone any more
          */
-        if (resctrl_mon_cpumask_read(class_id, name, &mask) == PQOS_RETVAL_OK &&
-            resctrl_cpumask_get(lcore, &mask))
-                return PQOS_RETVAL_OK;
+        if (resctrl_mon_cpumask_read(class_id, name, &mask) == PQOS_RETVAL_OK) {
+                *purged = 0;
+                if (resctrl_cpumask_get(lcore, &mask))
+                        return PQOS_RETVAL_OK;
+        }
 
         ret = resctrl_mon_assoc_get(lcore, buf, sizeof(buf));
         /* core already associated with mon group */
@@ -2230,8 +2233,11 @@ resctrl_mon_stop(struct pqos_mon_data *group)
 
         ASSERT(group != NULL);
 
-        /* off the list first: the group is gone after the stop, whatever the
-         * stop leaves
+        /* off the list first: pqos_mon_stop() frees the group whatever the
+         * stop returns, and no restore puts a core of it back after. A core
+         * of it that is offline comes back in the default group, so a
+         * directory that a failed stop leaves cannot merge another group's
+         * counts with it
          */
         mon_started_remove(group);
 
