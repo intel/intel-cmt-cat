@@ -120,6 +120,11 @@ mon_groups_unlist(void **state __attribute__((unused)))
 {
         memset(mon_groups_listed, 0, sizeof(mon_groups_listed));
 
+        /* and the core groups a case started and did not stop, which the
+         * library lists until then
+         */
+        resctrl_mon_fini();
+
         return 0;
 }
 
@@ -196,6 +201,14 @@ __wrap_pqos_fopen(const char *name, const char *mode)
             {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-busy/tasks",
              .mode = "r",
              .text = "1234\n",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-a/cpus_list",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-a/tasks",
+             .mode = "r",
+             .text = "",
              .plain_close = 1},
             {.path = RESCTRL_PATH "/mon_groups/pqos-split/tasks",
              .mode = "r",
@@ -1288,6 +1301,277 @@ test_resctrl_mon_start_core_failure(void **state)
         free(intl.resctrl.mon_group);
 }
 
+/* ======== core groups started in one directory ======== */
+
+static void
+core_group(struct pqos_mon_data *group,
+           struct pqos_mon_data_internal *intl,
+           unsigned *cores,
+           const unsigned num_cores)
+{
+        memset(group, 0, sizeof(*group));
+        memset(intl, 0, sizeof(*intl));
+        group->intl = intl;
+        group->num_cores = num_cores;
+        group->cores = cores;
+        group->event = PQOS_MON_EVENT_TMEM_BW;
+}
+
+/**
+ * @brief Starts core group \a group, where no directory is listed, in a new
+ *        one named \a name
+ *
+ * The case gives the cap, the topology and resctrl_mon_is_supported(), and no
+ * event, so that no occupancy is read
+ */
+static void
+start_core_group(struct pqos_mon_data *group,
+                 struct pqos_mon_data_internal *intl,
+                 unsigned *cores,
+                 const unsigned num_cores,
+                 const char *name)
+{
+        unsigned i;
+        int ret;
+
+        core_group(group, intl, cores, num_cores);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        will_return(resctrl_mon_new_group, name);
+        for (i = 0; i < num_cores; i++) {
+                expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores[i]);
+                expect_string(__wrap_resctrl_mon_assoc_set, name, name);
+                will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+        }
+
+        ret = resctrl_mon_start(group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl->resctrl.mon_group, name);
+}
+
+static void
+core_group_free(struct pqos_mon_data_internal *intl)
+{
+        free(intl->resctrl.mon_group);
+        free(intl->resctrl.l3id);
+}
+
+/* pqos-a has cores 2 and 5, on L3s 0 and 1. Core 2 has gone offline, which
+ * leaves core 5 alone in the directory: a group started on core 1, of L3 0, is
+ * not given pqos-a, which is still read on L3 0, but a directory of its own
+ */
+static void
+test_resctrl_mon_start_core_not_in_group_of_offline_core(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a, b;
+        struct pqos_mon_data_internal intl_a, intl_b;
+        unsigned cores_a[] = {2, 5};
+        unsigned cores_b[] = {1};
+        const char *const listed[] = {"pqos-a", NULL};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        core_group(&b, &intl_b, cores_b, DIM(cores_b));
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        mon_groups_listed[0] = listed;
+        expect_group_cores(data->cpu, 0, "pqos-a", 5);
+        will_return(resctrl_mon_new_group, "pqos-b");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores_b[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "pqos-b");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&b);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl_b.resctrl.mon_group, "pqos-b");
+
+        core_group_free(&intl_a);
+        core_group_free(&intl_b);
+}
+
+/* groups on cores 2 and 5, of L3s 0 and 1, are in one directory, as two
+ * groups of different L3s can be given one, and core 2 is offline: the stop
+ * of core 5's group leaves the directory, which core 2's group is still in,
+ * and that group's stop removes it
+ */
+static void
+test_resctrl_mon_stop_leaves_directory_of_group_offline(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a, b;
+        struct pqos_mon_data_internal intl_a, intl_b;
+        unsigned cores_a[] = {2};
+        unsigned cores_b[] = {5};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-ab");
+        start_core_group(&b, &intl_b, cores_b, DIM(cores_b), "pqos-ab");
+
+        /* core 5 is taken out of the directory, which is left */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-ab");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group,
+                      "pqos-ab");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_unset, lcore, cores_b[0]);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group,
+                      "pqos-ab");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_stop(&b);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        /* then core 2's group, with no core in the directory and no other
+         * group listed: the directory is removed
+         */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-ab");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group,
+                      "pqos-ab");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_unset, lcore, cores_a[0]);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group,
+                      "pqos-ab");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-ab");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group,
+                      "pqos-ab");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < data->cpu->num_cores; ++i) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             data->cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get, 0);
+        }
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-ab");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_stop(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* ======== resctrl_mon_purge ======== */
+
+/* the purge removes the empty directory of a group that no other group is
+ * in, and marks the group, whose last directory that was
+ */
+static void
+test_resctrl_mon_purge_marks_group_of_last_directory(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        /* no other group is in the directory, which has no core */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < data->cpu->num_cores; ++i) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             data->cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get, 0);
+        }
+
+        /* nor a task: it is removed */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-a");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_purge(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 1);
+
+        core_group_free(&intl_a);
+}
+
+/* groups on cores 2 and 5 are in one directory, with no core in it, as when
+ * both cores are offline: the purge of either leaves the directory, which
+ * the other is in, and reads nothing
+ */
+static void
+test_resctrl_mon_purge_leaves_directory_another_group_is_in(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a, b;
+        struct pqos_mon_data_internal intl_a, intl_b;
+        unsigned cores_a[] = {2};
+        unsigned cores_b[] = {5};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-ab");
+        start_core_group(&b, &intl_b, cores_b, DIM(cores_b), "pqos-ab");
+
+        ret = resctrl_mon_purge(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        ret = resctrl_mon_purge(&b);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 0);
+        assert_int_equal(intl_b.resctrl.purged, 0);
+
+        core_group_free(&intl_a);
+        core_group_free(&intl_b);
+}
+
 int
 main(void)
 {
@@ -1336,6 +1620,18 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_start_pid_unnamed),
             cmocka_unit_test(test_resctrl_mon_start_pid_fails_midway),
             cmocka_unit_test(test_resctrl_mon_start_core_failure),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_start_core_not_in_group_of_offline_core,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_stop_leaves_directory_of_group_offline,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_marks_group_of_last_directory,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_leaves_directory_another_group_is_in,
+                mon_groups_unlist),
         };
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini);

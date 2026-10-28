@@ -59,6 +59,23 @@ static int supported_events = 0;
 static unsigned resctrl_mon_counter = 0;
 
 /**
+ * The core groups this process has started. A directory lists only the cores
+ * that are online in it, so what the library tells from the cores a directory
+ * lists - the L3s it is in use on, and whether another group is in it - it
+ * tells from these as well: a group whose cores are offline is in its
+ * directory all the same. An entry is a copy, and \a group only tells it
+ * apart, since a group can be freed without its stop being reached
+ */
+static struct resctrl_mon_started {
+        const struct pqos_mon_data *group; /**< the group, never read */
+        char name[32];                     /**< its directory's name */
+        uint64_t l3ids;                    /**< the L3s of its cores */
+        int l3ids_valid; /**< 0 for an L3 ID above RESCTRL_CORE_MAX_L3ID */
+} *mon_started = NULL;
+static unsigned mon_started_num = 0;
+static unsigned mon_started_size = 0;
+
+/**
  * @brief Filter directory filenames
  *
  * This function is used by the scandir function
@@ -223,6 +240,11 @@ int
 resctrl_mon_fini(void)
 {
         supported_events = 0;
+
+        free(mon_started);
+        mon_started = NULL;
+        mon_started_num = 0;
+        mon_started_size = 0;
 
         return PQOS_RETVAL_OK;
 }
@@ -1049,16 +1071,64 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
         return ret;
 }
 
-/* @brief Restore association of \a lcore to monitoring group
+/**
+ * @brief Whether monitoring group \a name has a directory in a class other
+ *        than \a class_id
  *
- * @param [in] lcore CPU logical core id
- * @param [in] name name of monitoring group
+ * @param [in] class_id the class not looked in
+ * @param [in] name name of the monitoring group
+ * @param [out] elsewhere 1 for a directory in another class
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
+static int
+mon_dir_elsewhere(const unsigned class_id, const char *name, int *elsewhere)
+{
+        const struct pqos_cap *cap = _pqos_get_cap();
+        unsigned max_clos;
+        unsigned clos;
+        int ret;
+
+        *elsewhere = 0;
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_clos);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        for (clos = 0; clos < max_clos; clos++) {
+                char path[128];
+
+                if (clos == class_id)
+                        continue;
+                ret = resctrl_mon_group_path(clos, name, NULL, path,
+                                             sizeof(path));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                if (pqos_dir_exists(path)) {
+                        *elsewhere = 1;
+                        break;
+                }
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/* @brief Restore association of \a lcore to monitoring group
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [in] name name of monitoring group
+ * @param [in,out] purged whether the purge removed the group's last
+ *                        directory, which the restore makes again; cleared
+ *                        once the core is back in the group
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the group's directories were removed by
+ *         other than the purge
+ */
 PQOS_STATIC int
-resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
+resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
 {
         int ret;
         char buf[RESCTRL_MON_GROUP_NAME_SIZE];
@@ -1070,7 +1140,8 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         /* a core in no class, as an offline one is, has no group to be put
          * back in, and the poll goes on without it. When it comes back
          * online, in the default class, the restore puts it back in its
-         * group, making the group's directory there where it has none
+         * group, making the group's directory there where the purge removed
+         * it
          */
         ret = alloc_assoc_get(lcore, &class_id);
         if (ret == PQOS_RETVAL_RESOURCE)
@@ -1103,15 +1174,38 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        /* put back in the group, whose directory in that class is made where
-         * there is none: the core came back online in the default class, or a
-         * writer to resctrl moved it to a class the group has none in, or
-         * removed the directory. A directory made again counts from 0, which
-         * the poll takes as counts that started again
+        /* put back in the group. Where the group has no directory in that
+         * class, one is made if the purge removed the group's last, as it
+         * does once a core gone offline has left the directory empty: the
+         * core comes back online in the default class. The purge saved the
+         * counts of what it removed, and the group's count goes on from them.
+         * One is made too if the group still has a directory in another
+         * class, as when a writer to resctrl moved the core. Directories
+         * removed by anything else, as by a pqos_mon_reset(), are not made
+         * again: the group has gone, and the poll fails
          */
+        ret = resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (!*purged && !pqos_dir_exists(buf)) {
+                int elsewhere;
+
+                ret = mon_dir_elsewhere(class_id, name, &elsewhere);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                if (!elsewhere) {
+                        LOG_WARN("Could not restore core association with mon "
+                                 "group %s does not exists\n",
+                                 buf);
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
+
         ret = mon_assoc_add(class_id, lcore, name);
-        if (ret == PQOS_RETVAL_OK)
+        if (ret == PQOS_RETVAL_OK) {
+                *purged = 0;
                 return PQOS_RETVAL_OK;
+        }
 
         /* a core that went offline since the lookup is refused by the
          * kernel's cpus file, and is in no class now: nothing to restore
@@ -1269,6 +1363,102 @@ struct resctrl_core_group {
 };
 
 /**
+ * @brief Makes room to list one more core group started
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE on a memory allocation failure
+ */
+static int
+mon_started_reserve(void)
+{
+        struct resctrl_mon_started *grown;
+        const unsigned size = mon_started_size + 8;
+
+        if (mon_started_num < mon_started_size)
+                return PQOS_RETVAL_OK;
+
+        grown = realloc(mon_started, size * sizeof(*grown));
+        if (grown == NULL)
+                return PQOS_RETVAL_RESOURCE;
+        mon_started = grown;
+        mon_started_size = size;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Lists core group \a group as started, in the room
+ *        mon_started_reserve() made
+ *
+ * @param [in] group a core group whose start has succeeded
+ */
+static void
+mon_started_add(const struct pqos_mon_data *group)
+{
+        struct resctrl_mon_started *entry;
+        unsigned i;
+
+        ASSERT(mon_started_num < mon_started_size);
+        entry = &mon_started[mon_started_num++];
+
+        entry->group = group;
+        strncpy(entry->name, group->intl->resctrl.mon_group,
+                sizeof(entry->name));
+        entry->name[sizeof(entry->name) - 1] = '\0';
+        entry->l3ids = 0;
+        entry->l3ids_valid = 1;
+        for (i = 0; i < group->intl->resctrl.num_l3id; i++) {
+                const unsigned l3id = group->intl->resctrl.l3id[i];
+
+                if (l3id > RESCTRL_CORE_MAX_L3ID)
+                        entry->l3ids_valid = 0;
+                else
+                        entry->l3ids |= 1LLU << l3id;
+        }
+}
+
+/**
+ * @brief Takes core group \a group off the list of those started
+ *
+ * @param [in] group the group, which is not read
+ */
+static void
+mon_started_remove(const struct pqos_mon_data *group)
+{
+        unsigned i = 0;
+
+        while (i < mon_started_num)
+                if (mon_started[i].group == group)
+                        mon_started[i] = mon_started[--mon_started_num];
+                else
+                        i++;
+}
+
+/**
+ * @brief Adds to \a grp the L3s of the core groups started in its directory
+ *
+ * A core gone offline is in the cpus file of no directory, so the L3 it is on
+ * would look free in a directory that is still in use on it
+ *
+ * @param [in,out] grp a directory, as resctrl_mon_parse() lists it
+ */
+static void
+mon_started_l3ids(struct resctrl_core_group *grp)
+{
+        unsigned i;
+
+        for (i = 0; i < mon_started_num; i++) {
+                if (strncmp(mon_started[i].name, grp->name,
+                            sizeof(grp->name)) != 0)
+                        continue;
+                if (!mon_started[i].l3ids_valid)
+                        grp->valid = 0;
+                grp->l3ids |= mon_started[i].l3ids;
+        }
+}
+
+/**
  * @brief Parse resctrl monitoring groups of the library
  *
  * Lists the groups with the L3 IDs of the cores assigned to them. Whether a
@@ -1366,6 +1556,10 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                                 strncpy(grp->name, grp_name, sizeof(grp->name));
                                 grp->name[sizeof(grp->name) - 1] = '\0';
                                 grp->valid = 1;
+                                /* and the L3s of the groups started in it,
+                                 * whose cores may be offline
+                                 */
+                                mon_started_l3ids(grp);
                         }
                         if (!grp->valid)
                                 continue;
@@ -1673,6 +1867,15 @@ resctrl_mon_start(struct pqos_mon_data *group)
         ASSERT(group->tid_nr == 0 || group->tid_map != NULL);
         ASSERT(group->num_cores == 0 || group->cores != NULL);
 
+        /* room to list a core group in once started, made before the start
+         * changes anything, so that listing it cannot fail the start after
+         */
+        if (group->num_cores > 0) {
+                ret = mon_started_reserve();
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
         /* a group the caller names already monitors other tasks -
          * os_mon_add_pids() adds to one - so a failure here removes only what
          * this start made for it
@@ -1784,6 +1987,8 @@ resctrl_mon_start(struct pqos_mon_data *group)
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_start_exit;
         }
+        if (group->num_cores > 0)
+                mon_started_add(group);
 
 resctrl_mon_start_exit:
         if (ret != PQOS_RETVAL_OK) {
@@ -1888,11 +2093,23 @@ resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
         const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const char *mon_group = group->intl->resctrl.mon_group;
+        unsigned started;
 
         *shared = 0;
 
         if (group->num_pids > 0)
                 return PQOS_RETVAL_OK;
+
+        /* another group this process started is in the directory, whether its
+         * cores are in the cpus files or offline
+         */
+        for (started = 0; started < mon_started_num; started++)
+                if (mon_started[started].group != group &&
+                    strncmp(mon_started[started].name, mon_group,
+                            sizeof(mon_started[started].name)) == 0) {
+                        *shared = 1;
+                        return PQOS_RETVAL_OK;
+                }
 
         ret = resctrl_alloc_get_grps_num(cap, &max_clos);
         if (ret != PQOS_RETVAL_OK)
@@ -2013,6 +2230,11 @@ resctrl_mon_stop(struct pqos_mon_data *group)
 
         ASSERT(group != NULL);
 
+        /* off the list first: the group is gone after the stop, whatever the
+         * stop leaves
+         */
+        mon_started_remove(group);
+
         ret = resctrl_alloc_get_grps_num(cap, &max_clos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -2123,16 +2345,22 @@ resctrl_mon_stop_exit:
  * @brief The growth of a resctrl MBM count from \a old_value to \a new_value
  *
  * The kernel keeps these counts in 64 bits, from a hardware counter however
- * narrow, so they do not wrap: a count that falls has started again, as a
- * group's directory made again does, or the sum of a group that has lost one
- * of the directories it is read from. The reading then starts again from it
- * too, rather than the fall being taken for a wrap.
+ * narrow, so they do not wrap. A group's count is the sum of its directories'
+ * and of what the purge saved from those it removed, and so falls only where a
+ * directory went without its counts saved: one removed by a writer to resctrl
+ * outside the library, or one the purge removed while the kernel gave its
+ * counts as Unavailable or Unassigned. The count has then started again, and
+ * the reading starts again from it too, rather than the fall being taken for
+ * a wrap.
  *
  * @param [in] old_value the previous reading
  * @param [in] new_value this reading
- * @param [in,out] valid 0 before the group's first reading, 1 after it
+ * @param [in,out] valid 0 before the group's first valid reading, and after
+ *                       one the kernel gave as Unavailable or Unassigned; 1
+ *                       after a valid one
  *
- * @return the growth: 0 for a first reading, and for one that fell
+ * @return the growth: 0 for the first valid reading, for the first after an
+ *         unavailable one, and for one that fell
  */
 PQOS_STATIC uint64_t
 resctrl_mon_count_delta(const uint64_t old_value,
@@ -2150,19 +2378,25 @@ resctrl_mon_count_delta(const uint64_t old_value,
  * @brief This function removes all empty monitoring
  *        groups associated with \a group
  *
+ * A directory another group is in is left. Where the group's last directory
+ * is removed, the group is marked purged, for the restore to make one again
+ * when a core of the group is back.
+ *
  * @param group monitoring structure
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-static int
+PQOS_STATIC int
 resctrl_mon_purge(struct pqos_mon_data *group)
 {
         unsigned max_clos;
         unsigned clos;
         int ret;
         unsigned shared;
+        unsigned kept = 0;
+        unsigned removed = 0;
         const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(group != NULL);
@@ -2197,8 +2431,10 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
-                if (!empty)
+                if (!empty) {
+                        kept++;
                         continue;
+                }
 
                 /* store counter values */
                 if (resctrl_mon_is_event_supported(PQOS_MON_EVENT_LMEM_BW)) {
@@ -2236,8 +2472,12 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 }
 
                 LOG_INFO("Deleted empty mon group %s\n", buf);
+                removed++;
 
         } while (++clos < max_clos);
+
+        if (removed > 0 && kept == 0)
+                group->intl->resctrl.purged = 1;
 
         return ret;
 }
@@ -2277,7 +2517,8 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
          */
         for (i = 0; i < group->num_cores; i++) {
                 ret = resctrl_mon_assoc_restore(group->cores[i],
-                                                group->intl->resctrl.mon_group);
+                                                group->intl->resctrl.mon_group,
+                                                &group->intl->resctrl.purged);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
         }
