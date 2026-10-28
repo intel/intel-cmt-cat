@@ -478,6 +478,12 @@ l3ids_from_62(void **state)
 }
 
 static int
+l3ids_from_63(void **state)
+{
+        return l3ids_shift(state, 63);
+}
+
+static int
 l3ids_back(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
@@ -1711,6 +1717,59 @@ test_resctrl_mon_purge_of_a_group_moved_since_its_start(void **state)
         core_group_free(&intl_b);
 }
 
+/* pqos-a was started for core 5, on L3 64, past the L3s a mask holds, and
+ * core 5 has gone offline, so that only the list of started groups says the
+ * directory is in use, and that list cannot say on which L3: a group started
+ * on core 1, of L3 63, is not given pqos-a, whose cores are not read, but a
+ * directory of its own
+ */
+static void
+test_resctrl_mon_start_core_not_in_group_started_past_l3_63(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a, b;
+        struct pqos_mon_data_internal intl_a, intl_b;
+        unsigned cores_a[] = {5};
+        unsigned cores_b[] = {1};
+        const char *const listed[] = {"pqos-a", NULL};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        /* past L3 63, the start makes a directory without a look at those
+         * there are
+         */
+        core_group(&a, &intl_a, cores_a, DIM(cores_a));
+        will_return(resctrl_mon_new_group, "pqos-a");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores_a[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "pqos-a");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+        ret = resctrl_mon_start(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl_a.resctrl.mon_group, "pqos-a");
+
+        core_group(&b, &intl_b, cores_b, DIM(cores_b));
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        mon_groups_listed[0] = listed;
+        will_return(resctrl_mon_new_group, "pqos-b");
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, cores_b[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "pqos-b");
+        will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_start(&b);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(intl_b.resctrl.mon_group, "pqos-b");
+
+        core_group_free(&intl_a);
+        core_group_free(&intl_b);
+}
+
 /* the group's last directory goes between the purge's look at it and its
  * removal, as another writer may remove it: the removal finds it gone, which
  * is not the purge's removal, and the group is not marked
@@ -1974,6 +2033,9 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_resctrl_mon_start_core_on_l3_63_has_occupancy_read,
                 l3ids_from_62, l3ids_back),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_mon_start_core_not_in_group_started_past_l3_63,
+                l3ids_from_63, l3ids_back),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_start_core_not_in_group_with_tasks,
                 mon_groups_unlist),
