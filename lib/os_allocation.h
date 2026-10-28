@@ -416,6 +416,8 @@ PQOS_LOCAL int os_alloc_assoc_set(const unsigned lcore,
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if no class holds the core, as none holds an
+ *         offline one; \a class_id is not written
  */
 PQOS_LOCAL int os_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 

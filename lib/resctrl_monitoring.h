@@ -156,6 +156,8 @@ PQOS_LOCAL int resctrl_mon_assoc_get(const unsigned lcore,
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the core is in no class, as an offline one
+ *         is, or resctrl monitoring is not supported
  */
 PQOS_LOCAL int resctrl_mon_assoc_set(const unsigned lcore, const char *name);
 

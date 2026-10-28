@@ -706,6 +706,7 @@ $(BIN_DIR)/test_resctrl_mon_assoc: test_resctrl_mon_assoc.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=resctrl_alloc_get_grps_num \
 		-Wl,--wrap=resctrl_alloc_assoc_get \
+		-Wl,--wrap=resctrl_alloc_cpumask_read \
 		-Wl,--wrap=resctrl_alloc_assoc_get_pid \
 		-Wl,--wrap=resctrl_cpumask_get \
 		-Wl,--wrap=resctrl_cpumask_set \

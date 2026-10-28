@@ -252,7 +252,20 @@ alloc_assoc_get(const unsigned lcore, unsigned *class_id)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+        /* with no class but the default group, a core is in it, unless it
+         * is offline: the kernel takes an offline CPU out of every group
+         */
         if (max_clos == 0) {
+                struct resctrl_cpumask mask;
+
+                ret = resctrl_alloc_cpumask_read(0, &mask);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to retrieve core %u association\n",
+                                  lcore);
+                        return ret;
+                }
+                if (!resctrl_cpumask_get(lcore, &mask))
+                        return PQOS_RETVAL_RESOURCE;
                 *class_id = 0;
                 return PQOS_RETVAL_OK;
         }
@@ -978,12 +991,41 @@ resctrl_mon_assoc_get_exit:
         return ret;
 }
 
+/**
+ * @brief Puts \a lcore in monitoring group \a name of class \a class_id,
+ *        making the group's directory there if it has none
+ *
+ * @param [in] class_id class of service the core is in
+ * @param [in] lcore core to put in the group
+ * @param [in] name name of the monitoring group
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+mon_assoc_add(const unsigned class_id, const unsigned lcore, const char *name)
+{
+        int ret;
+        struct resctrl_cpumask cpumask;
+
+        ret = resctrl_mon_mkdir(class_id, name);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = resctrl_mon_cpumask_read(class_id, name, &cpumask);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        resctrl_cpumask_set(lcore, &cpumask);
+
+        return resctrl_mon_cpumask_write(class_id, name, &cpumask);
+}
+
 int
 resctrl_mon_assoc_set(const unsigned lcore, const char *name)
 {
         unsigned class_id = 0;
         int ret;
-        struct resctrl_cpumask cpumask;
 
         ASSERT(name != NULL);
 
@@ -998,17 +1040,7 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        ret = resctrl_mon_mkdir(class_id, name);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        ret = resctrl_mon_cpumask_read(class_id, name, &cpumask);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        resctrl_cpumask_set(lcore, &cpumask);
-
-        ret = resctrl_mon_cpumask_write(class_id, name, &cpumask);
+        ret = mon_assoc_add(class_id, lcore, name);
         if (ret != PQOS_RETVAL_OK)
                 LOG_ERROR("Could not assign core %u to resctrl monitoring "
                           "group\n",
@@ -1036,9 +1068,9 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         ASSERT(name != NULL);
 
         /* a core in no class, as an offline one is, has no group to be put
-         * back in, and the poll goes on without it: when it comes back online
-         * the kernel puts it in the default class, which a poll then takes as
-         * it does a core moved to another class
+         * back in, and the poll goes on without it. When it comes back
+         * online, in the default class, the restore puts it back in its
+         * group, making the group's directory there where it has none
          */
         ret = alloc_assoc_get(lcore, &class_id);
         if (ret == PQOS_RETVAL_RESOURCE)
@@ -1060,8 +1092,10 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         if (ret == PQOS_RETVAL_OK)
                 return PQOS_RETVAL_OK;
 
-        /* the core may have gone offline since the lookup above, which
-         * leaves nothing to restore either
+        /* the class again, which the search looked the core up in too: a
+         * writer to resctrl, which the library's lock does not hold off, may
+         * have moved the core to another since the lookup above, and the core
+         * may have gone offline, which leaves nothing to restore either
          */
         ret = alloc_assoc_get(lcore, &class_id);
         if (ret == PQOS_RETVAL_RESOURCE)
@@ -1069,14 +1103,25 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        /* put back in the group, whose directory in the core's class is made
-         * where there is none: the core came back online in the default class
-         * after the poll removed the directory it had left empty, or a writer
-         * to resctrl, which the library's lock does not hold off, moved it to
-         * a class the group has no directory in. The set looks the class up
-         * itself, so a move between the two lookups is followed too
+        /* put back in the group, whose directory in that class is made where
+         * there is none: the core came back online in the default class, or a
+         * writer to resctrl moved it to a class the group has none in, or
+         * removed the directory. A directory made again counts from 0, which
+         * the poll takes as counts that started again
          */
-        return resctrl_mon_assoc_set(lcore, name);
+        ret = mon_assoc_add(class_id, lcore, name);
+        if (ret == PQOS_RETVAL_OK)
+                return PQOS_RETVAL_OK;
+
+        /* a core that went offline since the lookup is refused by the
+         * kernel's cpus file, and is in no class now: nothing to restore
+         */
+        if (alloc_assoc_get(lcore, &class_id) == PQOS_RETVAL_RESOURCE)
+                return PQOS_RETVAL_OK;
+
+        LOG_ERROR("Could not assign core %u to resctrl monitoring group\n",
+                  lcore);
+        return ret;
 }
 
 int
@@ -2075,20 +2120,30 @@ resctrl_mon_stop_exit:
 }
 
 /**
- * @brief Gives the difference between two values with regard to the possible
- *        overrun
+ * @brief The growth of a resctrl MBM count from \a old_value to \a new_value
  *
- * @param old_value previous value
- * @param new_value current value
- * @return difference between the two values
+ * The kernel keeps these counts in 64 bits, from a hardware counter however
+ * narrow, so they do not wrap: a count that falls has started again, as a
+ * group's directory made again does, or the sum of a group that has lost one
+ * of the directories it is read from. The reading then starts again from it
+ * too, rather than the fall being taken for a wrap.
+ *
+ * @param [in] old_value the previous reading
+ * @param [in] new_value this reading
+ * @param [in,out] valid 0 before the group's first reading, 1 after it
+ *
+ * @return the growth: 0 for a first reading, and for one that fell
  */
-static uint64_t
-get_delta(const uint64_t old_value, const uint64_t new_value)
+PQOS_STATIC uint64_t
+resctrl_mon_count_delta(const uint64_t old_value,
+                        const uint64_t new_value,
+                        int *valid)
 {
-        if (old_value > new_value)
-                return (UINT64_MAX - old_value) + new_value;
-        else
+        if (*valid && new_value >= old_value)
                 return new_value - old_value;
+
+        *valid = 1;
+        return 0;
 }
 
 /**
@@ -2342,7 +2397,8 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
          * Set value.
          * For MBM events, apply a per-event validity state machine:
          *   initial/invalid -> valid: establish baseline, delta = 0.
-         *   valid -> valid: calculate normal delta.
+         *   valid -> valid: calculate normal delta, or 0 and a new baseline
+         *   for a count that fell, which has started again.
          */
         switch (event) {
         case PQOS_MON_EVENT_L3_OCCUP:
@@ -2353,27 +2409,17 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 old_value = group->values.mbm_local;
                 group->values.mbm_local =
                     value + group->intl->resctrl.values_storage.mbm_local;
-                if (group->intl->resctrl.valid_mbm_local) {
-                        group->values.mbm_local_delta =
-                            get_delta(old_value, group->values.mbm_local);
-                } else {
-                        /* First valid reading after invalidity: re-baseline */
-                        group->values.mbm_local_delta = 0;
-                        group->intl->resctrl.valid_mbm_local = 1;
-                }
+                group->values.mbm_local_delta = resctrl_mon_count_delta(
+                    old_value, group->values.mbm_local,
+                    &group->intl->resctrl.valid_mbm_local);
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
                 old_value = group->values.mbm_total;
                 group->values.mbm_total =
                     value + group->intl->resctrl.values_storage.mbm_total;
-                if (group->intl->resctrl.valid_mbm_total) {
-                        group->values.mbm_total_delta =
-                            get_delta(old_value, group->values.mbm_total);
-                } else {
-                        /* First valid reading after invalidity: re-baseline */
-                        group->values.mbm_total_delta = 0;
-                        group->intl->resctrl.valid_mbm_total = 1;
-                }
+                group->values.mbm_total_delta = resctrl_mon_count_delta(
+                    old_value, group->values.mbm_total,
+                    &group->intl->resctrl.valid_mbm_total);
                 break;
         default:
                 return PQOS_RETVAL_ERROR;

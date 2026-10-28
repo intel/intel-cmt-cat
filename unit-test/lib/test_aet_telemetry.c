@@ -211,6 +211,61 @@ test_pqos_mon_get_tel_value_power_ok(void **state __attribute__((unused)))
         assert_float_equal(val, 99.75, 0.001);
 }
 
+/* ======== mon_power_update ======== */
+
+void mon_power_update(struct pqos_mon_data_internal *intl);
+
+/* energy readings 2 s apart, the second given */
+static void
+energy_read(struct pqos_mon_data_internal *intl,
+            const double previous,
+            const double current)
+{
+        memset(intl, 0, sizeof(*intl));
+        intl->resctrl.tel[PQOS_TEL_SLOT_CORE_ENERGY].valid = 1;
+        intl->resctrl.tel[PQOS_TEL_SLOT_CORE_ENERGY].previous = previous;
+        intl->resctrl.tel[PQOS_TEL_SLOT_CORE_ENERGY].current = current;
+        intl->resctrl.prev_tel_ts.tv_sec = 10;
+        intl->resctrl.tel_ts.tv_sec = 12;
+}
+
+/* power is the energy's growth over the time between the readings */
+static void
+test_power_from_energy(void **state __attribute__((unused)))
+{
+        struct pqos_mon_data_internal intl;
+
+        energy_read(&intl, 100.0, 140.0);
+        mon_power_update(&intl);
+        assert_int_equal(intl.resctrl.tel[PQOS_TEL_SLOT_POWER].valid, 1);
+        assert_true(intl.resctrl.tel[PQOS_TEL_SLOT_POWER].current == 20.0);
+}
+
+/* an energy total that fell has started again, as when the group's directory
+ * was made again: no power for that interval, rather than a negative one
+ */
+static void
+test_power_after_energy_fell(void **state __attribute__((unused)))
+{
+        struct pqos_mon_data_internal intl;
+
+        energy_read(&intl, 140.0, 3.0);
+        mon_power_update(&intl);
+        assert_int_equal(intl.resctrl.tel[PQOS_TEL_SLOT_POWER].valid, 0);
+}
+
+/* no previous reading's time: no power yet */
+static void
+test_power_needs_two_readings(void **state __attribute__((unused)))
+{
+        struct pqos_mon_data_internal intl;
+
+        energy_read(&intl, 100.0, 140.0);
+        intl.resctrl.prev_tel_ts.tv_sec = 0;
+        mon_power_update(&intl);
+        assert_int_equal(intl.resctrl.tel[PQOS_TEL_SLOT_POWER].valid, 0);
+}
+
 int
 main(void)
 {
@@ -225,6 +280,9 @@ main(void)
             cmocka_unit_test(test_pqos_mon_get_tel_value_core_energy_ok),
             cmocka_unit_test(test_pqos_mon_get_tel_value_activity_ok),
             cmocka_unit_test(test_pqos_mon_get_tel_value_power_ok),
+            cmocka_unit_test(test_power_from_energy),
+            cmocka_unit_test(test_power_after_energy_fell),
+            cmocka_unit_test(test_power_needs_two_readings),
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);

@@ -75,5 +75,8 @@ int resctrl_mon_read_counter(const unsigned class_id,
                              const enum pqos_mon_event event,
                              uint64_t *value);
 int resctrl_mon_assoc_restore(const unsigned lcore, const char *name);
+uint64_t resctrl_mon_count_delta(const uint64_t old_value,
+                                 const uint64_t new_value,
+                                 int *valid);
 
 #endif /* MOCK_RESCTRL_MONITORING_H_ */

@@ -2135,6 +2135,9 @@ int pqos_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if there is no allocation technology, or, on
+ *         the OS interface, if no class holds the core, as none holds a core
+ *         gone offline since pqos_init(); \a class_id is not written
  */
 int pqos_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 
