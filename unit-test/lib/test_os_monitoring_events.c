@@ -31,6 +31,7 @@
  */
 
 #include "mock_os_monitoring.h"
+#include "mock_resctrl_monitoring.h"
 #include "monitoring.h"
 #include "os_monitoring.h"
 #include "test.h"
@@ -398,6 +399,35 @@ test_os_mon_start_events_lock_fails_after_pkgids(void **state)
         assert_null(intl.resctrl.mon_group);
 }
 
+/* the resctrl lock cannot be taken for the stop: the group is taken off the
+ * list of the core groups started all the same, since pqos_mon_stop() frees it
+ * whatever the stop returns
+ */
+static void
+test_os_mon_stop_events_lock_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {1};
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        intl.resctrl.event = PQOS_MON_EVENT_TMEM_BW;
+        mock_resctrl_mon_unlisted = NULL;
+
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_ERROR);
+
+        assert_int_equal(os_mon_stop_events(&group), PQOS_RETVAL_ERROR);
+        assert_ptr_equal(mock_resctrl_mon_unlisted, &group);
+}
+
 int
 main(void)
 {
@@ -412,6 +442,7 @@ main(void)
             cmocka_unit_test(test_os_mon_start_events_add_fails_before_resctrl),
             cmocka_unit_test(test_os_mon_start_events_add_resctrl_fails),
             cmocka_unit_test(test_os_mon_start_events_lock_fails_after_pkgids),
+            cmocka_unit_test(test_os_mon_stop_events_lock_fails),
         };
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini);

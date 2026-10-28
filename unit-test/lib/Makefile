@@ -1349,6 +1349,7 @@ $(BIN_DIR)/test_os_monitoring_events: ./test_os_monitoring_events.c $(LIB_OBJS)
 		-Wl,--wrap=resctrl_lock_exclusive \
 		-Wl,--wrap=resctrl_mon_start \
 		-Wl,--wrap=resctrl_mon_stop \
+		-Wl,--wrap=resctrl_mon_unlist \
 		-Wl,--wrap=resctrl_mon_collect_pkgids \
 		-Wl,--wrap=resctrl_lock_release \
 		-Wl,--start-group \

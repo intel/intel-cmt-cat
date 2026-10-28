@@ -1485,6 +1485,30 @@ test_resctrl_mon_stop_leaves_directory_of_group_offline(void **state)
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* a core group the start could not name, as one whose start failed before it
+ * was given a directory, is stopped with no file read or written: with no
+ * name, the paths would be the class's own, whose cores the stop would take
+ * out of it
+ */
+static void
+test_resctrl_mon_stop_unnamed_core_group(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {1};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        core_group(&group, &intl, cores, DIM(cores));
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 /* ======== resctrl_mon_purge ======== */
 
 /* the purge removes the empty directory of a group that no other group is
@@ -1626,6 +1650,7 @@ main(void)
             cmocka_unit_test_teardown(
                 test_resctrl_mon_stop_leaves_directory_of_group_offline,
                 mon_groups_unlist),
+            cmocka_unit_test(test_resctrl_mon_stop_unnamed_core_group),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_purge_marks_group_of_last_directory,
                 mon_groups_unlist),

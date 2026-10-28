@@ -114,6 +114,10 @@ os_mon_stop_events(struct pqos_mon_data *group)
         }
 
         if (group->intl->resctrl.event) {
+                /* off the list of the core groups started whether or not the
+                 * lock is taken: pqos_mon_stop() frees the group either way
+                 */
+                resctrl_mon_unlist(group);
                 ret = resctrl_lock_exclusive();
                 if (ret != PQOS_RETVAL_OK)
                         goto stop_event_error;

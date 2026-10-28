@@ -52,6 +52,15 @@ __wrap_resctrl_mon_stop(struct pqos_mon_data *group)
         return mock_type(int);
 }
 
+const struct pqos_mon_data *mock_resctrl_mon_unlisted;
+
+/* recorded rather than expected, so that each stop of a case need not say so */
+void
+__wrap_resctrl_mon_unlist(const struct pqos_mon_data *group)
+{
+        mock_resctrl_mon_unlisted = group;
+}
+
 int
 __wrap_resctrl_mon_is_event_supported(const enum pqos_mon_event event)
 {

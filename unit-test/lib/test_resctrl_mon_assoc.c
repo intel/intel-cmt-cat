@@ -46,6 +46,17 @@ resctrl_mon_is_supported(void)
         return mock_type(int);
 }
 
+/* the events resctrl_mon_is_event_supported() takes as supported: none, as
+ * for a library that is not initialised, unless a case says otherwise
+ */
+static int events_supported;
+
+int
+resctrl_mon_is_event_supported(const enum pqos_mon_event event)
+{
+        return (events_supported & event) == event;
+}
+
 int
 resctrl_mon_cpumask_read(const unsigned class_id,
                          const char *resctrl_group,
@@ -99,12 +110,23 @@ resctrl_mon_rmdir(const unsigned class_id, const char *name)
 
 FILE *__real_pqos_fopen(const char *name, const char *mode);
 
+/* files a case serves, each a path and then its text, up to a NULL path */
+static const char *const *served;
+
 FILE *
 __wrap_pqos_fopen(const char *name, const char *mode)
 {
         FILE *fd = tmpfile();
+        unsigned i;
 
         assert_non_null(fd);
+
+        for (i = 0; served != NULL && served[i] != NULL; i += 2)
+                if (strcmp(name, served[i]) == 0) {
+                        fprintf(fd, "%s", served[i + 1]);
+                        fseek(fd, 0, SEEK_SET);
+                        return fd;
+                }
 
         if (strcmp(name, "/sys/fs/resctrl/mon_groups/test/tasks") == 0) {
                 /* PID 1 assigned to "test" monitoring group */
@@ -1017,6 +1039,52 @@ test_resctrl_mon_assoc_restore_group_made_elsewhere(void **state
         assert_int_equal(purged, 0);
 }
 
+/* the purge removed the group's last directory, and while the restore looked
+ * something else made it again and put the core in it: the search finds the
+ * core in the group's own directory, and the mark is cleared there too
+ */
+static void
+test_resctrl_mon_assoc_restore_own_group_found_again(void **state
+                                                     __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        int purged = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+
+        /* the group's directory is not there at the first read */
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "test");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_ERROR);
+
+        /* and the search of the class's groups finds the core in it */
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS1/mon_groups/");
+        will_return(__wrap_scandir, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "test");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, 1);
+
+        ret = resctrl_mon_assoc_restore(lcore, "test", &purged);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(purged, 0);
+}
+
 /* the group's directories are gone, but not through the purge, as when
  * pqos_mon_reset() or a writer to resctrl removed them: the group is not made
  * again, and the restore fails, which it says once
@@ -1200,6 +1268,187 @@ test_resctrl_mon_assoc_restore_default_group_unreadable(void **state
         ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
         assert_int_equal(test_log_count_stop(), 1);
+}
+
+/* ======== resctrl_mon_poll ======== */
+
+static int
+poll_case_end(void **state __attribute__((unused)))
+{
+        served = NULL;
+        events_supported = 0;
+
+        return 0;
+}
+
+/* a lookup of \a lcore's class where there is no allocation class: in the
+ * default group's cpus if \a online
+ */
+static void
+expect_class_lookup(const unsigned lcore, const int online)
+{
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_value(__wrap_resctrl_alloc_cpumask_read, class_id, 0);
+        will_return(__wrap_resctrl_alloc_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+        will_return(__wrap_resctrl_cpumask_get, online);
+}
+
+/* the purge's check of whether another group is in pqos-g, whose cpus list
+ * \a held alone, or no core where \a held is none of \a cpu's
+ */
+static void
+expect_shared_check(const struct pqos_cpuinfo *cpu, const unsigned held)
+{
+        unsigned i;
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/pqos-g");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-g");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < cpu->num_cores; i++) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get,
+                            cpu->cores[i].lcore == held);
+        }
+}
+
+/* the directory pqos-g, looked for by the poll's read or by the purge */
+static void
+expect_group_directory(void)
+{
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/pqos-g");
+        will_return(__wrap_pqos_dir_exists, 1);
+}
+
+/* a group of core 2 alone, with no allocation class. The poll that finds the
+ * core offline reads the directory, which then lists no core, and the purge
+ * saves its count, removes it and marks the group. The poll after it, with
+ * the core back in the default class, makes the directory again from the
+ * mark and puts the core in it, and the group's count goes on from the one
+ * saved: its delta is the new directory's count, not a restart
+ */
+static void
+test_resctrl_mon_poll_core_offline_and_back(void **state
+                                            __attribute__((unused)))
+{
+        static const char *const offline[] = {
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
+            "mbm_total_bytes",
+            "5000\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list",
+            "\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/tasks",
+            "",
+            NULL};
+        static const char *const back[] = {
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
+            "mbm_total_bytes",
+            "100\n", "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list", "2\n",
+            NULL};
+        struct pqos_cap cap;
+        struct pqos_cpuinfo *cpu;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        unsigned l3id[] = {0};
+        unsigned i;
+
+        cpu = calloc(1, sizeof(*cpu) + 4 * sizeof(cpu->cores[0]));
+        assert_non_null(cpu);
+        cpu->num_cores = 4;
+        for (i = 0; i < cpu->num_cores; i++)
+                cpu->cores[i].lcore = i;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        group.values.mbm_total = 4000;
+        intl.resctrl.mon_group = strdup("pqos-g");
+        assert_non_null(intl.resctrl.mon_group);
+        intl.resctrl.l3id = l3id;
+        intl.resctrl.num_l3id = DIM(l3id);
+        intl.resctrl.valid_mbm_total = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+        will_return_maybe(__wrap__pqos_get_cpu, cpu);
+        events_supported = PQOS_MON_EVENT_TMEM_BW;
+
+        /* core 2 offline: nothing to restore, and the count read */
+        served = offline;
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_class_lookup(2, 0);
+        expect_group_directory();
+        /* the purge: no group in the directory but this one, which no core
+         * or task is in: the count saved, the directory removed
+         */
+        expect_shared_check(cpu, cpu->num_cores);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_group_directory();
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-g");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_OK);
+
+        assert_int_equal(resctrl_mon_poll(&group, PQOS_MON_EVENT_TMEM_BW),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(group.values.mbm_total, 5000);
+        assert_int_equal(group.values.mbm_total_delta, 1000);
+        assert_int_equal(intl.resctrl.values_storage.mbm_total, 5000);
+        assert_int_equal(intl.resctrl.purged, 1);
+
+        /* core 2 back in the default class, its group's directory gone and
+         * the core in no group: the directory is made again
+         */
+        served = back;
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_class_lookup(2, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-g");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_ERROR);
+        will_return(resctrl_mon_is_supported, 1);
+        expect_class_lookup(2, 1);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/mon_groups/");
+        will_return(__wrap_scandir, 0);
+        expect_class_lookup(2, 1);
+        expect_value(__wrap_resctrl_mon_mkdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_mkdir, name, "pqos-g");
+        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-g");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_set, lcore, 2);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group,
+                      "pqos-g");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+        expect_group_directory();
+        /* the purge: core 2 is in the directory, which is kept */
+        expect_shared_check(cpu, 2);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_group_directory();
+
+        assert_int_equal(resctrl_mon_poll(&group, PQOS_MON_EVENT_TMEM_BW),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(group.values.mbm_total, 5100);
+        assert_int_equal(group.values.mbm_total_delta, 100);
+        assert_int_equal(intl.resctrl.purged, 0);
+
+        free(intl.resctrl.mon_group);
+        free(cpu);
 }
 
 /* ======== resctrl_mon_count_delta ======== */
@@ -1470,6 +1719,10 @@ main(void)
                 test_resctrl_mon_assoc_restore_group_made_elsewhere),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_group_removed_elsewhere),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_own_group_found_again),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_poll_core_offline_and_back, poll_case_end),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_fails),

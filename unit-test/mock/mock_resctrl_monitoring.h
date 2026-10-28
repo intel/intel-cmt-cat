@@ -37,6 +37,9 @@
 
 int __wrap_resctrl_mon_start(struct pqos_mon_data *group);
 int __wrap_resctrl_mon_stop(struct pqos_mon_data *group);
+/* the group __wrap_resctrl_mon_unlist() was last given */
+extern const struct pqos_mon_data *mock_resctrl_mon_unlisted;
+void __wrap_resctrl_mon_unlist(const struct pqos_mon_data *group);
 int __wrap_resctrl_mon_is_event_supported(const enum pqos_mon_event event);
 int __wrap_resctrl_mon_init(const struct pqos_cpuinfo *cpu,
                             const struct pqos_cap *cap);

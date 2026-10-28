@@ -92,6 +92,17 @@ PQOS_LOCAL int resctrl_mon_start(struct pqos_mon_data *group);
 PQOS_LOCAL int resctrl_mon_stop(struct pqos_mon_data *group);
 
 /**
+ * @brief Takes core group \a group off the list of the groups started
+ *
+ * The stop does it too. For a stop that cannot reach resctrl_mon_stop(), as
+ * when the resctrl lock is not taken: pqos_mon_stop() frees the group anyway,
+ * which the list is not to go on counting as in its directory.
+ *
+ * @param [in] group the group, which is not read
+ */
+PQOS_LOCAL void resctrl_mon_unlist(const struct pqos_mon_data *group);
+
+/**
  * @brief This function polls all resctrl counters
  *
  * Reads counters for all events and stores values

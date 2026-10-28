@@ -1120,7 +1120,8 @@ mon_dir_elsewhere(const unsigned class_id, const char *name, int *elsewhere)
  * @param [in] name name of monitoring group
  * @param [in,out] purged whether the purge removed the group's last
  *                        directory, which the restore makes again; cleared
- *                        once the core is back in the group
+ *                        once the group has a directory in the core's class
+ *                        again, whoever made it
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
@@ -1163,8 +1164,14 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
 
         ret = resctrl_mon_assoc_get(lcore, buf, sizeof(buf));
         /* core already associated with mon group */
-        if (ret == PQOS_RETVAL_OK)
+        if (ret == PQOS_RETVAL_OK) {
+                /* its own, made again since the read above: the purge's mark
+                 * ends as it does there
+                 */
+                if (strcmp(buf, name) == 0)
+                        *purged = 0;
                 return PQOS_RETVAL_OK;
+        }
 
         /* the class again, which the search looked the core up in too: a
          * writer to resctrl, which the library's lock does not hold off, may
@@ -1436,6 +1443,12 @@ mon_started_remove(const struct pqos_mon_data *group)
                         mon_started[i] = mon_started[--mon_started_num];
                 else
                         i++;
+}
+
+void
+resctrl_mon_unlist(const struct pqos_mon_data *group)
+{
+        mon_started_remove(group);
 }
 
 /**
@@ -2277,9 +2290,11 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 }
 
         /*
-         * Remove cores from mon group
+         * Remove cores from mon group. A group the start could not name has
+         * no directory to take its cores out of: with no name, the paths
+         * below are the class's own, whose cores would be taken out of it
          */
-        if (group->num_cores > 0) {
+        if (group->num_cores > 0 && group->intl->resctrl.mon_group != NULL) {
                 const char *mon_group = group->intl->resctrl.mon_group;
                 char path[128];
                 unsigned clos = 0;
