@@ -130,6 +130,9 @@ struct resctrl_cpumask {
 /**
  * @brief Set lcore bit in cpu mask
  *
+ * A core of RESCTRL_MAX_CPUS or more, which the mask has no bit for, leaves
+ * it as it is.
+ *
  * @param [in] lcore Core number
  * @param [in] mask Modified cpu mask
  */
@@ -138,6 +141,9 @@ PQOS_LOCAL void resctrl_cpumask_set(const unsigned lcore,
 
 /**
  * @brief Unset lcore bit in cpu mask
+ *
+ * A core of RESCTRL_MAX_CPUS or more, which the mask has no bit for, leaves
+ * it as it is.
  *
  * @param [in] lcore Core number
  * @param [in] mask Modified cpu mask
@@ -153,7 +159,8 @@ PQOS_LOCAL void resctrl_cpumask_unset(const unsigned lcore,
  *
  * @return Returns 1 when bit corresponding to lcore is set in mask
  * @retval 1 if cpu bit is set in mask
- * @retval 0 if cpu bit is not set in mask
+ * @retval 0 if cpu bit is not set in mask, or lcore is RESCTRL_MAX_CPUS or
+ *         more, which the mask has no bit for
  */
 PQOS_LOCAL int resctrl_cpumask_get(const unsigned lcore,
                                    const struct resctrl_cpumask *mask);
@@ -178,6 +185,8 @@ PQOS_LOCAL int resctrl_cpumask_write(FILE *fd,
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if the file cannot be read, or holds a mask
+ *         longer than one of RESCTRL_MAX_CPUS
  */
 PQOS_LOCAL int resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask);
 

@@ -210,6 +210,10 @@ resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask)
         const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
         const unsigned bit = lcore % CHAR_BIT;
 
+        /* a core past the mask has no bit in it */
+        if (lcore >= RESCTRL_MAX_CPUS)
+                return;
+
         /* Set lcore bit in mask table item */
         mask->tab[item] = mask->tab[item] | (1 << bit);
 }
@@ -221,6 +225,10 @@ resctrl_cpumask_unset(const unsigned lcore, struct resctrl_cpumask *mask)
         const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
         const unsigned bit = lcore % CHAR_BIT;
 
+        /* a core past the mask has no bit in it */
+        if (lcore >= RESCTRL_MAX_CPUS)
+                return;
+
         /* Clear lcore bit in mask table item */
         mask->tab[item] &= ~(1 << bit);
 }
@@ -231,6 +239,10 @@ resctrl_cpumask_get(const unsigned lcore, const struct resctrl_cpumask *mask)
         /* index in mask table */
         const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
         const unsigned bit = lcore % CHAR_BIT;
+
+        /* a core past the mask has no bit in it */
+        if (lcore >= RESCTRL_MAX_CPUS)
+                return 0;
 
         /* Check if lcore bit is set in mask table item */
         return (mask->tab[item] >> bit) & 0x1;
@@ -273,12 +285,19 @@ resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * The characters of a cpus file whose mask has RESCTRL_MAX_CPUS bits: a hex
+ * digit for every 4 of them, a comma for every 32, and its newline
+ */
+#define RESCTRL_CPUMASK_CHARS (RESCTRL_MAX_CPUS / 4 + RESCTRL_MAX_CPUS / 32 + 1)
+
 int
 resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
 {
         int i, hex_offset, idx;
         size_t num_chars = 0;
-        char cpus[RESCTRL_MAX_CPUS / CHAR_BIT];
+        /* one more than such a file has, which tells a longer one */
+        char cpus[RESCTRL_CPUMASK_CHARS + 1];
 
         ASSERT(fd != NULL);
         ASSERT(mask != NULL);
@@ -293,7 +312,11 @@ resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
                 LOG_ERROR("Error reading CPU file\n");
                 return PQOS_RETVAL_ERROR;
         }
-        cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
+        if (num_chars == sizeof(cpus)) {
+                LOG_ERROR("CPU mask longer than one of %u CPUs\n",
+                          RESCTRL_MAX_CPUS);
+                return PQOS_RETVAL_ERROR;
+        }
 
         /**
          *  Convert the cpus array into hex, skip any non hex chars.
@@ -313,6 +336,11 @@ resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
                 else
                         continue;
 
+                if (idx < 0) {
+                        LOG_ERROR("CPU mask longer than one of %u CPUs\n",
+                                  RESCTRL_MAX_CPUS);
+                        return PQOS_RETVAL_ERROR;
+                }
                 if (!hex_offset)
                         mask->tab[idx] = (uint8_t)hex_num;
                 else {

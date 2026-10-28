@@ -232,6 +232,95 @@ test_resctrl_cpumask_read(void **state __attribute__((unused)))
         fclose(fd);
 }
 
+/* a mask of RESCTRL_MAX_CPUS, with its commas, is read whole: the first CPU
+ * and the last
+ */
+static void
+test_resctrl_cpumask_read_every_cpu(void **state __attribute__((unused)))
+{
+        struct resctrl_cpumask mask;
+        FILE *fd = tmpfile();
+        unsigned i;
+
+        assert_non_null(fd);
+        fprintf(fd, "80000000");
+        for (i = 1; i < RESCTRL_MAX_CPUS / 32 - 1; i++)
+                fprintf(fd, ",00000000");
+        fprintf(fd, ",00000001\n");
+        fseek(fd, 0, SEEK_SET);
+
+        assert_int_equal(resctrl_cpumask_read(fd, &mask), PQOS_RETVAL_OK);
+        for (i = 0; i < RESCTRL_MAX_CPUS; ++i)
+                assert_int_equal(resctrl_cpumask_get(i, &mask),
+                                 i == 0 || i == RESCTRL_MAX_CPUS - 1);
+        fclose(fd);
+}
+
+/* a mask longer than one of RESCTRL_MAX_CPUS is refused, with its commas or
+ * without them, rather than read in part
+ */
+static void
+test_resctrl_cpumask_read_longer_than_the_mask(void **state
+                                               __attribute__((unused)))
+{
+        struct resctrl_cpumask mask;
+        FILE *fd = tmpfile();
+        unsigned i;
+
+        assert_non_null(fd);
+        fprintf(fd, "1");
+        for (i = 0; i < RESCTRL_MAX_CPUS / 32; i++)
+                fprintf(fd, ",00000000");
+        fprintf(fd, "\n");
+        fseek(fd, 0, SEEK_SET);
+        assert_int_equal(resctrl_cpumask_read(fd, &mask), PQOS_RETVAL_ERROR);
+        fclose(fd);
+
+        fd = tmpfile();
+        assert_non_null(fd);
+        fprintf(fd, "1");
+        for (i = 0; i < RESCTRL_MAX_CPUS / 4; i++)
+                fprintf(fd, "0");
+        fprintf(fd, "\n");
+        fseek(fd, 0, SEEK_SET);
+        assert_int_equal(resctrl_cpumask_read(fd, &mask), PQOS_RETVAL_ERROR);
+        fclose(fd);
+
+        /* and a file longer than one of such a mask, which a read of that
+         * length would cut, whatever digits its start has
+         */
+        fd = tmpfile();
+        assert_non_null(fd);
+        for (i = 0; i < RESCTRL_MAX_CPUS / 32; i++)
+                fprintf(fd, "%s00000001", i == 0 ? "" : ",  ");
+        fprintf(fd, "\n");
+        fseek(fd, 0, SEEK_SET);
+        assert_int_equal(resctrl_cpumask_read(fd, &mask), PQOS_RETVAL_ERROR);
+        fclose(fd);
+}
+
+/* a core past the mask has no bit in it: it is not set, and setting it or
+ * unsetting it leaves the mask as it was
+ */
+static void
+test_resctrl_cpumask_core_past_the_mask(void **state __attribute__((unused)))
+{
+        struct resctrl_cpumask mask;
+        struct resctrl_cpumask copy;
+
+        memset(&mask, 0xff, sizeof(mask));
+        memcpy(&copy, &mask, sizeof(copy));
+
+        assert_int_equal(resctrl_cpumask_get(RESCTRL_MAX_CPUS, &mask), 0);
+        resctrl_cpumask_unset(RESCTRL_MAX_CPUS, &mask);
+        assert_memory_equal(&mask, &copy, sizeof(mask));
+
+        memset(&mask, 0, sizeof(mask));
+        memcpy(&copy, &mask, sizeof(copy));
+        resctrl_cpumask_set(RESCTRL_MAX_CPUS, &mask);
+        assert_memory_equal(&mask, &copy, sizeof(mask));
+}
+
 /* ======== resctrl_cpumask_write ======== */
 
 static void
@@ -301,6 +390,9 @@ main(void)
             cmocka_unit_test(test_resctrl_cpumask_set),
             cmocka_unit_test(test_resctrl_cpumask_unset),
             cmocka_unit_test(test_resctrl_cpumask_read),
+            cmocka_unit_test(test_resctrl_cpumask_read_every_cpu),
+            cmocka_unit_test(test_resctrl_cpumask_read_longer_than_the_mask),
+            cmocka_unit_test(test_resctrl_cpumask_core_past_the_mask),
             cmocka_unit_test(test_resctrl_cpumask_write),
             cmocka_unit_test(test_resctrl_cpumask_write_zero),
         };
