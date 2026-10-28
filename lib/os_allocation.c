@@ -568,14 +568,45 @@ os_alloc_reset_light_schematas_exit:
 #define RESET_TASKS_PASSES 10
 
 /**
+ * @brief Tells if each of \a count tasks is one of the \a num_kept tasks
+ *        that the pass before could not move
+ *
+ * @param [in] tasks tasks a read of the class lists
+ * @param [in] count number of \a tasks
+ * @param [in] kept tasks the pass before could not move
+ * @param [in] num_kept number of \a kept
+ *
+ * @return 1 if each is, 0 if not
+ */
+static int
+os_alloc_reset_only_kept(const unsigned *tasks,
+                         const unsigned count,
+                         const unsigned *kept,
+                         const unsigned num_kept)
+{
+        unsigned i;
+
+        for (i = 0; i < count; i++) {
+                unsigned j;
+
+                for (j = 0; j < num_kept && kept[j] != tasks[i]; j++)
+                        ;
+                if (j == num_kept)
+                        return 0;
+        }
+
+        return 1;
+}
+
+/**
  * @brief Moves the tasks of class \a class_id to CLOS0
  *
- * The class is read again after each pass that moved a task or found one gone,
- * before its write or at it, which may have forked into the class first; a
- * task gone is not listed again. A pass that does neither ends it: what that
- * pass listed cannot be moved, as a task that is exiting cannot on some
- * kernels, and is left as it is. A class still listing tasks after
- * RESET_TASKS_PASSES passes fails.
+ * The class is read again after each pass, as a task it moved, found gone or
+ * could not move may have forked into the class first. A task that cannot be
+ * moved, as one that is exiting cannot on some kernels, is left as it is, and
+ * a read that lists no task but those the pass before could not move ends the
+ * class. A class still listing other tasks after RESET_TASKS_PASSES passes
+ * fails.
  *
  * @param [in] class_id class whose tasks are moved
  *
@@ -587,11 +618,12 @@ os_alloc_reset_class_tasks(const unsigned class_id)
 {
         const int clos0 = 0;
         unsigned pass;
+        unsigned *kept = NULL;
+        unsigned num_kept = 0;
+        int ret = PQOS_RETVAL_OK;
 
         for (pass = 0;; pass++) {
                 unsigned count = 0;
-                unsigned moved = 0;
-                unsigned gone = 0;
                 unsigned i;
                 int alloc_result = PQOS_RETVAL_OK;
                 unsigned *tasks = os_pid_get_pid_assoc(class_id, &count);
@@ -599,20 +631,26 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                 if (tasks == NULL) {
                         LOG_ERROR("Failed to read the tasks of CLOS%u\n",
                                   class_id);
-                        return PQOS_RETVAL_ERROR;
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
                 }
-                if (count == 0) {
+                if (os_alloc_reset_only_kept(tasks, count, kept, num_kept)) {
                         free(tasks);
-                        return PQOS_RETVAL_OK;
+                        break;
                 }
                 if (pass == RESET_TASKS_PASSES) {
                         free(tasks);
                         LOG_ERROR("CLOS%u still lists tasks after %u passes "
                                   "of the reset\n",
                                   class_id, RESET_TASKS_PASSES);
-                        return PQOS_RETVAL_ERROR;
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
                 }
 
+                /* the tasks that this pass cannot move are kept in its list */
+                free(kept);
+                kept = tasks;
+                num_kept = 0;
                 for (i = 0; i < count; i++) {
                         const pid_t pid = (pid_t)tasks[i];
 
@@ -632,36 +670,41 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                           "skipping (benign race with "
                                           "short-lived process)\n",
                                           pid);
-                                gone++;
                                 continue;
                         }
                         alloc_result = os_alloc_assoc_set_pid(pid, clos0);
-                        if (alloc_result == PQOS_RETVAL_OK) {
-                                moved++;
-                        } else if (alloc_result == PQOS_RETVAL_PARAM) {
-                                LOG_DEBUG("Task %d no longer exists\n", pid);
-                                alloc_result = PQOS_RETVAL_OK;
-                                /* gone at the write, it may have forked into
-                                 * the class first, as one gone before it may;
-                                 * one that is still there could not be moved
+                        if (alloc_result == PQOS_RETVAL_PARAM) {
+                                /* gone at the write, or still there and not
+                                 * moved, as an exiting task is not on some
+                                 * kernels
                                  */
+                                alloc_result = PQOS_RETVAL_OK;
                                 if (resctrl_alloc_task_validate(pid) !=
-                                    PQOS_RETVAL_OK)
-                                        gone++;
-                        } else {
+                                    PQOS_RETVAL_OK) {
+                                        LOG_DEBUG("Task %d exited at its "
+                                                  "write\n",
+                                                  pid);
+                                } else {
+                                        LOG_DEBUG("Task %d could not be "
+                                                  "moved, left in CLOS%u\n",
+                                                  pid, class_id);
+                                        kept[num_kept++] = tasks[i];
+                                }
+                        } else if (alloc_result != PQOS_RETVAL_OK) {
                                 LOG_ERROR("Error allocating task %d to "
                                           "CLOS%u\n",
                                           pid, clos0);
                                 break;
                         }
                 }
-
-                free(tasks);
-                if (alloc_result != PQOS_RETVAL_OK)
-                        return alloc_result;
-                if (moved == 0 && gone == 0)
-                        return PQOS_RETVAL_OK;
+                if (alloc_result != PQOS_RETVAL_OK) {
+                        ret = alloc_result;
+                        break;
+                }
         }
+
+        free(kept);
+        return ret;
 }
 
 int

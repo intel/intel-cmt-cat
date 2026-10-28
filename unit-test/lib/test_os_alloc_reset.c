@@ -439,10 +439,20 @@ test_os_alloc_reset_tasks_gone_task_reads_class_again(void **state)
         assert_int_equal(test_log_count_stop(), 0);
 }
 
-/* a pass that moves no task and finds none gone ends its class: the task
- * listed is still there but cannot be moved, as an exiting one cannot on some
- * kernels (PARAM, and still there when looked at again), and the class is not
- * read again, so that the task cannot fail the reset
+/* task \a task written and not moved, and still there when looked at again,
+ * as an exiting task is on some kernels
+ */
+static void
+expect_task_not_moved(const pid_t task)
+{
+        expect_task_moved(task, 0, PQOS_RETVAL_PARAM);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, task);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+}
+
+/* a task that cannot be moved is left as it is: the class is read again, and
+ * a read that lists only it ends the class, so that the task cannot fail the
+ * reset
  */
 static void
 test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
@@ -454,9 +464,41 @@ test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
 
         expect_class_read(1, cos1, DIM(cos1));
-        expect_task_moved(11, 0, PQOS_RETVAL_PARAM);
-        expect_value(__wrap_resctrl_alloc_task_validate, task, 11);
-        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_task_not_moved(11);
+        expect_class_read(1, cos1, DIM(cos1));
+        expect_classes_empty(state, 2);
+
+        /* no message of the reset's own. resctrl_alloc_fclose() logs one for
+         * the ESRCH at the write, which the wrap of
+         * resctrl_alloc_assoc_set_pid() leaves out here (PSWD-20371)
+         */
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* the only task listed cannot be moved, as a zombie cannot on some kernels,
+ * after it forked a child into the class: the class is read again, the child,
+ * listed then, is moved, and the read after, which lists only the zombie, ends
+ * the class
+ */
+static void
+test_os_alloc_reset_tasks_unmovable_task_reads_class_again(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {11};
+        const unsigned read2[] = {11, 12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_class_read(1, read2, DIM(read2));
+        expect_task_not_moved(11);
+        expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, read1, DIM(read1));
         expect_classes_empty(state, 2);
 
         test_log_count_start();
@@ -484,6 +526,10 @@ test_os_alloc_reset_tasks_unreadable(void **state)
         expect_class_read(1, NULL, -1);
         expect_classes_empty(state, 2);
 
+        /* the reset's own message: what fails to read the file, such as
+         * resctrl_alloc_fopen(), or the lock, logs one of its own first, which
+         * the wraps leave out here
+         */
         test_log_count_start();
         ret = os_alloc_reset_tasks();
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
@@ -512,6 +558,9 @@ test_os_alloc_reset_tasks_move_fails(void **state)
         expect_task_moved(11, 0, PQOS_RETVAL_ERROR);
         expect_classes_empty(state, 2);
 
+        /* the reset's own message: the open, write or close that fails, or
+         * the lock, logs one of its own first, which the wraps leave out here
+         */
         test_log_count_start();
         ret = os_alloc_reset_tasks();
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
@@ -546,6 +595,8 @@ main(void)
                 test_os_alloc_reset_tasks_class_emptied_by_its_tenth_pass),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_unmovable_task_ends_class),
+            cmocka_unit_test(
+                test_os_alloc_reset_tasks_unmovable_task_reads_class_again),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
             cmocka_unit_test(test_os_alloc_reset_tasks_move_fails)};
 
