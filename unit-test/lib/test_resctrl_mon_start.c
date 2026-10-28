@@ -1629,6 +1629,61 @@ test_resctrl_mon_purge_marks_no_group_with_a_directory_left(void **state)
         core_group_free(&intl_a);
 }
 
+/* after a pqos_mon_reset(), the purge marks the group with the count of
+ * resets the restore then compares, so that the directory it removes is made
+ * again: the mark is 2 after one reset
+ */
+static void
+test_resctrl_mon_purge_after_a_reset_marks_its_count(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        /* the reset, which finds no group to remove */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        assert_int_equal(resctrl_mon_reset(), PQOS_RETVAL_OK);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < data->cpu->num_cores; ++i) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             data->cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get, 0);
+        }
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-a");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_purge(&a);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_a.resctrl.purged, 2);
+
+        core_group_free(&intl_a);
+}
+
 /* groups on cores 2 and 5 are in one directory, with no core in it, as when
  * both cores are offline: the purge of either leaves the directory, which
  * the other is in, and reads nothing
@@ -1725,6 +1780,9 @@ main(void)
                 mon_groups_unlist),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_purge_marks_no_group_with_a_directory_left,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_after_a_reset_marks_its_count,
                 mon_groups_unlist),
         };
 

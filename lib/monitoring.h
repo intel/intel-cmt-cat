@@ -135,8 +135,10 @@ struct pqos_mon_data_internal {
                                                             another CLOS */
                 unsigned *l3id;    /**< list of l3ids being monitored */
                 unsigned num_l3id; /**< Number of l3ids */
-                int purged; /**< the purge removed the group's last directory,
-                               which the restore makes again */
+                int purged; /**< 0, or one more than the monitoring resets
+                               made when the purge removed the group's last
+                               directory, which the restore makes again only
+                               while no reset has followed */
 
                 /* AET telemetry state */
                 struct pqos_tel_slot tel[PQOS_TEL_NUM_SLOTS];

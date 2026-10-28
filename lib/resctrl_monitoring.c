@@ -76,6 +76,13 @@ static unsigned mon_started_num = 0;
 static unsigned mon_started_size = 0;
 
 /**
+ * The monitoring resets this process has made. The purge's mark carries the
+ * count it was made at, plus one, and the restore makes a group's directory
+ * again from it only while no reset has followed: the reset removed the group
+ */
+static int mon_resets = 0;
+
+/**
  * @brief Filter directory filenames
  *
  * This function is used by the scandir function
@@ -245,6 +252,7 @@ resctrl_mon_fini(void)
         mon_started = NULL;
         mon_started_num = 0;
         mon_started_size = 0;
+        mon_resets = 0;
 
         return PQOS_RETVAL_OK;
 }
@@ -1118,10 +1126,11 @@ mon_dir_elsewhere(const unsigned class_id, const char *name, int *elsewhere)
  *
  * @param [in] lcore CPU logical core id
  * @param [in] name name of monitoring group
- * @param [in,out] purged whether the purge removed the group's last
- *                        directory, which the restore makes again; cleared
- *                        once the group has a directory in the core's class
- *                        again, whoever made it
+ * @param [in,out] purged the purge's mark that it removed the group's last
+ *                        directory, which the restore makes again while no
+ *                        reset has followed: the count of resets plus one, or
+ *                        0. Cleared once the group has a directory in the
+ *                        core's class again, whoever made it
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
@@ -1198,7 +1207,7 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
         ret = resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        if (!*purged && !pqos_dir_exists(buf)) {
+        if (*purged != mon_resets + 1 && !pqos_dir_exists(buf)) {
                 int elsewhere;
 
                 ret = mon_dir_elsewhere(class_id, name, &elsewhere);
@@ -2504,7 +2513,7 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         } while (++clos < max_clos);
 
         if (removed > 0 && kept == 0)
-                group->intl->resctrl.purged = 1;
+                group->intl->resctrl.purged = mon_resets + 1;
 
         return ret;
 }
@@ -2716,6 +2725,11 @@ resctrl_mon_reset(void)
 
         if (!resctrl_mon_is_supported())
                 return PQOS_RETVAL_RESOURCE;
+
+        /* a group the purge marked before this reset is not made again after
+         * it: the reset removes the group
+         */
+        mon_resets++;
 
         ret = resctrl_alloc_get_grps_num(cap, &grps);
         if (ret != PQOS_RETVAL_OK)

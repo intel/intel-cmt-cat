@@ -1085,6 +1085,55 @@ test_resctrl_mon_assoc_restore_own_group_found_again(void **state
         assert_int_equal(purged, 0);
 }
 
+/* the resets a case made forgotten, as a new session starts with none */
+static int
+resets_forgotten(void **state __attribute__((unused)))
+{
+        return resctrl_mon_fini();
+}
+
+/* the purge removed the group's last directory, and a pqos_mon_reset() came
+ * after it: the mark is from before the reset, which removed the group, so
+ * the directory is not made again when the core is back, and the restore
+ * fails, which it says once
+ */
+static void
+test_resctrl_mon_assoc_restore_group_reset_since_purge(void **state
+                                                       __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        int purged = 1;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        /* the reset, which finds no group left to remove */
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/mon_groups/");
+        will_return(__wrap_scandir, 0);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS1/mon_groups/");
+        will_return(__wrap_scandir, 0);
+        assert_int_equal(resctrl_mon_reset(), PQOS_RETVAL_OK);
+
+        expect_restore_to_missing_directory(lcore);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 0);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/COS1/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 0);
+
+        test_log_count_start();
+        ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(test_log_count_stop(), 1);
+}
+
 /* the group's directories are gone, but not through the purge, as when
  * pqos_mon_reset() or a writer to resctrl removed them: the group is not made
  * again, and the restore fails, which it says once
@@ -1809,6 +1858,9 @@ main(void)
                 test_resctrl_mon_assoc_restore_group_made_elsewhere),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_group_removed_elsewhere),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_assoc_restore_group_reset_since_purge,
+                resets_forgotten),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_own_group_found_again),
             cmocka_unit_test_teardown(
