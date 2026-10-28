@@ -603,10 +603,12 @@ os_alloc_reset_only_kept(const unsigned *tasks,
  *
  * The class is read again after each pass, as a task it moved, found gone or
  * could not move may have forked into the class first. A task that cannot be
- * moved, as one that is exiting cannot on some kernels, is left as it is, and
- * a read that lists no task but those the pass before could not move ends the
- * class. A class still listing other tasks after RESET_TASKS_PASSES passes
- * fails.
+ * moved, as one that is exiting cannot on some kernels, is left as it is: a
+ * read that lists no task but those the pass before could not move has them
+ * written once more, and if none of them moves then either, that ends the
+ * class. The write, rather than the TID, tells that a task is still the one
+ * that could not be moved, and not a task that has its TID since. A class
+ * still listing other tasks after RESET_TASKS_PASSES passes fails.
  *
  * @param [in] class_id class whose tasks are moved
  *
@@ -625,6 +627,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
         for (pass = 0;; pass++) {
                 unsigned count = 0;
                 unsigned i;
+                int only_kept;
                 int alloc_result = PQOS_RETVAL_OK;
                 unsigned *tasks = os_pid_get_pid_assoc(class_id, &count);
 
@@ -634,7 +637,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         ret = PQOS_RETVAL_ERROR;
                         break;
                 }
-                if (os_alloc_reset_only_kept(tasks, count, kept, num_kept)) {
+                if (count == 0) {
                         free(tasks);
                         break;
                 }
@@ -646,6 +649,9 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         ret = PQOS_RETVAL_ERROR;
                         break;
                 }
+
+                only_kept =
+                    os_alloc_reset_only_kept(tasks, count, kept, num_kept);
 
                 /* the tasks that this pass cannot move are kept in its list */
                 free(kept);
@@ -701,6 +707,9 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         ret = alloc_result;
                         break;
                 }
+                /* none of them moved, again */
+                if (only_kept && num_kept == count)
+                        break;
         }
 
         free(kept);

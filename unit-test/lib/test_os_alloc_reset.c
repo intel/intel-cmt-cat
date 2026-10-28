@@ -170,6 +170,22 @@ expect_task_moved(const pid_t task, const int monitored, const int ret)
 }
 
 /* the classes from \a first on, read and found to list no task */
+static void expect_classes_empty(void **state, const unsigned first);
+
+/* class 2, after one that fails, listing task 21, which is moved all the
+ * same, and the classes after it listing none
+ */
+static void
+expect_class_2_reset(void **state)
+{
+        static const unsigned cos2[] = {21};
+
+        expect_class_read(2, cos2, DIM(cos2));
+        expect_task_moved(21, 0, PQOS_RETVAL_OK);
+        expect_class_read(2, NULL, 0);
+        expect_classes_empty(state, 3);
+}
+
 static void
 expect_classes_empty(void **state, const unsigned first)
 {
@@ -315,7 +331,7 @@ test_os_alloc_reset_tasks_class_never_empty(void **state)
                 expect_task_moved((pid_t)forked[i], 0, PQOS_RETVAL_OK);
         }
         expect_class_read(1, &forked[10], 1);
-        expect_classes_empty(state, 2);
+        expect_class_2_reset(state);
 
         test_log_count_start();
         ret = os_alloc_reset_tasks();
@@ -450,9 +466,9 @@ expect_task_not_moved(const pid_t task)
         will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
 }
 
-/* a task that cannot be moved is left as it is: the class is read again, and
- * a read that lists only it ends the class, so that the task cannot fail the
- * reset
+/* a task that cannot be moved is left as it is: the class is read again, the
+ * read lists only it, and its write fails again, which ends the class, so
+ * that the task cannot fail the reset
  */
 static void
 test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
@@ -466,6 +482,7 @@ test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
         expect_class_read(1, cos1, DIM(cos1));
         expect_task_not_moved(11);
         expect_class_read(1, cos1, DIM(cos1));
+        expect_task_not_moved(11);
         expect_classes_empty(state, 2);
 
         /* no message of the reset's own. resctrl_alloc_fclose() logs one for
@@ -480,15 +497,15 @@ test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
 
 /* the only task listed cannot be moved, as a zombie cannot on some kernels,
  * after it forked a child into the class: the class is read again, the child,
- * listed then, is moved, and the read after, which lists only the zombie, ends
- * the class
+ * listed then and first, is moved, and the read after lists only the zombie,
+ * whose write fails again, which ends the class
  */
 static void
 test_os_alloc_reset_tasks_unmovable_task_reads_class_again(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         const unsigned read1[] = {11};
-        const unsigned read2[] = {11, 12};
+        const unsigned read2[] = {12, 11};
         int ret;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
@@ -496,9 +513,36 @@ test_os_alloc_reset_tasks_unmovable_task_reads_class_again(void **state)
         expect_class_read(1, read1, DIM(read1));
         expect_task_not_moved(11);
         expect_class_read(1, read2, DIM(read2));
-        expect_task_not_moved(11);
         expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_task_not_moved(11);
         expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* the task listed could not be moved, and is reaped; the next read lists a
+ * task that has its TID since, a live one forked into the class, which the
+ * write moves: the class is read again, and lists none
+ */
+static void
+test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned cos1[] = {11};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, cos1, DIM(cos1));
+        expect_task_not_moved(11);
+        expect_class_read(1, cos1, DIM(cos1));
+        expect_task_moved(11, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, NULL, 0);
         expect_classes_empty(state, 2);
 
         test_log_count_start();
@@ -524,7 +568,7 @@ test_os_alloc_reset_tasks_unreadable(void **state)
         assert_true(grps >= 3);
 
         expect_class_read(1, NULL, -1);
-        expect_classes_empty(state, 2);
+        expect_class_2_reset(state);
 
         /* the reset's own message: what fails to read the file, such as
          * resctrl_alloc_fopen(), or the lock, logs one of its own first, which
@@ -556,7 +600,7 @@ test_os_alloc_reset_tasks_move_fails(void **state)
 
         expect_class_read(1, cos1, DIM(cos1));
         expect_task_moved(11, 0, PQOS_RETVAL_ERROR);
-        expect_classes_empty(state, 2);
+        expect_class_2_reset(state);
 
         /* the reset's own message: the open, write or close that fails, or
          * the lock, logs one of its own first, which the wraps leave out here
@@ -597,6 +641,8 @@ main(void)
                 test_os_alloc_reset_tasks_unmovable_task_ends_class),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_unmovable_task_reads_class_again),
+            cmocka_unit_test(
+                test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
             cmocka_unit_test(test_os_alloc_reset_tasks_move_fails)};
 
