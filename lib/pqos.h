@@ -3101,7 +3101,10 @@ int pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_PARAM on NULL arguments or unsupported event
- * @retval PQOS_RETVAL_RESOURCE when no valid reading is available yet
+ * @retval PQOS_RETVAL_RESOURCE when no valid reading is available yet, or,
+ *         for PQOS_MON_EVENT_POWER, when the energy total fell since the
+ *         previous poll, as when the group's directory was removed or made
+ *         again
  */
 int pqos_mon_get_tel_value(const struct pqos_mon_data *group,
                            const enum pqos_mon_event event,

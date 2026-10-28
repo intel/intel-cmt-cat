@@ -1223,6 +1223,17 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
         if (alloc_assoc_get(lcore, &class_id) == PQOS_RETVAL_RESOURCE)
                 return PQOS_RETVAL_OK;
 
+        /* the kernel refuses the whole mask written for any CPU in it that is
+         * offline, or no longer in the class: another core of the directory
+         * may have gone since the add read the mask. The add reads it again,
+         * once, and that read lists no such core
+         */
+        ret = mon_assoc_add(class_id, lcore, name);
+        if (ret == PQOS_RETVAL_OK) {
+                *purged = 0;
+                return PQOS_RETVAL_OK;
+        }
+
         LOG_ERROR("Could not assign core %u to resctrl monitoring group\n",
                   lcore);
         return ret;

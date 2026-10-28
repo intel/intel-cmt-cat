@@ -1162,6 +1162,23 @@ expect_restore_to_add(const unsigned lcore)
         expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group, "own");
 }
 
+/* the add the restore makes once more after a failed one, which reads the
+ * directory's mask again, up to its write
+ */
+static void
+expect_add_again(const unsigned lcore)
+{
+        expect_value(__wrap_resctrl_mon_mkdir, class_id, 1);
+        expect_string(__wrap_resctrl_mon_mkdir, name, "own");
+        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_set, lcore, lcore);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 1);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group, "own");
+}
+
 /* the core goes offline after the restore's last lookup: the kernel refuses
  * it in the cpus file, and the core is in no class when looked up again.
  * Nothing to restore, and nothing said
@@ -1190,8 +1207,38 @@ test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write(
         assert_int_equal(test_log_count_stop(), 0);
 }
 
-/* the write fails with the core still in its class: the restore fails, and
- * says so once
+/* the write fails with the core still in its class, as when another core of
+ * the directory's mask went offline since the read: the add, made once more,
+ * reads the mask again and succeeds, without a word
+ */
+static void
+test_resctrl_mon_assoc_restore_add_retried(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        int purged = 0;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        expect_restore_to_add(lcore);
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_add_again(lcore);
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_OK);
+
+        test_log_count_start();
+        ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* the write fails with the core still in its class, and fails again when the
+ * add is made once more: the restore fails, and says so once
  */
 static void
 test_resctrl_mon_assoc_restore_add_fails(void **state __attribute__((unused)))
@@ -1210,6 +1257,8 @@ test_resctrl_mon_assoc_restore_add_fails(void **state __attribute__((unused)))
         expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
         will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_add_again(lcore);
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
 
         test_log_count_start();
         ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
@@ -1725,6 +1774,7 @@ main(void)
                 test_resctrl_mon_poll_core_offline_and_back, poll_case_end),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write),
+            cmocka_unit_test(test_resctrl_mon_assoc_restore_add_retried),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_fails),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_offline_without_classes),
