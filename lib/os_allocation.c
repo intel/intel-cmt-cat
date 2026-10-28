@@ -561,20 +561,21 @@ os_alloc_reset_light_schematas_exit:
 
 /*
  * The passes over a class's tasks an allocation reset makes. A member of the
- * class forks into it until the member is moved, so the class is read again
- * after a pass that moved a task: a pass that moves the members leaves at most
- * what they forked meanwhile, and the next pass moves that
+ * class forks into it until it is moved or has gone, so the class is read
+ * again after a pass that moved a task or found one gone: such a pass leaves
+ * at most what the members forked meanwhile, and the next pass moves that
  */
 #define RESET_TASKS_PASSES 10
 
 /**
  * @brief Moves the tasks of class \a class_id to CLOS0
  *
- * The class is read again after each pass that moved a task. A pass that
- * moves none ends it: what that pass listed has gone, or cannot be moved, as
- * a task that is exiting cannot on some kernels, and is left as it is. A class
- * still listing tasks after RESET_TASKS_PASSES passes that each moved some
- * fails.
+ * The class is read again after each pass that moved a task or found one gone
+ * before its write, which may have forked into the class first; a task gone
+ * is not listed again. A pass that does neither ends it: what that pass
+ * listed cannot be moved, as a task that is exiting cannot on some kernels,
+ * and is left as it is. A class still listing tasks after RESET_TASKS_PASSES
+ * passes fails.
  *
  * @param [in] class_id class whose tasks are moved
  *
@@ -590,6 +591,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
         for (pass = 0;; pass++) {
                 unsigned count = 0;
                 unsigned moved = 0;
+                unsigned gone = 0;
                 unsigned i;
                 int alloc_result = PQOS_RETVAL_OK;
                 unsigned *tasks = os_pid_get_pid_assoc(class_id, &count);
@@ -630,6 +632,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                           "skipping (benign race with "
                                           "short-lived process)\n",
                                           pid);
+                                gone++;
                                 continue;
                         }
                         alloc_result = os_alloc_assoc_set_pid(pid, clos0);
@@ -649,7 +652,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                 free(tasks);
                 if (alloc_result != PQOS_RETVAL_OK)
                         return alloc_result;
-                if (moved == 0)
+                if (moved == 0 && gone == 0)
                         return PQOS_RETVAL_OK;
         }
 }

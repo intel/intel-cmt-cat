@@ -230,7 +230,8 @@ test_os_alloc_reset_tasks_none(void **state)
 
 /* a task that has exited since the read is skipped, before it is written or
  * after, and the reset goes on. The one gone at the write is the class's last,
- * so that its PARAM, if not cleared, would end the reset before class 2
+ * so that its PARAM, if not cleared, would end class 1 before its second read
+ * and fail the reset
  */
 static void
 test_os_alloc_reset_tasks_exited(void **state)
@@ -297,10 +298,15 @@ test_os_alloc_reset_tasks_class_never_empty(void **state)
         struct test_data *data = (struct test_data *)*state;
         static const unsigned forked[] = {11, 12, 13, 14, 15, 16,
                                           17, 18, 19, 20, 21};
+        unsigned grps;
         unsigned i;
         int ret;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        assert_int_equal(resctrl_alloc_get_grps_num(data->cap, &grps),
+                         PQOS_RETVAL_OK);
+        /* a class after the one that fails, which the reset still reads */
+        assert_true(grps >= 3);
 
         for (i = 0; i < 10; i++) {
                 expect_class_read(1, &forked[i], 1);
@@ -347,6 +353,34 @@ test_os_alloc_reset_tasks_passes_count_per_class(void **state)
         assert_int_equal(test_log_count_stop(), 0);
 }
 
+/* the only task listed has gone before its write, after it forked a child
+ * into the class: the class is read again, and the child, listed then, is
+ * moved
+ */
+static void
+test_os_alloc_reset_tasks_gone_task_reads_class_again(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {11};
+        const unsigned read2[] = {12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, read1, DIM(read1));
+        expect_value(__wrap_resctrl_alloc_task_validate, task, 11);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_ERROR);
+        expect_class_read(1, read2, DIM(read2));
+        expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, NULL, 0);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
 /* a pass that moves no task ends its class: the task listed is still there
  * but cannot be moved, as an exiting one cannot on some kernels (PARAM), and
  * the class is not read again, so that the task cannot fail the reset
@@ -377,9 +411,14 @@ static void
 test_os_alloc_reset_tasks_unreadable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        unsigned grps;
         int ret;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        assert_int_equal(resctrl_alloc_get_grps_num(data->cap, &grps),
+                         PQOS_RETVAL_OK);
+        /* a class after the one that fails, which the reset still reads */
+        assert_true(grps >= 3);
 
         expect_class_read(1, NULL, -1);
         expect_classes_empty(state, 2);
@@ -398,9 +437,14 @@ test_os_alloc_reset_tasks_move_fails(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         const unsigned cos1[] = {11, 12};
+        unsigned grps;
         int ret;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        assert_int_equal(resctrl_alloc_get_grps_num(data->cap, &grps),
+                         PQOS_RETVAL_OK);
+        /* a class after the one that fails, which the reset still reads */
+        assert_true(grps >= 3);
 
         expect_class_read(1, cos1, DIM(cos1));
         expect_task_moved(11, 0, PQOS_RETVAL_ERROR);
@@ -432,6 +476,8 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_tasks_forked_since_read),
             cmocka_unit_test(test_os_alloc_reset_tasks_class_never_empty),
             cmocka_unit_test(test_os_alloc_reset_tasks_passes_count_per_class),
+            cmocka_unit_test(
+                test_os_alloc_reset_tasks_gone_task_reads_class_again),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_unmovable_task_ends_class),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
