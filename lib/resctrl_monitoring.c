@@ -1132,6 +1132,7 @@ PQOS_STATIC int
 resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
 {
         int ret;
+        unsigned attempt;
         char buf[RESCTRL_MON_GROUP_NAME_SIZE];
         unsigned class_id = 0;
         struct resctrl_cpumask mask;
@@ -1211,27 +1212,21 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
                 }
         }
 
-        ret = mon_assoc_add(class_id, lcore, name);
-        if (ret == PQOS_RETVAL_OK) {
-                *purged = 0;
-                return PQOS_RETVAL_OK;
-        }
-
-        /* a core that went offline since the lookup is refused by the
-         * kernel's cpus file, and is in no class now: nothing to restore
-         */
-        if (alloc_assoc_get(lcore, &class_id) == PQOS_RETVAL_RESOURCE)
-                return PQOS_RETVAL_OK;
-
         /* the kernel refuses the whole mask written for any CPU in it that is
-         * offline, or no longer in the class: another core of the directory
-         * may have gone since the add read the mask. The add reads it again,
-         * once, and that read lists no such core
+         * offline, or no longer in the class. After a failed add, a core that
+         * went offline itself since its lookup is in no class: nothing to
+         * restore. Otherwise another core of the directory may have gone
+         * since the add read the mask, and the add is made once more, which
+         * reads the mask again and lists no such core
          */
-        ret = mon_assoc_add(class_id, lcore, name);
-        if (ret == PQOS_RETVAL_OK) {
-                *purged = 0;
-                return PQOS_RETVAL_OK;
+        for (attempt = 0; attempt < 2; attempt++) {
+                ret = mon_assoc_add(class_id, lcore, name);
+                if (ret == PQOS_RETVAL_OK) {
+                        *purged = 0;
+                        return PQOS_RETVAL_OK;
+                }
+                if (alloc_assoc_get(lcore, &class_id) == PQOS_RETVAL_RESOURCE)
+                        return PQOS_RETVAL_OK;
         }
 
         LOG_ERROR("Could not assign core %u to resctrl monitoring group\n",

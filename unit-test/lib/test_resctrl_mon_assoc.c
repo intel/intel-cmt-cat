@@ -1237,8 +1237,44 @@ test_resctrl_mon_assoc_restore_add_retried(void **state __attribute__((unused)))
         assert_int_equal(test_log_count_stop(), 0);
 }
 
+/* the write fails with the core still in its class, and the core goes
+ * offline before the add made once more: the second write is refused, and
+ * the core is in no class then. Nothing to restore, and nothing said
+ */
+static void
+test_resctrl_mon_assoc_restore_gone_offline_at_second_write(
+    void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        int purged = 0;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        expect_restore_to_add(lcore);
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_add_again(lcore);
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_RESOURCE);
+
+        test_log_count_start();
+        ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
 /* the write fails with the core still in its class, and fails again when the
- * add is made once more: the restore fails, and says so once
+ * add is made once more, the core still in its class: the restore fails, and
+ * says so once
  */
 static void
 test_resctrl_mon_assoc_restore_add_fails(void **state __attribute__((unused)))
@@ -1259,6 +1295,11 @@ test_resctrl_mon_assoc_restore_add_fails(void **state __attribute__((unused)))
         will_return(__wrap_resctrl_alloc_assoc_get, 1);
         expect_add_again(lcore);
         will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
 
         test_log_count_start();
         ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
@@ -1775,6 +1816,8 @@ main(void)
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_retried),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_gone_offline_at_second_write),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_fails),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_offline_without_classes),
