@@ -560,10 +560,11 @@ os_alloc_reset_light_schematas_exit:
 }
 
 /*
- * The passes over a class's tasks an allocation reset makes. A member of the
- * class forks into it until it is moved or has gone, so the class is read
- * again after a pass that moved a task or found one gone: such a pass leaves
- * at most what the members forked meanwhile, and the next pass moves that
+ * The passes an allocation reset makes over a class whose reads list tasks
+ * other than those the pass before could not move. A member of the class
+ * forks into it until it is moved or has gone, so the class is read again
+ * after every pass; see os_alloc_reset_class_tasks(), which also writes the
+ * tasks the last of these passes could not move once more, a pass past them
  */
 #define RESET_TASKS_PASSES 10
 
@@ -608,7 +609,9 @@ os_alloc_reset_only_kept(const unsigned *tasks,
  * written once more, and if none of them moves then either, that ends the
  * class. The write, rather than the TID, tells that a task is still the one
  * that could not be moved, and not a task that has its TID since. A class
- * still listing other tasks after RESET_TASKS_PASSES passes fails.
+ * still listing other tasks after RESET_TASKS_PASSES passes fails. Tasks the
+ * last of those passes could not move get their one more write, and a class
+ * that lists any task after that fails too.
  *
  * @param [in] class_id class whose tasks are moved
  *
@@ -641,7 +644,14 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         free(tasks);
                         break;
                 }
-                if (pass == RESET_TASKS_PASSES) {
+                only_kept =
+                    os_alloc_reset_only_kept(tasks, count, kept, num_kept);
+                /* the limit is for a read that lists other tasks: one that
+                 * lists only those the last pass could not move has them
+                 * written once more, the one pass past it
+                 */
+                if ((pass >= RESET_TASKS_PASSES && !only_kept) ||
+                    pass > RESET_TASKS_PASSES) {
                         free(tasks);
                         LOG_ERROR("CLOS%u still lists tasks after %u passes "
                                   "of the reset\n",
@@ -649,9 +659,6 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                         ret = PQOS_RETVAL_ERROR;
                         break;
                 }
-
-                only_kept =
-                    os_alloc_reset_only_kept(tasks, count, kept, num_kept);
 
                 /* the tasks that this pass cannot move are kept in its list */
                 free(kept);
