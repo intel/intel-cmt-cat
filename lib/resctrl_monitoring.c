@@ -2411,6 +2411,53 @@ resctrl_mon_count_delta(const uint64_t old_value,
 }
 
 /**
+ * @brief Saves the telemetry totals of \a group's directory in class
+ *        \a class_id, which the purge is about to remove
+ *
+ * The poll's totals go on from what is saved, as they do from the MBM counts
+ * saved, so that a directory removed while its cores are offline, and made
+ * again when they are back, does not make CORE_ENERGY or ACTIVITY start again
+ *
+ * @param [in,out] group monitoring structure
+ * @param [in] class_id class of the directory
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_tel_save(struct pqos_mon_data *group, const unsigned class_id)
+{
+        static const struct {
+                enum pqos_mon_event event;
+                const char *file;
+                int slot;
+        } tel[] = {
+            {PQOS_MON_EVENT_CORE_ENERGY, "core_energy",
+             PQOS_TEL_SLOT_CORE_ENERGY},
+            {PQOS_MON_EVENT_ACTIVITY, "activity", PQOS_TEL_SLOT_ACTIVITY},
+        };
+        unsigned i;
+
+        for (i = 0; i < DIM(tel); i++) {
+                double value;
+                int ret;
+
+                if (!(group->intl->resctrl.event & tel[i].event))
+                        continue;
+
+                ret = resctrl_mon_read_tel_pkgs(
+                    class_id, group->intl->resctrl.mon_group, tel[i].file,
+                    group->intl->resctrl.pkgids,
+                    group->intl->resctrl.num_pkgids, &value);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                group->intl->resctrl.tel[tel[i].slot].saved += value;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief This function removes all empty monitoring
  *        groups associated with \a group
  *
@@ -2499,6 +2546,11 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                                 return ret;
                         /* UNAVAILABLE: skip saving partial/stale MBM data */
                 }
+
+                /* and the telemetry totals, as for the MBM counts */
+                ret = resctrl_mon_tel_save(group, clos);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
 
                 ret = resctrl_mon_rmdir(clos, name);
                 if (ret != PQOS_RETVAL_OK) {
@@ -2599,7 +2651,8 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
 
                 group->intl->resctrl.tel[slot].previous =
                     group->intl->resctrl.tel[slot].current;
-                group->intl->resctrl.tel[slot].current = total;
+                group->intl->resctrl.tel[slot].current =
+                    total + group->intl->resctrl.tel[slot].saved;
                 group->intl->resctrl.tel[slot].valid = 1;
 
                 if (event == PQOS_MON_EVENT_CORE_ENERGY) {

@@ -1590,6 +1590,106 @@ test_resctrl_mon_poll_core_offline_and_back(void **state
         free(cpu);
 }
 
+/* a CORE_ENERGY group of core 2 alone, with no allocation class, polled with
+ * the core offline: the first poll reads the directory's energy, and the purge
+ * saves it and removes the directory; the second finds no directory, and the
+ * total goes on from what was saved instead of falling to 0
+ */
+static void
+test_resctrl_mon_poll_energy_goes_on_after_the_purge(void **state
+                                                     __attribute__((unused)))
+{
+        static const char *const files[] = {
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_PERF_PKG_00/"
+            "core_energy",
+            "12.5\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/cpus_list",
+            "\n",
+            "/sys/fs/resctrl/mon_groups/pqos-g/tasks",
+            "",
+            NULL};
+        struct pqos_cap cap;
+        struct pqos_cpuinfo *cpu;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        unsigned pkgids[] = {0};
+        unsigned i;
+        const int slot = PQOS_TEL_SLOT_CORE_ENERGY;
+
+        cpu = calloc(1, sizeof(*cpu) + 4 * sizeof(cpu->cores[0]));
+        assert_non_null(cpu);
+        cpu->num_cores = 4;
+        for (i = 0; i < cpu->num_cores; i++)
+                cpu->cores[i].lcore = i;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_CORE_ENERGY;
+        intl.resctrl.event = PQOS_MON_EVENT_CORE_ENERGY;
+        intl.resctrl.mon_group = strdup("pqos-g");
+        assert_non_null(intl.resctrl.mon_group);
+        intl.resctrl.pkgids = pkgids;
+        intl.resctrl.num_pkgids = DIM(pkgids);
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+        will_return_maybe(__wrap__pqos_get_cpu, cpu);
+        events_supported = PQOS_MON_EVENT_CORE_ENERGY;
+        served = files;
+
+        /* core 2 offline, its directory still there: read, then purged */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_class_lookup(2, 0);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_group_directory();
+        expect_shared_check(cpu, cpu->num_cores);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_group_directory();
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-g");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_OK);
+
+        assert_int_equal(resctrl_mon_poll(&group, PQOS_MON_EVENT_CORE_ENERGY),
+                         PQOS_RETVAL_OK);
+        assert_true(intl.resctrl.tel[slot].current == 12.5);
+        assert_true(intl.resctrl.tel[slot].saved == 12.5);
+        assert_int_equal(intl.resctrl.purged, 1);
+
+        /* core 2 still offline, the directory gone */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_class_lookup(2, 0);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/pqos-g");
+        will_return(__wrap_pqos_dir_exists, 0);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/pqos-g");
+        will_return(__wrap_pqos_dir_exists, 0);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/pqos-g");
+        will_return(__wrap_pqos_dir_exists, 0);
+
+        assert_int_equal(resctrl_mon_poll(&group, PQOS_MON_EVENT_CORE_ENERGY),
+                         PQOS_RETVAL_OK);
+        assert_true(intl.resctrl.tel[slot].current == 12.5);
+        assert_true(intl.resctrl.tel[slot].previous == 12.5);
+
+        free(intl.resctrl.mon_group);
+        free(cpu);
+}
+
 /* ======== resctrl_mon_count_delta ======== */
 
 /* a first reading is the baseline, and growth is the delta */
@@ -1865,6 +1965,9 @@ main(void)
                 test_resctrl_mon_assoc_restore_own_group_found_again),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_poll_core_offline_and_back, poll_case_end),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_poll_energy_goes_on_after_the_purge,
+                poll_case_end),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_retried),

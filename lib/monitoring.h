@@ -91,6 +91,8 @@ struct pqos_tel_slot {
         double current;  /**< current value */
         double previous; /**< previous value */
         int valid;       /**< 1 if current is valid for display */
+        double saved;    /**< what the purge saved of the directories it
+                            removed, which current goes on from */
 };
 
 struct pqos_mon_data_internal {
