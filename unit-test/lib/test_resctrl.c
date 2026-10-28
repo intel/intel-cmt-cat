@@ -286,6 +286,19 @@ test_resctrl_cpumask_read_longer_than_the_mask(void **state
         assert_int_equal(resctrl_cpumask_read(fd, &mask), PQOS_RETVAL_ERROR);
         fclose(fd);
 
+        /* a file one character longer than a whole mask's, whose extra
+         * character, a comma at its end, is not a digit
+         */
+        fd = tmpfile();
+        assert_non_null(fd);
+        fprintf(fd, "80000000");
+        for (i = 1; i < RESCTRL_MAX_CPUS / 32; i++)
+                fprintf(fd, ",00000000");
+        fprintf(fd, ",\n");
+        fseek(fd, 0, SEEK_SET);
+        assert_int_equal(resctrl_cpumask_read(fd, &mask), PQOS_RETVAL_ERROR);
+        fclose(fd);
+
         /* and a file longer than one of such a mask, which a read of that
          * length would cut, whatever digits its start has
          */

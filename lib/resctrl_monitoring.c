@@ -2500,8 +2500,13 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         ret = resctrl_mon_shared(group, &shared);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        if (shared)
+        if (shared) {
+                /* a directory of the group that another group, or a core not
+                 * the group's, is in: in use, which ends the mark as below
+                 */
+                group->intl->resctrl.purged = 0;
                 return PQOS_RETVAL_OK;
+        }
 
         ret = resctrl_alloc_get_grps_num(cap, &max_clos);
         if (ret != PQOS_RETVAL_OK)

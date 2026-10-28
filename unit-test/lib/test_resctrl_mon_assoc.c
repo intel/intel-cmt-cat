@@ -589,8 +589,24 @@ test_resctrl_mon_assoc_set_error(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+/* the last message logged at the default verbosity, and how many there were,
+ * for a case that checks what a message says
+ */
+static char last_message[256];
+static unsigned messages;
+
+static void
+message_keep(void *context, const size_t size, const char *message)
+{
+        (void)context;
+        (void)size;
+        messages++;
+        snprintf(last_message, sizeof(last_message), "%s", message);
+}
+
 /* a core in no class, as an offline one is, cannot be put in a group, which
- * is said once: no group is made
+ * the assoc set says once, and says as such: the lookup leaves the saying to
+ * it, where it logged a failed lookup before. No group is made
  */
 static void
 test_resctrl_mon_assoc_set_core_in_no_class(void **state
@@ -608,10 +624,14 @@ test_resctrl_mon_assoc_set_core_in_no_class(void **state
         expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
         will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_RESOURCE);
 
-        test_log_count_start();
+        messages = 0;
+        last_message[0] = '\0';
+        (void)log_init(-1, message_keep, NULL, LOG_VER_DEFAULT);
         ret = resctrl_mon_assoc_set(lcore, "test");
+        test_log_init_silent();
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-        assert_int_equal(test_log_count_stop(), 1);
+        assert_int_equal(messages, 1);
+        assert_non_null(strstr(last_message, "it is in no class"));
 }
 
 /* ======== resctrl_mon_assoc_restore ======== */
@@ -1963,6 +1983,65 @@ test_resctrl_mon_poll_directory_in_use_ends_the_mark(void **state
         free(cpu);
 }
 
+/* the group above, whose directory another writer has made again with a
+ * core that is not the group's in it: the purge finds the directory shared,
+ * keeps it, and ends the mark too
+ */
+static void
+test_resctrl_mon_poll_directory_shared_ends_the_mark(void **state
+                                                     __attribute__((unused)))
+{
+        static const char *const files[] = {
+            "/sys/fs/resctrl/mon_groups/pqos-g/mon_data/mon_L3_00/"
+            "mbm_total_bytes",
+            "100\n", NULL};
+        struct pqos_cap cap;
+        struct pqos_cpuinfo *cpu;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {2};
+        unsigned l3id[] = {0};
+        unsigned i;
+
+        cpu = calloc(1, sizeof(*cpu) + 4 * sizeof(cpu->cores[0]));
+        assert_non_null(cpu);
+        cpu->num_cores = 4;
+        for (i = 0; i < cpu->num_cores; i++)
+                cpu->cores[i].lcore = i;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        intl.resctrl.mon_group = strdup("pqos-g");
+        assert_non_null(intl.resctrl.mon_group);
+        intl.resctrl.l3id = l3id;
+        intl.resctrl.num_l3id = DIM(l3id);
+        intl.resctrl.purged = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+        will_return_maybe(__wrap__pqos_get_cpu, cpu);
+        events_supported = PQOS_MON_EVENT_TMEM_BW;
+        served = files;
+
+        /* core 2 offline: nothing to restore, and the count read */
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_class_lookup(2, 0);
+        expect_group_directory();
+        /* the purge: core 3, not the group's, is in the directory */
+        expect_shared_check(cpu, 3);
+
+        assert_int_equal(resctrl_mon_poll(&group, PQOS_MON_EVENT_TMEM_BW),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(intl.resctrl.purged, 0);
+
+        free(intl.resctrl.mon_group);
+        free(cpu);
+}
+
 /* ======== resctrl_mon_count_delta ======== */
 
 /* a first reading is the baseline, and growth is the delta */
@@ -2249,6 +2328,9 @@ main(void)
                 poll_case_end),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_poll_directory_in_use_ends_the_mark,
+                poll_case_end),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_poll_directory_shared_ends_the_mark,
                 poll_case_end),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_gone_offline_at_the_write),

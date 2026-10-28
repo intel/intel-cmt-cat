@@ -287,9 +287,10 @@ resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
 
 /**
  * The characters of a cpus file whose mask has RESCTRL_MAX_CPUS bits: a hex
- * digit for every 4 of them, a comma for every 32, and its newline
+ * digit for every 4 of them, a comma between each 32 of them and the next,
+ * and its newline
  */
-#define RESCTRL_CPUMASK_CHARS (RESCTRL_MAX_CPUS / 4 + RESCTRL_MAX_CPUS / 32 + 1)
+#define RESCTRL_CPUMASK_CHARS (RESCTRL_MAX_CPUS / 4 + RESCTRL_MAX_CPUS / 32)
 
 int
 resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
