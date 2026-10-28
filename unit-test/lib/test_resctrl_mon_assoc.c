@@ -798,9 +798,6 @@ test_resctrl_mon_assoc_restore_core_moved_out(void **state
         expect_string(__wrap_pqos_dir_exists, path,
                       "/sys/fs/resctrl/COS1/mon_groups/own");
         will_return(__wrap_pqos_dir_exists, 1);
-        expect_value(__wrap_resctrl_mon_mkdir, class_id, 1);
-        expect_string(__wrap_resctrl_mon_mkdir, name, "own");
-        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
         expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
         expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
         will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
@@ -1220,9 +1217,6 @@ expect_restore_to_add(const unsigned lcore)
         expect_string(__wrap_pqos_dir_exists, path,
                       "/sys/fs/resctrl/COS1/mon_groups/own");
         will_return(__wrap_pqos_dir_exists, 1);
-        expect_value(__wrap_resctrl_mon_mkdir, class_id, 1);
-        expect_string(__wrap_resctrl_mon_mkdir, name, "own");
-        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
         expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
         expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
         will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
@@ -1231,15 +1225,16 @@ expect_restore_to_add(const unsigned lcore)
         expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group, "own");
 }
 
-/* the add the restore makes once more after a failed one, which reads the
- * directory's mask again, up to its write
+/* the add the restore makes once more after a failed one, which asks again
+ * whether it may, the directory still there, and reads the directory's mask
+ * again, up to its write
  */
 static void
 expect_add_again(const unsigned lcore)
 {
-        expect_value(__wrap_resctrl_mon_mkdir, class_id, 1);
-        expect_string(__wrap_resctrl_mon_mkdir, name, "own");
-        will_return(__wrap_resctrl_mon_mkdir, PQOS_RETVAL_OK);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/COS1/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 1);
         expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 1);
         expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "own");
         will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
@@ -1339,6 +1334,45 @@ test_resctrl_mon_assoc_restore_gone_offline_at_second_write(
         ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* the write fails because another writer removed the group's directory
+ * after the restore found it there: the add made once more asks again, finds
+ * the directory gone, with no mark of the purge's and none in another class,
+ * and fails the poll, as for a directory removed before, rather than make it
+ * again
+ */
+static void
+test_resctrl_mon_assoc_restore_dir_removed_before_second_add(
+    void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned lcore = 1;
+        int purged = 0;
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        expect_restore_to_add(lcore);
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/COS1/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 0);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      "/sys/fs/resctrl/mon_groups/own");
+        will_return(__wrap_pqos_dir_exists, 0);
+
+        test_log_count_start();
+        ret = resctrl_mon_assoc_restore(lcore, "own", &purged);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(test_log_count_stop(), 1);
 }
 
 /* the write fails with the core still in its class, and fails again when the
@@ -2071,6 +2105,23 @@ test_resctrl_mon_count_delta_fall_starts_again(void **state
         assert_int_equal(resctrl_mon_count_delta(100, 400, &valid), 300);
 }
 
+/* a sum of counts past 2^64 wraps: a fall from near the top of the range to
+ * near 0 is its growth, not a count started again
+ */
+static void
+test_resctrl_mon_count_delta_wraps_past_2_64(void **state
+                                             __attribute__((unused)))
+{
+        int valid = 1;
+
+        assert_int_equal(resctrl_mon_count_delta(UINT64_MAX - 100, 149, &valid),
+                         250);
+        assert_int_equal(valid, 1);
+        /* from below the top quarter, a fall is a count started again */
+        assert_int_equal(resctrl_mon_count_delta(UINT64_MAX / 2, 149, &valid),
+                         0);
+}
+
 /* ======== resctrl_mon_assoc_get_pid ======== */
 
 static void
@@ -2337,6 +2388,8 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_retried),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_gone_offline_at_second_write),
+            cmocka_unit_test(
+                test_resctrl_mon_assoc_restore_dir_removed_before_second_add),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_add_fails),
             cmocka_unit_test(
                 test_resctrl_mon_assoc_restore_core_offline_without_classes),
@@ -2344,6 +2397,7 @@ main(void)
                 test_resctrl_mon_assoc_restore_default_group_unreadable),
             cmocka_unit_test(test_resctrl_mon_count_delta_grows),
             cmocka_unit_test(test_resctrl_mon_count_delta_fall_starts_again),
+            cmocka_unit_test(test_resctrl_mon_count_delta_wraps_past_2_64),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_no_alloc),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_unassigned),

@@ -1030,24 +1030,31 @@ resctrl_mon_assoc_get_exit:
 
 /**
  * @brief Puts \a lcore in monitoring group \a name of class \a class_id,
- *        making the group's directory there if it has none
+ *        making the group's directory there first if \a make says so
  *
  * @param [in] class_id class of service the core is in
  * @param [in] lcore core to put in the group
  * @param [in] name name of the monitoring group
+ * @param [in] make 1 to make the directory where it is not there, 0 to fail
+ *                  then: the directory is not to be made
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-mon_assoc_add(const unsigned class_id, const unsigned lcore, const char *name)
+mon_assoc_add(const unsigned class_id,
+              const unsigned lcore,
+              const char *name,
+              const int make)
 {
         int ret;
         struct resctrl_cpumask cpumask;
 
-        ret = resctrl_mon_mkdir(class_id, name);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+        if (make) {
+                ret = resctrl_mon_mkdir(class_id, name);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
 
         ret = resctrl_mon_cpumask_read(class_id, name, &cpumask);
         if (ret != PQOS_RETVAL_OK)
@@ -1077,7 +1084,7 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        ret = mon_assoc_add(class_id, lcore, name);
+        ret = mon_assoc_add(class_id, lcore, name, 1);
         if (ret != PQOS_RETVAL_OK)
                 LOG_ERROR("Could not assign core %u to resctrl monitoring "
                           "group\n",
@@ -1124,6 +1131,63 @@ mon_dir_elsewhere(const unsigned class_id, const char *name, int *elsewhere)
                         *elsewhere = 1;
                         break;
                 }
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Tells if the restore may put a core in group \a name's directory in
+ *        class \a class_id, and if it is to make the directory first
+ *
+ * The directory there is used. One that is not there is made if the purge
+ * removed the group's last, as it does once a core gone offline has left the
+ * directory empty: the core comes back online in the default class, and the
+ * purge saved the counts of what it removed. One is made too if the group
+ * still has a directory in another class, as when a writer to resctrl moved
+ * the core. Directories removed by anything else, as by a pqos_mon_reset() or
+ * another writer, are not made again: the group has gone, and the poll fails.
+ *
+ * @param [in] class_id class the core is in
+ * @param [in] name name of the group
+ * @param [in] purged the group's purge mark
+ * @param [out] make 1 if the directory is to be made, 0 if it is there
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK if the core may be put there
+ * @retval PQOS_RETVAL_RESOURCE if the directory has gone and is not made
+ *         again, which is said
+ */
+static int
+mon_restore_may_add(const unsigned class_id,
+                    const char *name,
+                    const int purged,
+                    int *make)
+{
+        char buf[RESCTRL_MON_GROUP_NAME_SIZE];
+        int elsewhere;
+        int ret;
+
+        *make = 1;
+        if (purged == mon_resets + 1)
+                return PQOS_RETVAL_OK;
+
+        ret = resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (pqos_dir_exists(buf)) {
+                *make = 0;
+                return PQOS_RETVAL_OK;
+        }
+
+        ret = mon_dir_elsewhere(class_id, name, &elsewhere);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (!elsewhere) {
+                LOG_WARN("Could not restore core association with mon group "
+                         "%s does not exists\n",
+                         buf);
+                return PQOS_RETVAL_RESOURCE;
         }
 
         return PQOS_RETVAL_OK;
@@ -1201,42 +1265,22 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        /* put back in the group. Where the group has no directory in that
-         * class, one is made if the purge removed the group's last, as it
-         * does once a core gone offline has left the directory empty: the
-         * core comes back online in the default class. The purge saved the
-         * counts of what it removed, and the group's count goes on from them.
-         * One is made too if the group still has a directory in another
-         * class, as when a writer to resctrl moved the core. Directories
-         * removed by anything else, as by a pqos_mon_reset(), are not made
-         * again: the group has gone, and the poll fails
-         */
-        ret = resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-        if (*purged != mon_resets + 1 && !pqos_dir_exists(buf)) {
-                int elsewhere;
-
-                ret = mon_dir_elsewhere(class_id, name, &elsewhere);
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-                if (!elsewhere) {
-                        LOG_WARN("Could not restore core association with mon "
-                                 "group %s does not exists\n",
-                                 buf);
-                        return PQOS_RETVAL_RESOURCE;
-                }
-        }
-
-        /* the kernel refuses the whole mask written for any CPU in it that is
-         * offline, or no longer in the class. After a failed add, a core that
-         * went offline itself since its lookup is in no class: nothing to
-         * restore. Otherwise another core of the directory may have gone
-         * since the add read the mask, and the add is made once more, which
-         * reads the mask again and lists no such core
+        /* put back in the group, where the restore may put it, which is asked
+         * before each add: another writer may have removed the directory
+         * since. The kernel refuses the whole mask written for any CPU in it
+         * that is offline, or no longer in the class. After a failed add, a
+         * core that went offline itself since its lookup is in no class:
+         * nothing to restore. Otherwise another core of the directory may
+         * have gone since the add read the mask, and the add is made once
+         * more, which reads the mask again and lists no such core
          */
         for (attempt = 0; attempt < 2; attempt++) {
-                ret = mon_assoc_add(class_id, lcore, name);
+                int make;
+
+                ret = mon_restore_may_add(class_id, name, *purged, &make);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                ret = mon_assoc_add(class_id, lcore, name, make);
                 if (ret == PQOS_RETVAL_OK) {
                         *purged = 0;
                         return PQOS_RETVAL_OK;
@@ -2395,7 +2439,9 @@ resctrl_mon_stop_exit:
  * outside the library, or one the purge removed while the kernel gave its
  * counts as Unavailable or Unassigned. The count has then started again, and
  * the reading starts again from it too, rather than the fall being taken for
- * a wrap.
+ * a wrap. The sum itself wraps past 2^64, though, from near the top of the
+ * range to near 0: a fall from its top quarter to its bottom quarter is taken
+ * for that, as no count that has started again fell from so high.
  *
  * @param [in] old_value the previous reading
  * @param [in] new_value this reading
@@ -2404,7 +2450,7 @@ resctrl_mon_stop_exit:
  *                       after a valid one
  *
  * @return the growth: 0 for the first valid reading, for the first after an
- *         unavailable one, and for one that fell
+ *         unavailable one, and for one that fell other than by a wrap
  */
 PQOS_STATIC uint64_t
 resctrl_mon_count_delta(const uint64_t old_value,
@@ -2412,6 +2458,9 @@ resctrl_mon_count_delta(const uint64_t old_value,
                         int *valid)
 {
         if (*valid && new_value >= old_value)
+                return new_value - old_value;
+        if (*valid && old_value > UINT64_MAX - (UINT64_MAX >> 2) &&
+            new_value < (UINT64_MAX >> 2))
                 return new_value - old_value;
 
         *valid = 1;
@@ -2493,6 +2542,7 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         unsigned shared;
         unsigned kept = 0;
         unsigned removed = 0;
+        unsigned gone = 0;
         const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(group != NULL);
@@ -2537,6 +2587,11 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                         return ret;
 
                 if (!empty) {
+                        /* in use, as one another writer has made again: the
+                         * group has a directory, which ends the mark at once,
+                         * whatever fails after
+                         */
+                        group->intl->resctrl.purged = 0;
                         kept++;
                         continue;
                 }
@@ -2577,8 +2632,10 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 if (ret == PQOS_RETVAL_RESOURCE) {
                         /* gone before the purge removed it, which another
                          * writer did: neither its counts nor the mark are
-                         * the purge's
+                         * the purge's, and a mark the group had goes
                          */
+                        group->intl->resctrl.purged = 0;
+                        gone++;
                         ret = PQOS_RETVAL_OK;
                         continue;
                 }
@@ -2599,12 +2656,8 @@ resctrl_mon_purge(struct pqos_mon_data *group)
 
         } while (++clos < max_clos);
 
-        /* a directory of the group in use, as one another writer made again
-         * would be, ends the mark as the restore's finding one does
-         */
-        if (kept > 0)
-                group->intl->resctrl.purged = 0;
-        else if (removed > 0)
+        /* the purge removed each directory of the group it found itself */
+        if (removed > 0 && kept == 0 && gone == 0)
                 group->intl->resctrl.purged = mon_resets + 1;
 
         return ret;
@@ -2888,6 +2941,15 @@ resctrl_mon_active(unsigned *monitoring_status)
 
         if (!resctrl_mon_is_supported()) {
                 *monitoring_status = 0;
+                return PQOS_RETVAL_OK;
+        }
+
+        /* a core group this process has started is active whether or not it
+         * has a directory: the purge removes the last of a group whose cores
+         * are offline, and the restore makes it again
+         */
+        if (mon_started_num > 0) {
+                *monitoring_status = 1;
                 return PQOS_RETVAL_OK;
         }
 

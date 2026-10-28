@@ -223,6 +223,38 @@ __wrap_pqos_fopen(const char *name, const char *mode)
              .mode = "r",
              .text = "5\n",
              .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-c/cpus_list",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-c/tasks",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-c/cpus_list",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-c/tasks",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-d/cpus_list",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/mon_groups/pqos-d/tasks",
+             .mode = "r",
+             .text = "4321\n",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-d/cpus_list",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
+            {.path = RESCTRL_PATH "/COS1/mon_groups/pqos-d/tasks",
+             .mode = "r",
+             .text = "",
+             .plain_close = 1},
             {.path = RESCTRL_PATH "/mon_groups/pqos-split/tasks",
              .mode = "r",
              .text = "",
@@ -1798,6 +1830,152 @@ test_resctrl_mon_purge_of_a_directory_already_gone(void **state)
         core_group_free(&intl_a);
 }
 
+/* the purge's look at a group's directories in classes 0 and 1, which no
+ * other group or core is in, for the group of \a cpu named \a name
+ */
+static void
+expect_purge_shared_check_two_classes(const struct pqos_cpuinfo *cpu,
+                                      const char *path0,
+                                      const char *path1,
+                                      const char *name)
+{
+        unsigned clos;
+        unsigned i;
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        for (clos = 0; clos < 2; clos++) {
+                expect_string(__wrap_pqos_dir_exists, path,
+                              clos == 0 ? path0 : path1);
+                will_return(__wrap_pqos_dir_exists, 1);
+                expect_value(__wrap_resctrl_mon_cpumask_read, class_id, clos);
+                expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group,
+                              name);
+                will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+                for (i = 0; i < cpu->num_cores; ++i) {
+                        expect_value(__wrap_resctrl_cpumask_get, lcore,
+                                     cpu->cores[i].lcore);
+                        will_return(__wrap_resctrl_cpumask_get, 0);
+                }
+        }
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+}
+
+/* a group with empty directories in classes 0 and 1: the purge removes class
+ * 0's, and finds class 1's gone at its removal, which another writer did, so
+ * that the group's last directory was not the purge's to remove: no mark
+ */
+static void
+test_resctrl_mon_purge_of_last_dir_another_writer_removed(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data c;
+        struct pqos_mon_data_internal intl_c;
+        unsigned cores_c[] = {2};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        core_group(&c, &intl_c, cores_c, DIM(cores_c));
+        intl_c.resctrl.mon_group = strdup("pqos-c");
+        assert_non_null(intl_c.resctrl.mon_group);
+
+        expect_purge_shared_check_two_classes(
+            data->cpu, RESCTRL_PATH "/mon_groups/pqos-c",
+            RESCTRL_PATH "/COS1/mon_groups/pqos-c", "pqos-c");
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-c");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-c");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_OK);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/COS1/mon_groups/pqos-c");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 1);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-c");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_RESOURCE);
+
+        ret = resctrl_mon_purge(&c);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(intl_c.resctrl.purged, 0);
+
+        core_group_free(&intl_c);
+}
+
+/* a marked group whose class 0 directory another writer has made again with
+ * a task in it: the purge keeps it, which ends the mark at once, so that the
+ * failure of class 1's removal after it leaves no mark either
+ */
+static void
+test_resctrl_mon_purge_ends_the_mark_before_a_later_failure(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data d;
+        struct pqos_mon_data_internal intl_d;
+        unsigned cores_d[] = {2};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        core_group(&d, &intl_d, cores_d, DIM(cores_d));
+        intl_d.resctrl.mon_group = strdup("pqos-d");
+        assert_non_null(intl_d.resctrl.mon_group);
+        intl_d.resctrl.purged = 1;
+
+        expect_purge_shared_check_two_classes(
+            data->cpu, RESCTRL_PATH "/mon_groups/pqos-d",
+            RESCTRL_PATH "/COS1/mon_groups/pqos-d", "pqos-d");
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-d");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/COS1/mon_groups/pqos-d");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 1);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-d");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_ERROR);
+
+        ret = resctrl_mon_purge(&d);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(intl_d.resctrl.purged, 0);
+
+        core_group_free(&intl_d);
+}
+
+/* a core group started, whose directory the purge has removed: monitoring is
+ * active all the same, so that an allocation reset that would remount
+ * resctrl is refused, as one with the directory there is
+ */
+static void
+test_resctrl_mon_active_with_a_started_group_without_directory(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        unsigned status = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+
+        assert_int_equal(resctrl_mon_active(&status), PQOS_RETVAL_OK);
+        assert_int_equal(status, 1);
+
+        core_group_free(&intl_a);
+}
+
 /* a reset that fails before it removes anything, at the read of mon_groups,
  * leaves the marks as they were: a purge after it marks the group with the
  * count of no reset
@@ -2089,6 +2267,15 @@ main(void)
                 mon_groups_unlist),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_purge_of_a_directory_already_gone,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_of_last_dir_another_writer_removed,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_purge_ends_the_mark_before_a_later_failure,
+                mon_groups_unlist),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_active_with_a_started_group_without_directory,
                 mon_groups_unlist),
             cmocka_unit_test_teardown(
                 test_resctrl_mon_reset_that_fails_first_leaves_the_marks,
