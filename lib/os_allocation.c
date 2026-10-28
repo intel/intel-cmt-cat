@@ -562,36 +562,36 @@ os_alloc_reset_light_schematas_exit:
 /*
  * The passes over a class's tasks an allocation reset makes. A member of the
  * class forks into it until the member is moved, so the class is read again
- * until it lists no task: a pass that moves the members leaves at most what
- * they forked meanwhile, and the next pass moves that
+ * after a pass that moved a task: a pass that moves the members leaves at most
+ * what they forked meanwhile, and the next pass moves that
  */
 #define RESET_TASKS_PASSES 10
 
-int
-os_alloc_reset_tasks(void)
+/**
+ * @brief Moves the tasks of class \a class_id to CLOS0
+ *
+ * The class is read again after each pass that moved a task. A pass that
+ * moves none ends it: what that pass listed has gone, or cannot be moved, as
+ * a task that is exiting cannot on some kernels, and is left as it is. A class
+ * still listing tasks after RESET_TASKS_PASSES passes that each moved some
+ * fails.
+ *
+ * @param [in] class_id class whose tasks are moved
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+os_alloc_reset_class_tasks(const unsigned class_id)
 {
-        unsigned grps;
-        unsigned class_id;
-        unsigned passes = 0;
-        int alloc_result;
         const int clos0 = 0;
-        const struct pqos_cap *cap = _pqos_get_cap();
+        unsigned pass;
 
-        LOG_INFO("OS alloc reset - tasks\n");
-
-        alloc_result = resctrl_alloc_get_grps_num(cap, &grps);
-        if (alloc_result != PQOS_RETVAL_OK)
-                return alloc_result;
-
-        /*
-         * Only the tasks of the other classes are moved: those of the default
-         * class, nearly every task on the system, are where the reset puts
-         * them. A class's tasks file lists each thread, which is moved on its
-         * own. A class is done once a read of it lists no task.
-         */
-        for (class_id = 1; class_id < grps;) {
+        for (pass = 0;; pass++) {
                 unsigned count = 0;
+                unsigned moved = 0;
                 unsigned i;
+                int alloc_result = PQOS_RETVAL_OK;
                 unsigned *tasks = os_pid_get_pid_assoc(class_id, &count);
 
                 if (tasks == NULL) {
@@ -601,11 +601,9 @@ os_alloc_reset_tasks(void)
                 }
                 if (count == 0) {
                         free(tasks);
-                        class_id++;
-                        passes = 0;
-                        continue;
+                        return PQOS_RETVAL_OK;
                 }
-                if (++passes > RESET_TASKS_PASSES) {
+                if (pass == RESET_TASKS_PASSES) {
                         free(tasks);
                         LOG_ERROR("CLOS%u still lists tasks after %u passes "
                                   "of the reset\n",
@@ -635,10 +633,12 @@ os_alloc_reset_tasks(void)
                                 continue;
                         }
                         alloc_result = os_alloc_assoc_set_pid(pid, clos0);
-                        if (alloc_result == PQOS_RETVAL_PARAM) {
+                        if (alloc_result == PQOS_RETVAL_OK) {
+                                moved++;
+                        } else if (alloc_result == PQOS_RETVAL_PARAM) {
                                 LOG_DEBUG("Task %d no longer exists\n", pid);
                                 alloc_result = PQOS_RETVAL_OK;
-                        } else if (alloc_result != PQOS_RETVAL_OK) {
+                        } else {
                                 LOG_ERROR("Error allocating task %d to "
                                           "CLOS%u\n",
                                           pid, clos0);
@@ -649,9 +649,40 @@ os_alloc_reset_tasks(void)
                 free(tasks);
                 if (alloc_result != PQOS_RETVAL_OK)
                         return alloc_result;
+                if (moved == 0)
+                        return PQOS_RETVAL_OK;
+        }
+}
+
+int
+os_alloc_reset_tasks(void)
+{
+        unsigned grps;
+        unsigned class_id;
+        int ret;
+        const struct pqos_cap *cap = _pqos_get_cap();
+
+        LOG_INFO("OS alloc reset - tasks\n");
+
+        ret = resctrl_alloc_get_grps_num(cap, &grps);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /*
+         * Only the tasks of the other classes are moved: those of the default
+         * class, nearly every task on the system, are where the reset puts
+         * them. A class's tasks file lists each thread, which is moved on its
+         * own. A class that fails does not stop the reset of those after it:
+         * the reset fails once it has been through them all.
+         */
+        for (class_id = 1; class_id < grps; class_id++) {
+                const int class_result = os_alloc_reset_class_tasks(class_id);
+
+                if (class_result != PQOS_RETVAL_OK && ret == PQOS_RETVAL_OK)
+                        ret = class_result;
         }
 
-        return PQOS_RETVAL_OK;
+        return ret;
 }
 
 /**
