@@ -2393,6 +2393,14 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 return -1;
         }
 
+        /* a stop asked for during the starts: the groups started are stopped
+         * as at the end of a run, the loop not running, and those not tried
+         * are no processes that ended, which the check below would take
+         * the top-pids ones for
+         */
+        if (__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED))
+                return 0;
+
         if (sel_mon_top_pids && drop_ended_top_pids() == 0) {
                 printf("Every top-pids process ended before its monitoring "
                        "could start\n");

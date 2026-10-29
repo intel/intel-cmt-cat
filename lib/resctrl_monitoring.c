@@ -906,39 +906,29 @@ resctrl_mon_empty(const unsigned class_id,
 }
 
 /**
- * The mkdir of a monitoring group takes an RMID. The kernel keeps the RMID of
- * a removed group in limbo until the occupancy counted against it falls under
- * max_threshold_occupancy, and looks at the RMIDs in limbo once a second; while
- * every free RMID is there, the mkdir fails with EBUSY. It is tried this many
- * times, with a wait this long between two tries, before the group is said to
- * be busy: 29 waits, 2.9 s, in which the kernel looks at its limbo two or three
- * times. A start a few RMIDs short gets through; on an idle board the last of
- * many can take tens of seconds, which a start does not wait. The waits are
- * made with the resctrl lock given back, so that other processes, which wait
- * 100 ms for it, are not held off
- */
-#define RESCTRL_MON_MKDIR_TRIES   30
-#define RESCTRL_MON_MKDIR_WAIT_NS 100000000L
-
-/**
  * @brief Create monitoring group directory if not exists
+ *
+ * The mkdir takes an RMID. The kernel keeps the RMID of a removed group in
+ * limbo until the occupancy counted against it falls under
+ * max_threshold_occupancy, and while every free RMID is there the mkdir fails
+ * with EBUSY. That is not tried again here, under the resctrl lock: what the
+ * caller found before the mkdir would not hold after a wait.
+ * os_mon_start_cores() tries the whole start again instead, and says the
+ * failure if it persists, as the other callers of a start do
  *
  * @param [in] class_id CLOS id
  * @param[in] name mon group name
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
- * @retval PQOS_RETVAL_BUSY every free RMID is still in the kernel's limbo
- *         after RESCTRL_MON_MKDIR_TRIES tries
+ * @retval PQOS_RETVAL_BUSY every free RMID is in the kernel's limbo (EBUSY)
  * @retval PQOS_RETVAL_RESOURCE no RMID is left (ENOSPC)
- * @retval PQOS_RETVAL_ERROR any other failure, the resctrl lock not taken
- *         again after a wait among them, which leaves it not held
+ * @retval PQOS_RETVAL_ERROR any other failure
  */
 PQOS_STATIC int
 resctrl_mon_mkdir(const unsigned class_id, const char *name)
 {
         char path[128];
-        unsigned tries;
         int err;
 
         ASSERT(name != NULL);
@@ -947,34 +937,15 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
             PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        for (tries = 1;; tries++) {
-                if (mkdir(path, 0755) != -1 || errno == EEXIST)
-                        return PQOS_RETVAL_OK;
-                err = errno;
-                if (err != EBUSY || tries == RESCTRL_MON_MKDIR_TRIES)
-                        break;
-                if (tries == 1)
-                        LOG_DEBUG("No free RMID for resctrl monitoring group "
-                                  "%s but in the kernel's limbo: trying "
-                                  "again\n",
-                                  path);
-                if (resctrl_lock_yield(RESCTRL_MON_MKDIR_WAIT_NS) !=
-                    PQOS_RETVAL_OK) {
-                        LOG_ERROR("Failed to create resctrl monitoring group "
-                                  "%s: the resctrl lock could not be taken "
-                                  "again after a wait for an RMID\n",
-                                  path);
-                        return PQOS_RETVAL_ERROR;
-                }
-        }
+        if (mkdir(path, 0755) != -1 || errno == EEXIST)
+                return PQOS_RETVAL_OK;
+        err = errno;
 
         if (err == EBUSY) {
-                LOG_ERROR("Failed to create resctrl monitoring group %s: "
-                          "errno %d (%s), every free RMID still in the "
-                          "kernel's limbo after %u tries; a higher "
-                          "max_threshold_occupancy in " RESCTRL_PATH
-                          "/info/L3_MON frees them sooner\n",
-                          path, err, strerror(err), tries);
+                LOG_DEBUG("Failed to create resctrl monitoring group %s: "
+                          "errno %d (%s), every free RMID in the kernel's "
+                          "limbo\n",
+                          path, err, strerror(err));
                 return PQOS_RETVAL_BUSY;
         }
         if (err == ENOSPC) {
@@ -1135,7 +1106,10 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
                 return ret;
 
         ret = mon_assoc_add(class_id, lcore, name, 1);
-        if (ret != PQOS_RETVAL_OK)
+        /* BUSY, every free RMID in limbo, is for the start's caller to say,
+         * which may try the start again
+         */
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_BUSY)
                 LOG_ERROR("Could not assign core %u to resctrl monitoring "
                           "group\n",
                           lcore);
@@ -1339,8 +1313,16 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
                         return PQOS_RETVAL_OK;
         }
 
-        LOG_ERROR("Could not assign core %u to resctrl monitoring group\n",
-                  lcore);
+        if (ret == PQOS_RETVAL_BUSY)
+                LOG_ERROR("Could not assign core %u to resctrl monitoring "
+                          "group: every free RMID is in the kernel's limbo; a "
+                          "higher max_threshold_occupancy in " RESCTRL_PATH
+                          "/info/L3_MON frees them sooner\n",
+                          lcore);
+        else
+                LOG_ERROR("Could not assign core %u to resctrl monitoring "
+                          "group\n",
+                          lcore);
         return ret;
 }
 
@@ -1440,9 +1422,11 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
                 return ret;
         if (name != NULL) {
                 ret = resctrl_mon_mkdir(class_id, name);
+                /* BUSY is the start's caller's to say */
                 if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR(
-                            "Failed to create resctrl monitoring group!\n");
+                        if (ret != PQOS_RETVAL_BUSY)
+                                LOG_ERROR("Failed to create resctrl "
+                                          "monitoring group!\n");
                         return ret;
                 }
         }

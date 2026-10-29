@@ -195,6 +195,79 @@ test_os_mon_start_events_resctrl(void **state)
         }
 }
 
+/* the resctrl start of a core group, in a class whose free RMIDs are all
+ * in the kernel's limbo, failing with resctrl_ret, and its rollback stop
+ * with stop_ret; returns what os_mon_start_events() returns, and says how
+ * many messages it logged
+ */
+static int
+start_busy(struct test_data *data, const int stop_ret, unsigned *logged)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        enum pqos_mon_event event = PQOS_MON_EVENT_L3_OCCUP;
+        unsigned cores[] = {1};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        group.num_cores = DIM(cores);
+        group.cores = cores;
+        group.event = event;
+
+        expect_value(__wrap_perf_mon_is_event_supported, event, event);
+        will_return(__wrap_perf_mon_is_event_supported, 0);
+        expect_value(__wrap_resctrl_mon_is_event_supported, event, event);
+        will_return(__wrap_resctrl_mon_is_event_supported, 1);
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_start, group, &group);
+        will_return(__wrap_resctrl_mon_start, PQOS_RETVAL_BUSY);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+        /* the rollback */
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_stop, group, &group);
+        will_return(__wrap_resctrl_mon_stop, stop_ret);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        test_log_count_start();
+        ret = os_mon_start_events(&group);
+        *logged = test_log_count_stop();
+
+        return ret;
+}
+
+/* a start that finds every free RMID in limbo, rolled back whole, is BUSY:
+ * one that may be tried again, which its caller says once it gives up
+ */
+static void
+test_os_mon_start_events_busy(void **state)
+{
+        unsigned logged;
+
+        assert_int_equal(
+            start_busy((struct test_data *)*state, PQOS_RETVAL_OK, &logged),
+            PQOS_RETVAL_BUSY);
+        assert_int_equal(logged, 0);
+}
+
+/* one whose rollback fails has left something of itself behind: not to be
+ * tried again, it fails with the stop's failure, which is said
+ */
+static void
+test_os_mon_start_events_busy_rollback_fails(void **state)
+{
+        unsigned logged;
+
+        assert_int_equal(
+            start_busy((struct test_data *)*state, PQOS_RETVAL_ERROR, &logged),
+            PQOS_RETVAL_ERROR);
+        assert_true(logged >= 1);
+}
+
 static void
 test_os_mon_start_events_unsupported(void **state)
 {
@@ -436,6 +509,8 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_os_mon_start_events_perf),
             cmocka_unit_test(test_os_mon_start_events_resctrl),
+            cmocka_unit_test(test_os_mon_start_events_busy),
+            cmocka_unit_test(test_os_mon_start_events_busy_rollback_fails),
             cmocka_unit_test(test_os_mon_start_events_unsupported),
             cmocka_unit_test(test_os_mon_start_events_perf_fails_first),
             cmocka_unit_test(test_os_mon_start_events_add_perf_fails_first),

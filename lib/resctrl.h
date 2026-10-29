@@ -92,23 +92,6 @@ PQOS_LOCAL int resctrl_lock_exclusive(void);
 PQOS_LOCAL int resctrl_lock_release(void);
 
 /**
- * @brief Gives the lock on resctrl filesystem back for a wait, and takes it
- *        again, of the type it was
- *
- * For a wait that other processes are not to be held off by: they wait 100 ms
- * for the lock, and a poll or a stop of theirs that does not get it fails. A
- * signal does not cut the wait short.
- *
- * @param [in] wait_ns the wait, in nanoseconds, under a second
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK the lock is held again
- * @retval PQOS_RETVAL_ERROR the lock was not held, or could not be taken
- *         again, and is not held
- */
-PQOS_LOCAL int resctrl_lock_yield(const long wait_ns);
-
-/**
  * @brief Mount the resctrl file system with given CDP option
  *
  * @param l3_cdp_cfg L3 CDP option

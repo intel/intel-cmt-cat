@@ -653,8 +653,6 @@ $(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=mount \
 		-Wl,--wrap=umount2 \
-		-Wl,--wrap=open \
-		-Wl,--wrap=nanosleep \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -741,7 +739,6 @@ $(BIN_DIR)/test_resctrl_mon: test_resctrl_mon.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=mkdir \
-		-Wl,--wrap=resctrl_lock_yield \
 		-Wl,--wrap=rmdir \
 		-Wl,--wrap=pqos_fopen \
 		-Wl,--start-group \
@@ -1345,6 +1342,7 @@ $(BIN_DIR)/test_os_cpuinfo: ./test_os_cpuinfo.c $(LIB_OBJS)
 $(BIN_DIR)/test_os_monitoring: ./test_os_monitoring.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=nanosleep \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
 		-Wl,--wrap=resctrl_mon_init \

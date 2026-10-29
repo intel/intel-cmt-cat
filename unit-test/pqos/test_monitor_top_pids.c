@@ -81,6 +81,12 @@ static pid_t g_start_fails;
 /** how many groups the mocked start was asked for */
 static unsigned g_starts;
 
+/** the signal the mocked start raises at its first call, 0 for none, and
+ *  the process that first call was for
+ */
+static int g_signal_at_first_start;
+static pid_t g_first_start;
+
 /** the process whose /proc stat file reads as one reaped after its open */
 static pid_t g_reaped_on_read;
 
@@ -165,6 +171,11 @@ __wrap_pqos_mon_start_pids2(const unsigned num_pids,
         assert_int_equal(num_pids, 1);
         g_starts++;
         *group = NULL;
+        if (g_starts == 1) {
+                g_first_start = pids[0];
+                if (g_signal_at_first_start != 0)
+                        raise(g_signal_at_first_start);
+        }
 
         if (pids[0] == g_ended || pretends_ended(pids[0]))
                 return PQOS_RETVAL_PARAM;
@@ -450,6 +461,35 @@ top_pids_pick(const pid_t pid)
 }
 
 /**
+ * @brief Selects \a first and \a second the way top-pids mode does, the
+ *        first using less CPU, which has its group started first
+ */
+static void
+top_pids_pick_two(const pid_t first, const pid_t second)
+{
+        struct proc_stats stats[2];
+        struct slist elems[2];
+        int ret = 0;
+
+        memset(stats, 0, sizeof(stats));
+        stats[0].pid = first;
+        stats[0].ticks_delta = 1;
+        stats[0].valid = 1;
+        stats[1].pid = second;
+        stats[1].ticks_delta = 2;
+        stats[1].valid = 1;
+        elems[0].data = &stats[0];
+        elems[0].next = &elems[1];
+        elems[1].data = &stats[1];
+        elems[1].next = NULL;
+
+        sel_mon_top_pids = 1;
+        run_function(fill_top_procs, ret, &elems[0]);
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, 2);
+}
+
+/**
  * @brief Selects \a pid the way "-p llc:<pid>" does, or "-p llc:[<pid>]"
  */
 static void
@@ -553,6 +593,14 @@ reset(void **state)
         sel_mon_top_like = 0;
         sel_monitor_opts = 0;
         sel_events_max = (enum pqos_mon_event)0;
+        g_signal_at_first_start = 0;
+        g_first_start = 0;
+        /* a case that raised a signal: the flag, and the default actions */
+        stop_monitoring_loop = 0;
+        (void)signal(SIGINT, SIG_DFL);
+        (void)signal(SIGHUP, SIG_DFL);
+        (void)signal(SIGTERM, SIG_DFL);
+        (void)signal(SIGPIPE, SIG_DFL);
 
         return 0;
 }
@@ -842,6 +890,33 @@ test_every_top_pid_ended_fails_the_run(void **state)
         assert_int_equal(sel_monitor_num, 0);
 }
 
+/* a stop asked for during the first start, which is of a pick that ended and
+ * so is left out: the other pick is not tried, and is no process that ended,
+ * so the setup does not fail as if every pick had
+ */
+static void
+test_a_stop_during_the_starts_is_no_ended_top_pid(void **state)
+{
+        const pid_t first = running_process();
+        const pid_t second = running_process();
+
+        (void)state;
+        top_pids_pick_two(first, second);
+        g_others_ended = 1;
+        g_kept = second;
+        g_signal_at_first_start = SIGTERM;
+
+        assert_int_equal(setup(), 0);
+        assert_int_equal(g_first_start, first);
+        assert_int_equal(g_starts, 1);
+        assert_int_equal(stop_monitoring_loop, 1);
+        assert_true(output_has_text("PID %d ended before its monitoring "
+                                    "could start, so it is left out",
+                                    (int)first));
+        assert_false(output_has_text("Every top-pids process ended before its "
+                                     "monitoring could start"));
+}
+
 /**
  * @brief Makes \a pid a zombie: exited and waited for, but not reaped
  */
@@ -1080,6 +1155,9 @@ main(void)
                                             reset, reset),
             cmocka_unit_test_setup_teardown(
                 test_every_top_pid_ended_fails_the_run, reset, reset),
+            cmocka_unit_test_setup_teardown(
+                test_a_stop_during_the_starts_is_no_ended_top_pid, reset,
+                reset),
             cmocka_unit_test_setup_teardown(
                 test_another_failure_of_an_ended_top_pid_stays_an_error, reset,
                 reset),

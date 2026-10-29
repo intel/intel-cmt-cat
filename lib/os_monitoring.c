@@ -44,6 +44,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h> /**< pid_t */
 
 /**
@@ -326,8 +327,16 @@ start_event_error:
                 }
                 stop_ret = os_mon_stop_events(group);
 
-                LOG_ERROR("Failed to start all selected "
-                          "OS monitoring events\n");
+                /* BUSY, every free RMID in the kernel's limbo, is a start
+                 * that may be tried again, and is said by the caller that
+                 * gives up on it: so only for one that left nothing of itself
+                 * behind. Otherwise the stop's failure is the start's
+                 */
+                if (ret == PQOS_RETVAL_BUSY && stop_ret != PQOS_RETVAL_OK)
+                        ret = stop_ret;
+                if (ret != PQOS_RETVAL_BUSY)
+                        LOG_ERROR("Failed to start all selected "
+                                  "OS monitoring events\n");
 
                 if (ret == PQOS_RETVAL_OK && stop_ret != PQOS_RETVAL_OK)
                         ret = stop_ret;
@@ -465,6 +474,91 @@ os_mon_validate_event(const enum pqos_mon_event event)
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * A start that finds every free RMID in the kernel's limbo, and so returns
+ * BUSY having left nothing of itself behind, is tried again this many times,
+ * with a wait this long between two tries: 29 waits, 2.9 s. The kernel keeps
+ * the RMID of a removed group in limbo until the occupancy counted against it
+ * falls under max_threshold_occupancy, and looks at its limbo once a second,
+ * so two or three times in that while. A start a few RMIDs short gets
+ * through; on an idle board the last of many can take tens of seconds, which
+ * a start does not wait.
+ *
+ * Each try is a start of its own, with the resctrl lock taken for it alone,
+ * so the waits hold off no other process, and nothing a try found is kept for
+ * the next one, which looks at the cores, their classes and their groups
+ * again. A task group's start is not tried again: a task found before the
+ * waits may have ended, and its ID gone to another task, by the next try.
+ */
+#define OS_MON_START_TRIES   30
+#define OS_MON_START_WAIT_NS 100000000L
+
+/**
+ * @brief Waits between two tries of a start, the rest of the wait after a
+ *        signal that cuts it short included
+ */
+static void
+os_mon_start_wait(void)
+{
+        struct timespec wait = {0, OS_MON_START_WAIT_NS};
+
+        while (nanosleep(&wait, &wait) == -1)
+                if (errno != EINTR)
+                        break;
+}
+
+/**
+ * @brief The cause of a start that failed with BUSY, said once it is given up
+ *
+ * @param [in] tries the tries made, 1 for a start not tried again
+ */
+static void
+os_mon_busy_say(const unsigned tries)
+{
+        LOG_ERROR("Failed to create a resctrl monitoring group after %u "
+                  "tries: every free RMID is still in the kernel's limbo; a "
+                  "higher max_threshold_occupancy in " RESCTRL_PATH
+                  "/info/L3_MON frees them sooner\n",
+                  tries);
+}
+
+/**
+ * @brief Checks that each core is valid, and in no monitoring group already,
+ *        as another process's start would have put it
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK if each core may be started
+ * @retval PQOS_RETVAL_PARAM a core is not valid
+ * @retval PQOS_RETVAL_RESOURCE a core's monitoring is already started
+ */
+static int
+os_mon_cores_free(const struct pqos_cpuinfo *cpu,
+                  const unsigned num_cores,
+                  const unsigned *cores)
+{
+        unsigned i;
+        int ret;
+
+        for (i = 0; i < num_cores; i++) {
+                const unsigned lcore = cores[i];
+                char name[RESCTRL_MON_GROUP_NAME_SIZE];
+
+                ret = pqos_cpu_check_core(cpu, lcore);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
+
+                ret = resctrl_mon_assoc_get(lcore, name, sizeof(name));
+                if (ret == PQOS_RETVAL_OK) {
+                        LOG_ERROR("Monitoring on core %u is already started\n",
+                                  lcore);
+                        return PQOS_RETVAL_RESOURCE;
+                } else if (ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 os_mon_start_cores(const unsigned num_cores,
                    const unsigned *cores,
@@ -475,6 +569,7 @@ os_mon_start_cores(const unsigned num_cores,
                    const struct pqos_mon_options *opt)
 {
         unsigned i = 0;
+        unsigned tries;
         int ret;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
@@ -495,22 +590,9 @@ os_mon_start_cores(const unsigned num_cores,
          * Check if all requested cores are valid
          * and not used by other monitoring processes.
          */
-        for (i = 0; i < num_cores; i++) {
-                const unsigned lcore = cores[i];
-                char name[RESCTRL_MON_GROUP_NAME_SIZE];
-
-                ret = pqos_cpu_check_core(cpu, lcore);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_PARAM;
-
-                ret = resctrl_mon_assoc_get(lcore, name, sizeof(name));
-                if (ret == PQOS_RETVAL_OK) {
-                        LOG_ERROR("Monitoring on core %u is already started\n",
-                                  lcore);
-                        return PQOS_RETVAL_RESOURCE;
-                } else if (ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-        }
+        ret = os_mon_cores_free(cpu, num_cores, cores);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         /**
          * Fill in the monitoring group structure
@@ -525,7 +607,21 @@ os_mon_start_cores(const unsigned num_cores,
         for (i = 0; i < num_cores; i++)
                 group->cores[i] = cores[i];
 
-        ret = os_mon_start_events(group);
+        for (tries = 1;; tries++) {
+                ret = os_mon_start_events(group);
+                if (ret != PQOS_RETVAL_BUSY || tries == OS_MON_START_TRIES)
+                        break;
+                if (tries == 1)
+                        LOG_DEBUG("Every free RMID is in the kernel's limbo: "
+                                  "trying the start again\n");
+                os_mon_start_wait();
+                /* a core another process has started meanwhile is its */
+                ret = os_mon_cores_free(cpu, num_cores, cores);
+                if (ret != PQOS_RETVAL_OK)
+                        break;
+        }
+        if (ret == PQOS_RETVAL_BUSY)
+                os_mon_busy_say(tries);
         if (ret != PQOS_RETVAL_OK && group->cores != NULL) {
                 free(group->cores);
                 group->cores = NULL;
@@ -731,6 +827,8 @@ os_mon_start_pids(const unsigned num_pids,
                 group->pids[i] = pids[i];
 
         ret = os_mon_start_events(group);
+        if (ret == PQOS_RETVAL_BUSY)
+                os_mon_busy_say(1);
 
 os_mon_start_pids_exit:
         if (ret != PQOS_RETVAL_OK) {
@@ -830,6 +928,8 @@ os_mon_add_pids(const unsigned num_pids,
         }
 
         ret = os_mon_start_events(&added);
+        if (ret == PQOS_RETVAL_BUSY)
+                os_mon_busy_say(1);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mon_add_pids_exit;
         started = 1;

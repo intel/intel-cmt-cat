@@ -36,6 +36,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <time.h>
 
 /* ======== mock ======== */
 int
@@ -55,6 +56,7 @@ int
 os_mon_start_events(struct pqos_mon_data *group)
 {
         unsigned num_ctrs = 0;
+        int ret;
 
         assert_non_null(group);
         check_expected_ptr(group);
@@ -67,7 +69,41 @@ os_mon_start_events(struct pqos_mon_data *group)
         group->intl->perf.ctx =
             calloc(num_ctrs, sizeof(group->intl->perf.ctx[0]));
 
-        return mock_type(int);
+        /* a start that fails rolls itself back, as the real one does */
+        ret = mock_type(int);
+        if (ret != PQOS_RETVAL_OK) {
+                free(group->intl->perf.ctx);
+                group->intl->perf.ctx = NULL;
+        }
+
+        return ret;
+}
+
+/* the waits between the tries of a start, which take no time here: what each
+ * asked for, and the first waits_cut_short of them end half way, as a signal
+ * ends them
+ */
+static unsigned waits;
+static long wait_ns[4];
+static unsigned waits_cut_short;
+
+int
+__wrap_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+        assert_non_null(req);
+        assert_int_equal(req->tv_sec, 0);
+        if (waits < DIM(wait_ns))
+                wait_ns[waits] = req->tv_nsec;
+        waits++;
+        if (waits <= waits_cut_short) {
+                assert_non_null(rem);
+                rem->tv_sec = 0;
+                rem->tv_nsec = req->tv_nsec / 2;
+                errno = EINTR;
+                return -1;
+        }
+
+        return 0;
 }
 
 int
@@ -404,6 +440,165 @@ test_os_mon_start_cores(void **state)
         assert_null(group.cores);
 }
 
+/* a core group's start whose tries find every free RMID in limbo: each try
+ * finds the cores free again, and its BUSY, which leaves nothing of it, has
+ * the start made again after a wait, tries times in all, ending with last
+ */
+static int
+start_cores_tried(struct test_data *data,
+                  struct pqos_mon_data *group,
+                  const unsigned tries,
+                  const int last,
+                  unsigned *logged)
+{
+        unsigned cores[] = {1};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        for (i = 0; i < tries; i++) {
+                expect_value(__wrap_resctrl_mon_assoc_get, lcore, cores[0]);
+                will_return(__wrap_resctrl_mon_assoc_get, PQOS_RETVAL_RESOURCE);
+                expect_value(os_mon_start_events, group, group);
+                will_return(os_mon_start_events,
+                            i + 1 < tries ? PQOS_RETVAL_BUSY : last);
+        }
+
+        waits = 0;
+        test_log_count_start();
+        ret = os_mon_start_cores(DIM(cores), cores, PQOS_MON_EVENT_L3_OCCUP,
+                                 NULL, NULL, group, NULL);
+        *logged = test_log_count_stop();
+
+        return ret;
+}
+
+static void
+test_os_mon_start_cores_busy_then_started(void **state)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned logged;
+        int ret;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        ret = start_cores_tried((struct test_data *)*state, &group, 3,
+                                PQOS_RETVAL_OK, &logged);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(waits, 2);
+        assert_int_equal(wait_ns[0], 100000000L);
+        assert_int_equal(logged, 0);
+        assert_non_null(group.cores);
+
+        expect_value(os_mon_stop_events, group, &group);
+        will_return(os_mon_stop_events, PQOS_RETVAL_OK);
+        assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
+}
+
+static void
+test_os_mon_start_cores_busy_throughout(void **state)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned logged;
+        int ret;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        ret = start_cores_tried((struct test_data *)*state, &group, 30,
+                                PQOS_RETVAL_BUSY, &logged);
+        assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        assert_int_equal(waits, 29);
+        assert_int_equal(logged, 1);
+        assert_null(group.cores);
+}
+
+/* a failure other than BUSY is the start's: not tried again */
+static void
+test_os_mon_start_cores_error_not_tried_again(void **state)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned logged;
+        int ret;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        ret = start_cores_tried((struct test_data *)*state, &group, 1,
+                                PQOS_RETVAL_ERROR, &logged);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(waits, 0);
+        assert_null(group.cores);
+}
+
+/* a core that another process started during a wait is its: the start fails
+ * as it would have before its first try, and is not made again
+ */
+static void
+test_os_mon_start_cores_core_taken_during_a_wait(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned cores[] = {1};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        expect_value(__wrap_resctrl_mon_assoc_get, lcore, cores[0]);
+        will_return(__wrap_resctrl_mon_assoc_get, PQOS_RETVAL_RESOURCE);
+        expect_value(os_mon_start_events, group, &group);
+        will_return(os_mon_start_events, PQOS_RETVAL_BUSY);
+        expect_value(__wrap_resctrl_mon_assoc_get, lcore, cores[0]);
+        will_return(__wrap_resctrl_mon_assoc_get, PQOS_RETVAL_OK);
+
+        waits = 0;
+        ret = os_mon_start_cores(DIM(cores), cores, PQOS_MON_EVENT_L3_OCCUP,
+                                 NULL, NULL, &group, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(waits, 1);
+        assert_null(group.cores);
+}
+
+/* a signal that ends a wait early has the rest of it waited */
+static void
+test_os_mon_start_cores_wait_after_a_signal(void **state)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned logged;
+        int ret;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        waits_cut_short = 1;
+
+        ret = start_cores_tried((struct test_data *)*state, &group, 2,
+                                PQOS_RETVAL_OK, &logged);
+        waits_cut_short = 0;
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(waits, 2);
+        assert_int_equal(wait_ns[0], 100000000L);
+        assert_int_equal(wait_ns[1], 50000000L);
+
+        expect_value(os_mon_stop_events, group, &group);
+        will_return(os_mon_stop_events, PQOS_RETVAL_OK);
+        assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
+}
+
 /* ======== os_mon_start_pids ======== */
 
 static void
@@ -518,6 +713,39 @@ test_os_mon_start_pids_task_dir(void **state)
         ret = os_mon_start_pids(1, &unreadable, PQOS_MON_EVENT_L3_OCCUP, NULL,
                                 &group);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(group.tid_map);
+}
+
+/* a task group's start is not tried again on BUSY: a task found before a
+ * wait may have ended, and its ID gone to another, by the next try
+ */
+static void
+test_os_mon_start_pids_busy_not_tried_again(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pids[] = {1};
+        unsigned logged;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        expect_value(os_mon_start_events, group, &group);
+        will_return(os_mon_start_events, PQOS_RETVAL_BUSY);
+
+        waits = 0;
+        test_log_count_start();
+        ret = os_mon_start_pids(DIM(pids), pids, PQOS_MON_EVENT_L3_OCCUP, NULL,
+                                &group);
+        logged = test_log_count_stop();
+        assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        assert_int_equal(waits, 0);
+        assert_int_equal(logged, 1);
         assert_null(group.tid_map);
 }
 
@@ -721,8 +949,14 @@ main(void)
             cmocka_unit_test(test_os_mon_start_cores_param),
             cmocka_unit_test(test_os_mon_start_cores_already_started),
             cmocka_unit_test(test_os_mon_start_cores),
+            cmocka_unit_test(test_os_mon_start_cores_busy_then_started),
+            cmocka_unit_test(test_os_mon_start_cores_busy_throughout),
+            cmocka_unit_test(test_os_mon_start_cores_error_not_tried_again),
+            cmocka_unit_test(test_os_mon_start_cores_core_taken_during_a_wait),
+            cmocka_unit_test(test_os_mon_start_cores_wait_after_a_signal),
             cmocka_unit_test(test_os_mon_start_pids_param),
             cmocka_unit_test(test_os_mon_start_pids),
+            cmocka_unit_test(test_os_mon_start_pids_busy_not_tried_again),
             cmocka_unit_test(test_os_mon_start_pids_task_dir),
             cmocka_unit_test(test_os_mon_add_pids),
             cmocka_unit_test(test_os_mon_remove_pids),
