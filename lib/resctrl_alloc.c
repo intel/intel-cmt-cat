@@ -572,6 +572,14 @@ resctrl_alloc_task_search(unsigned *class_id,
                                 return PQOS_RETVAL_OK;
                         }
                 }
+                /* a read that failed is not the end of the file: the task
+                 * may be in the rest of it, and would be found in no class
+                 */
+                if (ferror(fd)) {
+                        LOG_ERROR("Could not read tasks file for CLOS %u\n", i);
+                        resctrl_alloc_fclose(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
                 if (resctrl_alloc_fclose(fd) != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
         }
@@ -601,8 +609,16 @@ resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found)
 
         /* Search tasks file for any task ID */
         memset(buf, 0, sizeof(buf));
-        if (fgets(buf, sizeof(buf), fd) != NULL)
+        if (fgets(buf, sizeof(buf), fd) != NULL) {
                 *found = 1;
+        } else if (ferror(fd)) {
+                /* a read that failed is not an empty file: the class may
+                 * hold tasks, and would be handed out as an unused one
+                 */
+                LOG_ERROR("Could not read tasks file for CLOS %u\n", class_id);
+                resctrl_alloc_fclose(fd);
+                return PQOS_RETVAL_ERROR;
+        }
 
         if (resctrl_alloc_fclose(fd) != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;

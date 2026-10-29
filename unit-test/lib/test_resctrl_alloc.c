@@ -419,6 +419,91 @@ test_resctrl_alloc_task_read_error_after_a_task(void **state
         fclose(fd);
 }
 
+/* ======== resctrl_alloc_task_file_check ======== */
+
+/* the tasks file of class_id, which fd reads */
+static void
+expect_tasks_file(const unsigned class_id, FILE *fd)
+{
+        expect_value(resctrl_alloc_fopen, class_id, class_id);
+        expect_string(resctrl_alloc_fopen, name, "tasks");
+        expect_string(resctrl_alloc_fopen, mode, "r");
+        will_return(resctrl_alloc_fopen, fd);
+}
+
+/* the cpus file of class_id, which the mock resctrl_cpumask_read() reads as
+ * holding no core
+ */
+static void
+expect_cpus_file_with_no_core(const unsigned class_id)
+{
+        expect_value(resctrl_alloc_fopen, class_id, class_id);
+        expect_string(resctrl_alloc_fopen, name, "cpus");
+        expect_string(resctrl_alloc_fopen, mode, "r");
+        will_return(resctrl_alloc_fopen, (FILE *)1);
+        will_return(__wrap_resctrl_cpumask_read, PQOS_RETVAL_OK);
+}
+
+static void
+test_resctrl_alloc_task_file_check_a_task(void **state __attribute__((unused)))
+{
+        FILE *fd = tmpfile();
+        unsigned found = 0;
+        int ret;
+
+        assert_non_null(fd);
+        fprintf(fd, "11\n");
+        rewind(fd);
+        expect_tasks_file(1, fd);
+
+        ret = resctrl_alloc_task_file_check(1, &found);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(found, 1);
+
+        fclose(fd);
+}
+
+static void
+test_resctrl_alloc_task_file_check_blank(void **state __attribute__((unused)))
+{
+        FILE *fd = tmpfile();
+        unsigned found = 0;
+        int ret;
+
+        assert_non_null(fd);
+        expect_tasks_file(1, fd);
+
+        ret = resctrl_alloc_task_file_check(1, &found);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(found, 0);
+
+        fclose(fd);
+}
+
+/* a read that fails is not a blank file: the class may hold tasks */
+static void
+test_resctrl_alloc_task_file_check_read_error(void **state
+                                              __attribute__((unused)))
+{
+        /* open for writing only: fgets() fails on it, and sets the stream's
+         * error indicator, as a read() that fails does
+         */
+        FILE *fd = fopen("/dev/null", "w");
+        unsigned found = 0;
+        int ret;
+
+        assert_non_null(fd);
+        expect_tasks_file(1, fd);
+
+        test_log_count_start();
+        ret = resctrl_alloc_task_file_check(1, &found);
+        assert_int_equal(test_log_count_stop(), 1);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(found, 0);
+
+        fclose(fd);
+}
+
 /* ========= resctrl_alloc_schemata_read ======== */
 
 static void
@@ -716,6 +801,44 @@ test_resctrl_alloc_task_search_not_found(void **state)
         assert_int_equal(class_id, 7);
 }
 
+/* a read that fails, after a task, ends the search with that error: the task
+ * may be in the rest of the file, so it is not looked for in the next class
+ */
+static void
+test_resctrl_alloc_task_search_read_error(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned num_classes = data->cap_l3ca.num_classes;
+        const pid_t task = 1234;
+        int calls = 0;
+        cookie_io_functions_t io = {.read = one_task_then_eio};
+        FILE *fd = fopencookie(&calls, "r", io);
+        unsigned class_id = 7;
+        unsigned logged;
+        int ret;
+
+        assert_non_null(fd);
+        data->cap_l3ca.num_classes = 2;
+
+        expect_value(__wrap_kill, pid, task);
+        expect_value(__wrap_kill, sig, 0);
+        will_return(__wrap_kill, 0);
+        /* the highest class is searched first, and class 0 is not opened */
+        expect_tasks_file(1, fd);
+
+        test_log_count_start();
+        ret = resctrl_alloc_task_search(&class_id, data->cap, task);
+        logged = test_log_count_stop();
+
+        data->cap_l3ca.num_classes = num_classes;
+        fclose(fd);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(logged, 1);
+        assert_int_equal(class_id, 7);
+        assert_true(calls >= 2);
+}
+
 static void
 test_resctrl_alloc_get_unused_group_no_groups(void **state
                                               __attribute__((unused)))
@@ -725,6 +848,55 @@ test_resctrl_alloc_get_unused_group_no_groups(void **state
 
         ret = resctrl_alloc_get_unused_group(0, &group_id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* class 2 has no core but a task, and class 1 neither: class 1 is unused */
+static void
+test_resctrl_alloc_get_unused_group(void **state __attribute__((unused)))
+{
+        FILE *tasks2 = tmpfile();
+        FILE *tasks1 = tmpfile();
+        unsigned group_id = 0xdead;
+        int ret;
+
+        assert_non_null(tasks2);
+        assert_non_null(tasks1);
+        fprintf(tasks2, "11\n");
+        rewind(tasks2);
+        expect_cpus_file_with_no_core(2);
+        expect_tasks_file(2, tasks2);
+        expect_cpus_file_with_no_core(1);
+        expect_tasks_file(1, tasks1);
+
+        ret = resctrl_alloc_get_unused_group(3, &group_id);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(group_id, 1);
+
+        fclose(tasks2);
+        fclose(tasks1);
+}
+
+/* a class with no core whose tasks file cannot be read may hold tasks: it is
+ * not handed out as unused
+ */
+static void
+test_resctrl_alloc_get_unused_group_tasks_read_error(void **state
+                                                     __attribute__((unused)))
+{
+        /* open for writing only, so that the read fails */
+        FILE *fd = fopen("/dev/null", "w");
+        unsigned group_id = 0xdead;
+        int ret;
+
+        assert_non_null(fd);
+        expect_cpus_file_with_no_core(1);
+        expect_tasks_file(1, fd);
+
+        ret = resctrl_alloc_get_unused_group(2, &group_id);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(group_id, 0xdead);
+
+        fclose(fd);
 }
 
 /* ======== resctrl_alloc_get_num_closids ======== */
@@ -782,6 +954,7 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_task_search_ended_before),
             cmocka_unit_test(test_resctrl_alloc_task_search_ended_during),
             cmocka_unit_test(test_resctrl_alloc_task_search_not_found),
+            cmocka_unit_test(test_resctrl_alloc_task_search_read_error),
             cmocka_unit_test(test_resctrl_alloc_task_search_no_groups),
             cmocka_unit_test(test_resctrl_alloc_schemata_write_l3ca)};
 
@@ -805,6 +978,9 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_task_read),
             cmocka_unit_test(test_resctrl_alloc_task_read_error),
             cmocka_unit_test(test_resctrl_alloc_task_read_error_after_a_task),
+            cmocka_unit_test(test_resctrl_alloc_task_file_check_a_task),
+            cmocka_unit_test(test_resctrl_alloc_task_file_check_blank),
+            cmocka_unit_test(test_resctrl_alloc_task_file_check_read_error),
             cmocka_unit_test(test_resctrl_alloc_schemata_read),
             cmocka_unit_test(test_resctrl_alloc_schemata_read_fopen),
             cmocka_unit_test(test_resctrl_alloc_schemata_write_fopen),
@@ -812,7 +988,10 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_task_validate_error),
             cmocka_unit_test(test_resctrl_alloc_task_validate_no_permission),
             cmocka_unit_test(test_resctrl_alloc_task_validate_signal_denied),
-            cmocka_unit_test(test_resctrl_alloc_get_unused_group_no_groups)};
+            cmocka_unit_test(test_resctrl_alloc_get_unused_group_no_groups),
+            cmocka_unit_test(test_resctrl_alloc_get_unused_group),
+            cmocka_unit_test(
+                test_resctrl_alloc_get_unused_group_tasks_read_error)};
 
         const struct CMUnitTest tests_num_closids[] = {
             cmocka_unit_test(test_resctrl_alloc_get_num_closids),
