@@ -44,9 +44,11 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/mount.h>
+#include <time.h>
 #include <unistd.h>
 
-static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
+static int resctrl_lock_fd = -1;  /**< File descriptor to the lockfile */
+static int resctrl_lock_type = 0; /**< LOCK_SH or LOCK_EX, while it is held */
 
 /**
  * @brief Handle SIGALRM
@@ -91,6 +93,7 @@ resctrl_lock(const int type)
         ualarm(100000, 0);
 
         if (flock(resctrl_lock_fd, type) == 0) {
+                resctrl_lock_type = type;
                 ret = PQOS_RETVAL_OK;
                 goto resctrl_lock_exit;
         }
@@ -138,8 +141,45 @@ resctrl_lock_release(void)
 
         close(resctrl_lock_fd);
         resctrl_lock_fd = -1;
+        resctrl_lock_type = 0;
 
         return PQOS_RETVAL_OK;
+}
+
+/* how many times the lock is asked for again after a yield, each time for the
+ * 100 ms that taking it waits: whoever took it meanwhile, for a poll, a start
+ * or a stop, gives it back soon
+ */
+#define RESCTRL_LOCK_YIELD_TRIES 3
+
+int
+resctrl_lock_yield(const long wait_ns)
+{
+        const int type = resctrl_lock_type;
+        struct timespec wait = {0, wait_ns};
+        unsigned tries;
+
+        ASSERT(wait_ns >= 0 && wait_ns < 1000000000L);
+
+        if (resctrl_lock_fd < 0) {
+                LOG_ERROR("Resctrl filesystem not locked\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        (void)resctrl_lock_release();
+        /* the rest of the wait after a signal: a caller that tries something
+         * again after each wait would otherwise run through its tries in no
+         * time with signals coming often
+         */
+        while (nanosleep(&wait, &wait) == -1)
+                if (errno != EINTR)
+                        break;
+
+        for (tries = 0; tries < RESCTRL_LOCK_YIELD_TRIES; tries++)
+                if (resctrl_lock(type) == PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_OK;
+
+        return PQOS_RETVAL_ERROR;
 }
 
 int

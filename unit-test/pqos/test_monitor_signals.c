@@ -427,6 +427,55 @@ test_sigterm_during_the_start_stops_the_group(void **state)
 }
 
 /**
+ * @brief A signal during a start ends the starts
+ *
+ * A start can wait seconds for an RMID that the kernel keeps in its limbo, so
+ * one asked to stop starts no group after it; the one started is stopped as at
+ * the end of a run.
+ */
+static void
+test_a_signal_during_a_start_starts_no_more_groups(void **state)
+{
+        const uint64_t pids[] = {(uint64_t)getpid(), (uint64_t)getppid()};
+        struct pqos_cpuinfo cpu;
+        struct pqos_capability cap;
+        struct pqos_cap_mon *mon;
+        unsigned i;
+        int ret = -1;
+
+        (void)state;
+        for (i = 0; i < DIM(pids); i++) {
+                char *desc = uinttostr_checked((unsigned)pids[i]);
+
+                assert_non_null(desc);
+                assert_non_null(grp_add(MON_GROUP_TYPE_PID,
+                                        PQOS_MON_EVENT_L3_OCCUP, desc, &pids[i],
+                                        1));
+        }
+        memset(&cpu, 0, sizeof(cpu));
+        mon = calloc(1, sizeof(*mon) + sizeof(mon->events[0]));
+        assert_non_null(mon);
+        mon->max_rmid = 64;
+        mon->num_events = 1;
+        mon->events[0].type = PQOS_MON_EVENT_L3_OCCUP;
+        cap.type = PQOS_CAP_TYPE_MON;
+        cap.u.mon = mon;
+        g_signal_at_start = SIGTERM;
+
+        run_function(monitor_setup, ret, &cpu, &cap, NULL);
+        free(mon);
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, 0);
+        assert_int_equal(g_starts, 1);
+        assert_int_equal(stop_monitoring_loop, 1);
+
+        run_void_function(monitor_loop);
+        assert_int_equal(g_polls, 0);
+        stop_selection();
+        assert_int_equal(g_stops, 1);
+}
+
+/**
  * @brief A handler that cannot be set fails the setup before any group starts
  *
  * Left at its default action, that signal would end the process with its
@@ -585,6 +634,9 @@ main(void)
                 test_sighup_during_the_start_stops_the_group, reset, reset),
             cmocka_unit_test_setup_teardown(
                 test_sigterm_during_the_start_stops_the_group, reset, reset),
+            cmocka_unit_test_setup_teardown(
+                test_a_signal_during_a_start_starts_no_more_groups, reset,
+                reset),
             cmocka_unit_test_setup_teardown(test_sigint_during_the_loop_ends_it,
                                             reset, reset),
             cmocka_unit_test_setup_teardown(

@@ -2222,6 +2222,14 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
         for (i = 0; i < sel_monitor_num; i++) {
                 struct mon_group *grp = &sel_monitor_group[i];
 
+                /* a signal that asks for a stop ends the starts, as it would
+                 * the loop: a start can wait seconds for an RMID that the
+                 * kernel keeps in its limbo. The groups started are stopped
+                 * as at the end of a run, the loop not running
+                 */
+                if (__atomic_load_n(&stop_monitoring_loop, __ATOMIC_RELAXED))
+                        break;
+
                 /* Convert device group to channel group */
                 if (grp->type == MON_GROUP_TYPE_DEVICE) {
                         ret = grp_device_to_channel(grp, dev_info);

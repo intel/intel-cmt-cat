@@ -764,6 +764,7 @@ os_mon_add_pids(const unsigned num_pids,
         struct pqos_mon_data_internal added_intl;
         struct pqos_mon_perf_ctx *ctx;
         unsigned num_duplicated = 0;
+        int started = 0;
 
         ASSERT(group != NULL);
         ASSERT(num_pids > 0);
@@ -831,6 +832,7 @@ os_mon_add_pids(const unsigned num_pids,
         ret = os_mon_start_events(&added);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mon_add_pids_exit;
+        started = 1;
 
         /**
          * Update mon group
@@ -875,7 +877,10 @@ os_mon_add_pids_exit:
                 free(added.intl->resctrl.mon_group);
                 added.intl->resctrl.mon_group = NULL;
         }
-        if (ret == PQOS_RETVAL_RESOURCE) {
+        /* a memory allocation that fails after the start: the start's own
+         * failures, RESOURCE among them, it has rolled back itself
+         */
+        if (ret == PQOS_RETVAL_RESOURCE && started) {
                 LOG_ERROR("Memory allocation error!\n");
                 os_mon_stop_events(&added);
         }

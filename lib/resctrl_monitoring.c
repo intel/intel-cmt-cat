@@ -910,9 +910,12 @@ resctrl_mon_empty(const unsigned class_id,
  * a removed group in limbo until the occupancy counted against it falls under
  * max_threshold_occupancy, and looks at the RMIDs in limbo once a second; while
  * every free RMID is there, the mkdir fails with EBUSY. It is tried this many
- * times, this far apart, before the group is said to be busy: three of the
- * kernel's looks, which a start a few RMIDs short gets through. On an idle
- * board the last of many can take tens of seconds, which a start does not wait
+ * times, with a wait this long between two tries, before the group is said to
+ * be busy: 29 waits, 2.9 s, in which the kernel looks at its limbo two or three
+ * times. A start a few RMIDs short gets through; on an idle board the last of
+ * many can take tens of seconds, which a start does not wait. The waits are
+ * made with the resctrl lock given back, so that other processes, which wait
+ * 100 ms for it, are not held off
  */
 #define RESCTRL_MON_MKDIR_TRIES   30
 #define RESCTRL_MON_MKDIR_WAIT_NS 100000000L
@@ -928,7 +931,8 @@ resctrl_mon_empty(const unsigned class_id,
  * @retval PQOS_RETVAL_BUSY every free RMID is still in the kernel's limbo
  *         after RESCTRL_MON_MKDIR_TRIES tries
  * @retval PQOS_RETVAL_RESOURCE no RMID is left (ENOSPC)
- * @retval PQOS_RETVAL_ERROR any other failure
+ * @retval PQOS_RETVAL_ERROR any other failure, the resctrl lock not taken
+ *         again after a wait among them, which leaves it not held
  */
 PQOS_STATIC int
 resctrl_mon_mkdir(const unsigned class_id, const char *name)
@@ -944,8 +948,6 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
                 return PQOS_RETVAL_ERROR;
 
         for (tries = 1;; tries++) {
-                struct timespec wait = {0, RESCTRL_MON_MKDIR_WAIT_NS};
-
                 if (mkdir(path, 0755) != -1 || errno == EEXIST)
                         return PQOS_RETVAL_OK;
                 err = errno;
@@ -956,7 +958,14 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
                                   "%s but in the kernel's limbo: trying "
                                   "again\n",
                                   path);
-                (void)nanosleep(&wait, NULL);
+                if (resctrl_lock_yield(RESCTRL_MON_MKDIR_WAIT_NS) !=
+                    PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to create resctrl monitoring group "
+                                  "%s: the resctrl lock could not be taken "
+                                  "again after a wait for an RMID\n",
+                                  path);
+                        return PQOS_RETVAL_ERROR;
+                }
         }
 
         if (err == EBUSY) {

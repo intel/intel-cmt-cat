@@ -602,6 +602,24 @@ test_os_mon_add_pids(void **state)
                 assert_int_equal(group.tid_nr, 2);
         }
 
+        /* a start that fails with RESOURCE, as one finding no RMID left does,
+         * has rolled itself back, and is not stopped again: that is for an
+         * add whose memory runs out after its start. os_mon_stop_events() is
+         * not expected
+         */
+        {
+                unsigned num_pids = 1;
+                pid_t pids[] = {4};
+
+                expect_any(os_mon_start_events, group);
+                will_return(os_mon_start_events, PQOS_RETVAL_RESOURCE);
+
+                ret = os_mon_add_pids(num_pids, pids, &group);
+                assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+                assert_int_equal(group.num_pids, 2);
+                assert_int_equal(group.tid_nr, 2);
+        }
+
         /* stop monitoring */
         {
                 expect_value(os_mon_stop_events, group, &group);

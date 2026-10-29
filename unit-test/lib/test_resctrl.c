@@ -33,6 +33,15 @@
 #include "resctrl.h"
 #include "test.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/file.h>
+#include <time.h>
+#include <unistd.h>
+
 /* ======== mock ======== */
 
 int
@@ -61,6 +70,119 @@ __wrap_umount2(const char *target, int flags)
         assert_int_equal(flags, 0);
 
         return mock_type(int);
+}
+
+/* the directory a case has the resctrl lock taken on, by opening it for
+ * RESCTRL_PATH, which a test host may not have; "" for none
+ */
+static char lock_dir[64];
+
+typedef int open_fn(const char *path, int oflags, ...);
+open_fn __real_open;
+
+int
+__wrap_open(const char *path, int oflags, ...)
+{
+        int mode = 0;
+
+#ifdef O_TMPFILE
+        if ((oflags & O_TMPFILE) == O_TMPFILE || (oflags & O_CREAT) != 0) {
+#else
+        if ((oflags & O_CREAT) != 0) {
+#endif
+                va_list args;
+
+                va_start(args, oflags);
+                mode = va_arg(args, int);
+                va_end(args);
+        }
+        if (lock_dir[0] != '\0' && strcmp(path, RESCTRL_PATH) == 0)
+                path = lock_dir;
+
+        return __real_open(path, oflags, mode);
+}
+
+int __real_nanosleep(const struct timespec *req, struct timespec *rem);
+
+/* what the waits of a case found and asked for: the lock free to be taken
+ * by another during each, and the time each was asked to wait; the first
+ * wait_interrupted waits end early, as a signal ends them, half way
+ */
+static unsigned waits;
+static unsigned waits_lock_free;
+static long wait_ns[4];
+static unsigned waits_interrupted;
+/* a case that has another take the lock during the wait, and keep it */
+static int taker_fd = -1;
+
+/* whether another open file description could take the lock now, of type */
+static int
+lock_free_for(const int type)
+{
+        const int fd = __real_open(lock_dir, O_DIRECTORY | O_CLOEXEC, 0);
+        int free_now;
+
+        assert_true(fd >= 0);
+        free_now = flock(fd, type | LOCK_NB) == 0;
+        if (free_now)
+                (void)flock(fd, LOCK_UN);
+        close(fd);
+
+        return free_now;
+}
+
+int
+__wrap_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+        assert_non_null(req);
+        assert_int_equal(req->tv_sec, 0);
+        if (waits < DIM(wait_ns))
+                wait_ns[waits] = req->tv_nsec;
+        waits++;
+        if (lock_free_for(LOCK_EX))
+                waits_lock_free++;
+        if (taker_fd == -2) {
+                taker_fd = __real_open(lock_dir, O_DIRECTORY | O_CLOEXEC, 0);
+                assert_true(taker_fd >= 0);
+                assert_int_equal(flock(taker_fd, LOCK_EX | LOCK_NB), 0);
+        }
+        if (waits <= waits_interrupted) {
+                assert_non_null(rem);
+                rem->tv_sec = 0;
+                rem->tv_nsec = req->tv_nsec / 2;
+                errno = EINTR;
+                return -1;
+        }
+
+        return 0;
+}
+
+static int
+lock_dir_make(void **state)
+{
+        (void)state;
+        snprintf(lock_dir, sizeof(lock_dir), "/tmp/pqos_ut_lock_XXXXXX");
+        assert_non_null(mkdtemp(lock_dir));
+        waits = 0;
+        waits_lock_free = 0;
+        waits_interrupted = 0;
+        memset(wait_ns, 0, sizeof(wait_ns));
+        taker_fd = -1;
+
+        return 0;
+}
+
+static int
+lock_dir_remove(void **state)
+{
+        (void)state;
+        if (taker_fd >= 0)
+                close(taker_fd);
+        taker_fd = -1;
+        rmdir(lock_dir);
+        lock_dir[0] = '\0';
+
+        return 0;
 }
 
 /* ======== resctrl_mount ======== */
@@ -388,6 +510,87 @@ test_resctrl_cpumask_write_zero(void **state __attribute__((unused)))
         fclose(fd);
 }
 
+/* ======== resctrl_lock_yield ======== */
+
+/* the lock is given back for the wait, so that another can take it then, and
+ * held again, of its type, after it
+ */
+static void
+test_resctrl_lock_yield_exclusive(void **state __attribute__((unused)))
+{
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_false(lock_free_for(LOCK_SH));
+
+        assert_int_equal(resctrl_lock_yield(100000000L), PQOS_RETVAL_OK);
+        assert_int_equal(waits, 1);
+        assert_int_equal(waits_lock_free, 1);
+        assert_int_equal(wait_ns[0], 100000000L);
+        assert_false(lock_free_for(LOCK_SH));
+
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_true(lock_free_for(LOCK_EX));
+}
+
+static void
+test_resctrl_lock_yield_shared(void **state __attribute__((unused)))
+{
+        assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
+
+        assert_int_equal(resctrl_lock_yield(100000000L), PQOS_RETVAL_OK);
+        assert_int_equal(waits_lock_free, 1);
+        /* shared again: another can share it, and not have it alone */
+        assert_true(lock_free_for(LOCK_SH));
+        assert_false(lock_free_for(LOCK_EX));
+
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* a signal that ends the wait early has the rest of it waited */
+static void
+test_resctrl_lock_yield_waits_the_rest_after_a_signal(void **state
+                                                      __attribute__((unused)))
+{
+        waits_interrupted = 2;
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+
+        assert_int_equal(resctrl_lock_yield(100000000L), PQOS_RETVAL_OK);
+        assert_int_equal(waits, 3);
+        assert_int_equal(wait_ns[0], 100000000L);
+        assert_int_equal(wait_ns[1], 50000000L);
+        assert_int_equal(wait_ns[2], 25000000L);
+
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* no lock held, nothing to give back: no wait either */
+static void
+test_resctrl_lock_yield_not_locked(void **state __attribute__((unused)))
+{
+        test_log_count_start();
+        assert_int_equal(resctrl_lock_yield(100000000L), PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 1);
+        assert_int_equal(waits, 0);
+}
+
+/* another that takes the lock during the wait and keeps it: the lock is not
+ * held again, each of the tries to take it timing out, and is not held after
+ */
+static void
+test_resctrl_lock_yield_lock_kept_by_another(void **state
+                                             __attribute__((unused)))
+{
+        taker_fd = -2;
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+
+        test_log_count_start();
+        assert_int_equal(resctrl_lock_yield(100000000L), PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 3);
+
+        test_log_count_start();
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_ERROR);
+        assert_int_equal(test_log_count_stop(), 1);
+}
+
 int
 main(void)
 {
@@ -410,7 +613,23 @@ main(void)
             cmocka_unit_test(test_resctrl_cpumask_write_zero),
         };
 
+        const struct CMUnitTest tests_lock[] = {
+            cmocka_unit_test_setup_teardown(test_resctrl_lock_yield_exclusive,
+                                            lock_dir_make, lock_dir_remove),
+            cmocka_unit_test_setup_teardown(test_resctrl_lock_yield_shared,
+                                            lock_dir_make, lock_dir_remove),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_yield_waits_the_rest_after_a_signal,
+                lock_dir_make, lock_dir_remove),
+            cmocka_unit_test_setup_teardown(test_resctrl_lock_yield_not_locked,
+                                            lock_dir_make, lock_dir_remove),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_yield_lock_kept_by_another, lock_dir_make,
+                lock_dir_remove),
+        };
+
         result += cmocka_run_group_tests(tests, NULL, NULL);
+        result += cmocka_run_group_tests(tests_lock, NULL, NULL);
 
         return result;
 }
