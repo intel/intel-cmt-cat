@@ -45,7 +45,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
-static int mba_ctrl = -1; /**< mba ctrl support */
+/** MBA CTRL support where os_cap_init() found it out, -1 where it did not */
+static int mba_ctrl = -1;
 
 /**
  * @brief Retrieves number of ways
@@ -115,6 +116,11 @@ int
 os_cap_init(const enum pqos_interface inter)
 {
         int ret = PQOS_RETVAL_OK;
+
+        /* found out anew at each initialisation: what an earlier one found
+         * says nothing of how resctrl has been mounted since
+         */
+        mba_ctrl = -1;
 
         /**
          * resctrl detection
