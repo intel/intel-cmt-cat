@@ -693,11 +693,14 @@ os_alloc_reset_only_kept(const unsigned *tasks,
  * moved, as one that is exiting cannot on some kernels, is left as it is: a
  * read that lists no task but those the pass before could not move, each the
  * same task by its start time, has them written once more, and if none of
- * them moves then either, that ends the class. A task that has the TID of a
- * kept one since is not one of them, and is moved, or kept itself. A class
- * still listing other tasks after RESET_TASKS_PASSES passes fails. Tasks the
- * last of those passes could not move get their one more write, and a class
- * that lists any task after that fails too.
+ * them moves then either, that ends the class. A task is kept by the start
+ * time read before its write, and only if it still has that start time after
+ * it: a task that took its TID at the write is another, which no write has
+ * been tried on. A task that has the TID of a kept one since is not one of
+ * them, and is moved, or kept itself. A class still listing other tasks after
+ * RESET_TASKS_PASSES passes fails. Tasks the last of those passes could not
+ * move get their one more write, and a class that lists any task after that
+ * fails too.
  *
  * @param [in] class_id class whose tasks are moved
  *
@@ -759,6 +762,9 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                 }
                 for (i = 0; i < count; i++) {
                         const pid_t pid = (pid_t)tasks[i];
+                        unsigned long long start = 0;
+                        unsigned long long start_after = 0;
+                        int start_known;
 
                         /*
                          * Tasks listed may exit between the read and the
@@ -778,6 +784,13 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                           pid);
                                 continue;
                         }
+                        /* who the write is tried on: a task it cannot move
+                         * is kept as that task, and not as one that has
+                         * taken its TID since, which no write has been tried
+                         * on
+                         */
+                        start_known =
+                            os_alloc_task_start(pid, &start) == PQOS_RETVAL_OK;
                         alloc_result = os_alloc_assoc_set_pid(pid, clos0);
                         if (alloc_result == PQOS_RETVAL_PARAM) {
                                 /* gone at the write, or still there and not
@@ -785,11 +798,12 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                  * kernels
                                  */
                                 alloc_result = PQOS_RETVAL_OK;
-                                if (resctrl_alloc_task_validate(pid) !=
+                                if (!start_known ||
+                                    resctrl_alloc_task_validate(pid) !=
                                         PQOS_RETVAL_OK ||
-                                    os_alloc_task_start(
-                                        pid, &kept[num_kept].start) !=
-                                        PQOS_RETVAL_OK) {
+                                    os_alloc_task_start(pid, &start_after) !=
+                                        PQOS_RETVAL_OK ||
+                                    start_after != start) {
                                         LOG_DEBUG("Task %d exited at its "
                                                   "write\n",
                                                   pid);
@@ -797,7 +811,8 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                                         LOG_DEBUG("Task %d could not be "
                                                   "moved, left in CLOS%u\n",
                                                   pid, class_id);
-                                        kept[num_kept++].tid = tasks[i];
+                                        kept[num_kept].tid = tasks[i];
+                                        kept[num_kept++].start = start;
                                 }
                         } else if (alloc_result != PQOS_RETVAL_OK) {
                                 LOG_ERROR("Error allocating task %d to "

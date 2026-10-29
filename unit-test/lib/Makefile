@@ -802,6 +802,7 @@ $(BIN_DIR)/test_os_allocation: test_os_allocation.c $(LIB_OBJS)
 		-Wl,--wrap=pqos_dir_exists \
 		-Wl,--wrap=resctrl_mon_active \
 		-Wl,--wrap=pqos_fread_uint64 \
+		-Wl,--wrap=pqos_fopen \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

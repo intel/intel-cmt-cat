@@ -41,6 +41,7 @@
 #include "test.h"
 
 #include <signal.h>
+#include <stdio.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1649,6 +1650,89 @@ test_os_l2ca_get_min_cbm_bits_unsupported(void **state)
 
 int os_alloc_task_start(const pid_t tid, unsigned long long *start);
 
+/* the record a case gives in place of a file, NULL for the file itself */
+static const char *record;
+
+FILE *__real_pqos_fopen(const char *name, const char *mode);
+
+/* the library's pqos_fopen(), or a file that holds record: this file's own,
+ * as mock_common.c's, which is weak, has every call expected
+ */
+FILE *
+__wrap_pqos_fopen(const char *name, const char *mode)
+{
+        FILE *fd;
+
+        if (record == NULL)
+                return __real_pqos_fopen(name, mode);
+
+        fd = tmpfile();
+        assert_non_null(fd);
+        fputs(record, fd);
+        rewind(fd);
+
+        return fd;
+}
+
+static int
+record_back(void **state __attribute__((unused)))
+{
+        record = NULL;
+
+        return 0;
+}
+
+/* the start time is field 22 of the record, counted from the last ')', as a
+ * name may hold a ')' and spaces itself: each field after the name holds its
+ * own number, so that a parser that reads another field gives another one
+ */
+static void
+test_os_alloc_task_start_field_22(void **state __attribute__((unused)))
+{
+        unsigned long long start = 0;
+
+        record = "4321 (a) b c) d) S 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 "
+                 "19 20 21 22 23 24 25\n";
+        assert_int_equal(os_alloc_task_start(4321, &start), PQOS_RETVAL_OK);
+        assert_int_equal(start, 22);
+
+        /* a record that ends before field 22 */
+        record = "4321 (a) b c) d) S 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 "
+                 "19 20 21\n";
+        assert_int_equal(os_alloc_task_start(4321, &start), PQOS_RETVAL_ERROR);
+
+        /* a field 22 that is not a number */
+        record = "4321 (a) S 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 "
+                 "x 23\n";
+        assert_int_equal(os_alloc_task_start(4321, &start), PQOS_RETVAL_ERROR);
+
+        /* no name */
+        record = "4321 S 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22\n";
+        assert_int_equal(os_alloc_task_start(4321, &start), PQOS_RETVAL_ERROR);
+}
+
+/* the child and the pipe of the case below, which its teardown ends and
+ * closes, wherever the case stopped: the child is forgotten once reaped, so
+ * that no task that has its PID since is signalled
+ */
+static pid_t start_child = -1;
+static int start_go = -1;
+
+static int
+start_child_end(void **state __attribute__((unused)))
+{
+        if (start_go >= 0)
+                close(start_go);
+        start_go = -1;
+        if (start_child > 0) {
+                (void)kill(start_child, SIGKILL);
+                (void)waitpid(start_child, NULL, 0);
+        }
+        start_child = -1;
+
+        return 0;
+}
+
 /* a child's start time, read from the real /proc: the same once it has a name
  * with a ')' and spaces in it and has exited, as a zombie waiting to be
  * reaped still has its record, and none once it has been reaped
@@ -1663,31 +1747,39 @@ test_os_alloc_task_start(void **state __attribute__((unused)))
         unsigned long long after;
 
         assert_int_equal(pipe(go), 0);
+        start_go = go[1];
         child = fork();
-        assert_true(child >= 0);
         if (child == 0) {
                 char c;
 
                 close(go[1]);
                 if (read(go[0], &c, 1) != 1)
                         _exit(1);
-                (void)prctl(PR_SET_NAME, "a) b c) d");
+                /* a name not renamed would not be the case's */
+                if (prctl(PR_SET_NAME, "a) b c) d") != 0)
+                        _exit(2);
                 _exit(0);
         }
         close(go[0]);
+        assert_true(child > 0);
+        start_child = child;
 
         assert_int_equal(os_alloc_task_start(child, &before), PQOS_RETVAL_OK);
         assert_true(before > 0);
 
         assert_int_equal(write(go[1], "g", 1), 1);
         close(go[1]);
+        start_go = -1;
         memset(&info, 0, sizeof(info));
         assert_int_equal(waitid(P_PID, child, &info, WEXITED | WNOWAIT), 0);
+        assert_int_equal(info.si_code, CLD_EXITED);
+        assert_int_equal(info.si_status, 0);
 
         assert_int_equal(os_alloc_task_start(child, &after), PQOS_RETVAL_OK);
         assert_true(after == before);
 
         assert_int_equal(waitpid(child, NULL, 0), child);
+        start_child = -1;
         assert_int_equal(os_alloc_task_start(child, &after), PQOS_RETVAL_ERROR);
 }
 
@@ -1715,7 +1807,10 @@ main(void)
             cmocka_unit_test(test_os_alloc_init_unmounted),
             cmocka_unit_test(test_os_l3ca_get_min_cbm_bits),
             cmocka_unit_test(test_os_l2ca_get_min_cbm_bits_unsupported),
-            cmocka_unit_test(test_os_alloc_task_start)};
+            cmocka_unit_test_teardown(test_os_alloc_task_start_field_22,
+                                      record_back),
+            cmocka_unit_test_teardown(test_os_alloc_task_start,
+                                      start_child_end)};
 
         const struct CMUnitTest tests_l2ca[] = {
             cmocka_unit_test(test_os_l2ca_set_param),

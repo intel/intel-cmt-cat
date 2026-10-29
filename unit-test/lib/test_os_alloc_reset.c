@@ -213,6 +213,41 @@ expect_task_not_moved(const pid_t task)
         will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
 }
 
+/* the write of task \a value, the TID \a tid, at which another task takes
+ * the TID: from that read of the class on, its start time is the other
+ * task's
+ */
+static int
+tid_taken_at_write(const LargestIntegralType value,
+                   const LargestIntegralType tid)
+{
+        if (value != tid)
+                return 0;
+        reused_tid = (pid_t)tid;
+        reused_from = reads;
+        return 1;
+}
+
+/* task \a task written and not moved, and reaped at the write, where
+ * another task takes its TID, which is there when looked at again
+ */
+static void
+expect_task_taken_at_write(const pid_t task)
+{
+        expect_value(__wrap_resctrl_alloc_task_validate, task, task);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_get_pid, task, task);
+        will_return(__wrap_resctrl_mon_assoc_get_pid, PQOS_RETVAL_RESOURCE);
+        expect_check(__wrap_resctrl_alloc_assoc_set_pid, task,
+                     tid_taken_at_write, task);
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, class_id, 0);
+        will_return(__wrap_resctrl_alloc_assoc_set_pid, PQOS_RETVAL_PARAM);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, task);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+}
+
 /* the classes from \a first on, read and found to list no task */
 static void expect_classes_empty(void **state, const unsigned first);
 
@@ -443,9 +478,9 @@ test_os_alloc_reset_tasks_task_kept_by_the_tenth_pass(void **state)
 }
 
 /* the write past the limit is the last: of the two tasks the tenth pass
- * could not move, the one whose TID a live task has taken since is moved,
- * and the read after, which lists only the other, fails the class, which is
- * said once
+ * could not move, the same two by their start times, one moves at that
+ * write, and the read after, which lists only the other, fails the class,
+ * which is said once
  */
 static void
 test_os_alloc_reset_tasks_limit_after_the_kept_tasks_write(void **state)
@@ -656,8 +691,9 @@ test_os_alloc_reset_tasks_unmovable_child_reads_class_again(void **state)
 }
 
 /* the task listed could not be moved, and is reaped; the next read lists a
- * task that has its TID since, a live one forked into the class, which the
- * write moves: the class is read again, and lists none
+ * task that has its TID since, a live one forked into the class, which its
+ * start time tells from the task kept, and which the write moves: the class
+ * is read again, and lists none
  */
 static void
 test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved(void **state)
@@ -667,6 +703,9 @@ test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved(void **state)
         int ret;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        reads = 0;
+        reused_tid = 11;
+        reused_from = 2;
 
         expect_class_read(1, cos1, DIM(cos1));
         expect_task_not_moved(11);
@@ -701,6 +740,40 @@ test_os_alloc_reset_tasks_kept_tid_taken_by_another_task(void **state)
 
         expect_class_read(1, read1, DIM(read1));
         expect_task_not_moved(11);
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_class_read(1, read3, DIM(read3));
+        expect_task_not_moved(11);
+        expect_task_moved(12, 0, PQOS_RETVAL_OK);
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_not_moved(11);
+        expect_classes_empty(state, 2);
+
+        test_log_count_start();
+        ret = os_alloc_reset_tasks();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* task 11 cannot be moved, and is reaped at its write, where another task
+ * forked into the class takes its TID: the task is not kept, as the start
+ * time after the write is not the one before it, so the next read, which
+ * lists TID 11 again, has a pass of its own. The other task cannot be moved
+ * either, and forks a child into the class at its write, which the read
+ * after lists, and moves
+ */
+static void
+test_os_alloc_reset_tasks_tid_taken_at_the_write(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const unsigned read1[] = {11};
+        const unsigned read3[] = {11, 12};
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+
+        expect_class_read(1, read1, DIM(read1));
+        expect_task_taken_at_write(11);
         expect_class_read(1, read1, DIM(read1));
         expect_task_not_moved(11);
         expect_class_read(1, read3, DIM(read3));
@@ -841,11 +914,14 @@ main(void)
                 test_os_alloc_reset_tasks_unmovable_task_reads_class_again),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_unmovable_child_reads_class_again),
-            cmocka_unit_test(
-                test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved),
+            cmocka_unit_test_teardown(
+                test_os_alloc_reset_tasks_task_with_a_kept_tid_is_moved,
+                tid_back),
             cmocka_unit_test_teardown(
                 test_os_alloc_reset_tasks_kept_tid_taken_by_another_task,
                 tid_back),
+            cmocka_unit_test_teardown(
+                test_os_alloc_reset_tasks_tid_taken_at_the_write, tid_back),
             cmocka_unit_test(
                 test_os_alloc_reset_tasks_kept_tasks_in_another_order),
             cmocka_unit_test(test_os_alloc_reset_tasks_unreadable),
