@@ -213,8 +213,9 @@ PQOS_LOCAL unsigned *resctrl_alloc_task_read(unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_PARAM the task has ended, before or during the search
- * @retval PQOS_RETVAL_ERROR a tasks file could not be opened or read, or the
- *         task is in none
+ * @retval PQOS_RETVAL_ERROR the task is in no tasks file read, as when it is
+ *         in the one of a class that could not be read, or a tasks file
+ *         could not be opened
  */
 PQOS_LOCAL int resctrl_alloc_task_search(unsigned *class_id,
                                          const struct pqos_cap *cap,

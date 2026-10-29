@@ -167,6 +167,97 @@ test_os_alloc_assoc_set_pid_active_mon(void **state)
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* a task whose monitoring group cannot be looked up is not moved: the move
+ * would take it out of a group it may be in, with no name to put it back in
+ */
+static void
+test_os_alloc_assoc_set_pid_mon_lookup_error(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned class_id = 1;
+        pid_t task = 2;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_get_pid, task, task);
+        will_return(__wrap_resctrl_mon_assoc_get_pid, PQOS_RETVAL_ERROR);
+        /* and no write to a tasks file: resctrl_alloc_assoc_set_pid() is not
+         * expected
+         */
+
+        ret = os_alloc_assoc_set_pid(task, class_id);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+/* a task moved that cannot be put back in its monitoring group has been
+ * taken out of its monitoring: the call fails
+ */
+static void
+test_os_alloc_assoc_set_pid_mon_restore_error(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned class_id = 1;
+        pid_t task = 2;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_get_pid, task, task);
+        will_return(__wrap_resctrl_mon_assoc_get_pid, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, task, task);
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, class_id, class_id);
+        will_return(__wrap_resctrl_alloc_assoc_set_pid, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, task);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_ERROR);
+
+        ret = os_alloc_assoc_set_pid(task, class_id);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+/* a task that ended after its move is in no monitoring group to be put back
+ * in: that is no failure
+ */
+static void
+test_os_alloc_assoc_set_pid_mon_restore_task_ended(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned class_id = 1;
+        pid_t task = 2;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_get_pid, task, task);
+        will_return(__wrap_resctrl_mon_assoc_get_pid, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, task, task);
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, class_id, class_id);
+        will_return(__wrap_resctrl_alloc_assoc_set_pid, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, task);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_PARAM);
+
+        ret = os_alloc_assoc_set_pid(task, class_id);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 static void
 test_os_alloc_assoc_set_pid_param(void **state)
 {
@@ -198,7 +289,11 @@ main(void)
             cmocka_unit_test(test_os_alloc_assoc_set_active_mon),
             cmocka_unit_test(test_os_alloc_assoc_set_pid),
             cmocka_unit_test(test_os_alloc_assoc_set_pid_param),
-            cmocka_unit_test(test_os_alloc_assoc_set_pid_active_mon)};
+            cmocka_unit_test(test_os_alloc_assoc_set_pid_active_mon),
+            cmocka_unit_test(test_os_alloc_assoc_set_pid_mon_lookup_error),
+            cmocka_unit_test(test_os_alloc_assoc_set_pid_mon_restore_error),
+            cmocka_unit_test(
+                test_os_alloc_assoc_set_pid_mon_restore_task_ended)};
 
         const struct CMUnitTest tests_unsupported[] = {};
 

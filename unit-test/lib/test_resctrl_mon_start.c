@@ -1192,6 +1192,123 @@ test_resctrl_mon_stop_pid_thread_never_added(void **state)
         assert_null(intl.resctrl.mon_group);
 }
 
+/* a thread that cannot be moved back does not end the stop: the next one is
+ * moved, the group's directory, which gives its class the tasks still in it,
+ * is removed, what the group held is freed, and the stop fails
+ */
+static void
+test_resctrl_mon_stop_pid_thread_not_moved_back(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1, 2};
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        intl.resctrl.mon_group = strdup("test");
+        assert_non_null(intl.resctrl.mon_group);
+        intl.resctrl.pkgids = calloc(1, sizeof(*intl.resctrl.pkgids));
+        assert_non_null(intl.resctrl.pkgids);
+        intl.resctrl.num_pkgids = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[0]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_any(__wrap_resctrl_mon_assoc_set_pid, name);
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_ERROR);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[1]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[1]);
+        expect_any(__wrap_resctrl_mon_assoc_set_pid, name);
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(intl.resctrl.mon_group);
+        assert_null(intl.resctrl.pkgids);
+        assert_int_equal(intl.resctrl.num_pkgids, 0);
+}
+
+/* a directory that cannot be removed fails the stop, and what the group held
+ * is freed all the same: pqos_mon_stop() frees the group whatever it returns
+ */
+static void
+test_resctrl_mon_stop_pid_directory_not_removed(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1};
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        intl.resctrl.mon_group = strdup("test");
+        assert_non_null(intl.resctrl.mon_group);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_alloc_task_validate, task, tids[0]);
+        will_return(__wrap_resctrl_alloc_task_validate, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, tids[0]);
+        expect_any(__wrap_resctrl_mon_assoc_set_pid, name);
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_ERROR);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(intl.resctrl.mon_group);
+}
+
+/* with no count of classes, nothing can be taken out of them, and what the
+ * group held is freed all the same
+ */
+static void
+test_resctrl_mon_stop_pid_no_classes(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pid = 1;
+        pid_t tids[] = {1};
+        int ret;
+
+        pid_group(&group, &intl, &pid, tids, DIM(tids));
+        intl.resctrl.mon_group = strdup("test");
+        assert_non_null(intl.resctrl.mon_group);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_ERROR);
+
+        ret = resctrl_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(intl.resctrl.mon_group);
+}
+
 static void
 test_resctrl_mon_start_pid_add_fails_before_any_thread(void **state)
 {
@@ -2238,6 +2355,9 @@ main(void)
             cmocka_unit_test(
                 test_resctrl_mon_stop_pid_thread_ended_at_the_write),
             cmocka_unit_test(test_resctrl_mon_stop_pid_thread_never_added),
+            cmocka_unit_test(test_resctrl_mon_stop_pid_thread_not_moved_back),
+            cmocka_unit_test(test_resctrl_mon_stop_pid_directory_not_removed),
+            cmocka_unit_test(test_resctrl_mon_stop_pid_no_classes),
             cmocka_unit_test(
                 test_resctrl_mon_start_pid_add_fails_before_any_thread),
             cmocka_unit_test(test_resctrl_mon_start_pid_unnamed),

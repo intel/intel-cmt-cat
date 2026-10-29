@@ -801,42 +801,182 @@ test_resctrl_alloc_task_search_not_found(void **state)
         assert_int_equal(class_id, 7);
 }
 
-/* a read that fails, after a task, ends the search with that error: the task
- * may be in the rest of the file, so it is not looked for in the next class
+/* the last message the library logged at the default verbosity, and how
+ * many there were, from message_keep_start() to message_keep_stop()
  */
+static char kept_message[256];
+static unsigned kept_messages;
+
 static void
-test_resctrl_alloc_task_search_read_error(void **state)
+message_keep(void *context, const size_t size, const char *message)
 {
-        struct test_data *data = (struct test_data *)*state;
-        const unsigned num_classes = data->cap_l3ca.num_classes;
+        (void)context;
+        (void)size;
+        kept_messages++;
+        snprintf(kept_message, sizeof(kept_message), "%s", message);
+}
+
+static void
+message_keep_start(void)
+{
+        kept_messages = 0;
+        kept_message[0] = '\0';
+        (void)log_init(-1, message_keep, NULL, LOG_VER_DEFAULT);
+}
+
+static void
+message_keep_stop(void)
+{
+        test_log_init_silent();
+}
+
+/*
+ * Searches for task 1234, alive when the search starts, the tasks files of
+ * classes num_classes - 1 down to 0 given in fds; if the task is in none of
+ * them, it is alive_after at the end. The messages are kept
+ */
+static int
+search_files(struct test_data *data,
+             FILE **fds,
+             const unsigned num_classes,
+             const int in_none,
+             const int alive_after,
+             unsigned *class_id)
+{
+        const unsigned classes_before = data->cap_l3ca.num_classes;
         const pid_t task = 1234;
-        int calls = 0;
-        cookie_io_functions_t io = {.read = one_task_then_eio};
-        FILE *fd = fopencookie(&calls, "r", io);
-        unsigned class_id = 7;
-        unsigned logged;
+        unsigned i;
         int ret;
 
-        assert_non_null(fd);
-        data->cap_l3ca.num_classes = 2;
-
+        data->cap_l3ca.num_classes = num_classes;
         expect_value(__wrap_kill, pid, task);
         expect_value(__wrap_kill, sig, 0);
         will_return(__wrap_kill, 0);
-        /* the highest class is searched first, and class 0 is not opened */
-        expect_tasks_file(1, fd);
+        for (i = num_classes; i-- > 0;)
+                expect_tasks_file(i, fds[i]);
+        if (in_none) {
+                expect_value(__wrap_kill, pid, task);
+                expect_value(__wrap_kill, sig, 0);
+                will_return(__wrap_kill, alive_after ? 0 : -ESRCH);
+        }
 
-        test_log_count_start();
-        ret = resctrl_alloc_task_search(&class_id, data->cap, task);
-        logged = test_log_count_stop();
+        message_keep_start();
+        ret = resctrl_alloc_task_search(class_id, data->cap, task);
+        message_keep_stop();
 
-        data->cap_l3ca.num_classes = num_classes;
-        fclose(fd);
+        data->cap_l3ca.num_classes = classes_before;
+        return ret;
+}
+
+/* a read that fails is not the end of the file, nor of the search: a task is
+ * in one class only, so where it is in another, it is found there
+ */
+static void
+test_resctrl_alloc_task_search_read_error_found_elsewhere(void **state)
+{
+        int calls = 0;
+        cookie_io_functions_t io = {.read = one_task_then_eio};
+        FILE *fds[2] = {tmpfile(), fopencookie(&calls, "r", io)};
+        unsigned class_id = 7;
+        int ret;
+
+        assert_non_null(fds[0]);
+        assert_non_null(fds[1]);
+        fprintf(fds[0], "1\n1234\n");
+        rewind(fds[0]);
+
+        ret = search_files((struct test_data *)*state, fds, DIM(fds), 0, 1,
+                           &class_id);
+        fclose(fds[0]);
+        fclose(fds[1]);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(class_id, 0);
+        assert_int_equal(kept_messages, 0);
+        assert_true(calls >= 2);
+}
+
+/* a running task in none of the files read may be in the rest of the one that
+ * could not be read: the search fails, naming that class
+ */
+static void
+test_resctrl_alloc_task_search_read_error_in_none(void **state)
+{
+        int calls = 0;
+        cookie_io_functions_t io = {.read = one_task_then_eio};
+        FILE *fds[2] = {tmpfile(), fopencookie(&calls, "r", io)};
+        unsigned class_id = 7;
+        int ret;
+
+        assert_non_null(fds[0]);
+        assert_non_null(fds[1]);
+        fprintf(fds[0], "1\n2\n");
+        rewind(fds[0]);
+
+        ret = search_files((struct test_data *)*state, fds, DIM(fds), 1, 1,
+                           &class_id);
+        fclose(fds[0]);
+        fclose(fds[1]);
 
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
-        assert_int_equal(logged, 1);
         assert_int_equal(class_id, 7);
-        assert_true(calls >= 2);
+        assert_int_equal(kept_messages, 1);
+        assert_non_null(strstr(kept_message, "tasks file for CLOS 1 could not "
+                                             "be read"));
+}
+
+/* two classes that could not be read are both counted, the first named */
+static void
+test_resctrl_alloc_task_search_read_errors_in_none(void **state)
+{
+        int calls1 = 0, calls2 = 0;
+        cookie_io_functions_t io = {.read = one_task_then_eio};
+        FILE *fds[3] = {tmpfile(), fopencookie(&calls1, "r", io),
+                        fopencookie(&calls2, "r", io)};
+        unsigned class_id = 7;
+        int ret;
+
+        assert_non_null(fds[0]);
+        assert_non_null(fds[1]);
+        assert_non_null(fds[2]);
+
+        ret = search_files((struct test_data *)*state, fds, DIM(fds), 1, 1,
+                           &class_id);
+        fclose(fds[0]);
+        fclose(fds[1]);
+        fclose(fds[2]);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(class_id, 7);
+        assert_int_equal(kept_messages, 1);
+        assert_non_null(strstr(kept_message, "tasks files for 2 CLOS could "
+                                             "not be read, CLOS 2 among "
+                                             "them"));
+}
+
+/* a task that ended during the search is in none of the files either: that
+ * is the benign race it is anyway, whatever could not be read
+ */
+static void
+test_resctrl_alloc_task_search_read_error_task_ended(void **state)
+{
+        int calls = 0;
+        cookie_io_functions_t io = {.read = one_task_then_eio};
+        FILE *fds[2] = {tmpfile(), fopencookie(&calls, "r", io)};
+        unsigned class_id = 7;
+        int ret;
+
+        assert_non_null(fds[0]);
+        assert_non_null(fds[1]);
+
+        ret = search_files((struct test_data *)*state, fds, DIM(fds), 1, 0,
+                           &class_id);
+        fclose(fds[0]);
+        fclose(fds[1]);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(class_id, 7);
+        assert_int_equal(kept_messages, 0);
 }
 
 static void
@@ -954,7 +1094,13 @@ main(void)
             cmocka_unit_test(test_resctrl_alloc_task_search_ended_before),
             cmocka_unit_test(test_resctrl_alloc_task_search_ended_during),
             cmocka_unit_test(test_resctrl_alloc_task_search_not_found),
-            cmocka_unit_test(test_resctrl_alloc_task_search_read_error),
+            cmocka_unit_test(
+                test_resctrl_alloc_task_search_read_error_found_elsewhere),
+            cmocka_unit_test(test_resctrl_alloc_task_search_read_error_in_none),
+            cmocka_unit_test(
+                test_resctrl_alloc_task_search_read_errors_in_none),
+            cmocka_unit_test(
+                test_resctrl_alloc_task_search_read_error_task_ended),
             cmocka_unit_test(test_resctrl_alloc_task_search_no_groups),
             cmocka_unit_test(test_resctrl_alloc_schemata_write_l3ca)};
 

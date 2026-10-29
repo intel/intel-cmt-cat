@@ -2307,6 +2307,7 @@ int
 resctrl_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
+        int retval = PQOS_RETVAL_OK;
         unsigned max_clos;
         unsigned i;
         const struct pqos_cap *cap = _pqos_get_cap();
@@ -2321,12 +2322,21 @@ resctrl_mon_stop(struct pqos_mon_data *group)
          */
         mon_started_remove(group);
 
+        /* which is also why a failed step does not end the stop: what the
+         * group holds is freed however it ends, and the steps after a failed
+         * one are still taken, the failure being the one the stop returns
+         */
         ret = resctrl_alloc_get_grps_num(cap, &max_clos);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+        if (ret != PQOS_RETVAL_OK) {
+                retval = ret;
+                goto resctrl_mon_stop_free;
+        }
 
         /*
-         * Add pids back to the default group
+         * Add pids back to the default group. One that cannot be is left to
+         * the removal of the group's directory below, which gives the tasks
+         * still in it to its class, as the moves would, and the others are
+         * moved all the same
          */
         if (group->num_pids > 0)
                 for (i = 0; i < group->tid_nr; i++) {
@@ -2347,13 +2357,10 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                                 continue;
                         }
                         ret = resctrl_mon_assoc_set_pid(tid, NULL);
-                        if (ret == PQOS_RETVAL_PARAM) {
-                                /* ended after the check above */
-                                ret = PQOS_RETVAL_OK;
-                                continue;
-                        }
-                        if (ret != PQOS_RETVAL_OK)
-                                goto resctrl_mon_stop_exit;
+                        /* PARAM: ended after the check above */
+                        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_PARAM &&
+                            retval == PQOS_RETVAL_OK)
+                                retval = ret;
                 }
 
         /*
@@ -2372,14 +2379,14 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                         ret = resctrl_mon_group_path(clos, mon_group, NULL,
                                                      path, sizeof(path));
                         if (ret != PQOS_RETVAL_OK)
-                                goto resctrl_mon_stop_exit;
+                                break;
                         if (!pqos_dir_exists(path))
                                 continue;
 
                         ret =
                             resctrl_mon_cpumask_read(clos, mon_group, &cpumask);
                         if (ret != PQOS_RETVAL_OK)
-                                goto resctrl_mon_stop_exit;
+                                break;
 
                         for (i = 0; i < group->num_cores; i++) {
                                 const unsigned core = group->cores[i];
@@ -2390,43 +2397,39 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                         ret = resctrl_mon_cpumask_write(clos, mon_group,
                                                         &cpumask);
                         if (ret != PQOS_RETVAL_OK)
-                                goto resctrl_mon_stop_exit;
+                                break;
                 } while (++clos < max_clos);
+                if (ret != PQOS_RETVAL_OK && retval == PQOS_RETVAL_OK)
+                        retval = ret;
         }
 
+        /* the directory goes, taking its tasks and cores out of the group
+         * whether or not the steps above could, unless it is shared
+         */
         if (group->intl->resctrl.mon_group != NULL) {
                 unsigned shared;
 
                 ret = resctrl_mon_shared(group, &shared);
-                if (ret != PQOS_RETVAL_OK)
-                        goto resctrl_mon_stop_exit;
-
-                if (!shared) {
+                if (ret == PQOS_RETVAL_OK && !shared)
                         ret =
                             resctrl_mon_delete(group->intl->resctrl.mon_group);
-                        if (ret != PQOS_RETVAL_OK)
-                                goto resctrl_mon_stop_exit;
-                }
-
-                free(group->intl->resctrl.mon_group);
-                group->intl->resctrl.mon_group = NULL;
+                if (ret != PQOS_RETVAL_OK && retval == PQOS_RETVAL_OK)
+                        retval = ret;
         }
 
-        if (group->intl->resctrl.l3id != NULL) {
-                free(group->intl->resctrl.l3id);
-                group->intl->resctrl.l3id = NULL;
-        }
+resctrl_mon_stop_free:
+        free(group->intl->resctrl.mon_group);
+        group->intl->resctrl.mon_group = NULL;
+
+        free(group->intl->resctrl.l3id);
+        group->intl->resctrl.l3id = NULL;
         group->intl->resctrl.num_l3id = 0;
 
-        if (group->intl->resctrl.pkgids != NULL) {
-                free(group->intl->resctrl.pkgids);
-                group->intl->resctrl.pkgids = NULL;
-        }
-
+        free(group->intl->resctrl.pkgids);
+        group->intl->resctrl.pkgids = NULL;
         group->intl->resctrl.num_pkgids = 0;
 
-resctrl_mon_stop_exit:
-        return ret;
+        return retval;
 }
 
 /**

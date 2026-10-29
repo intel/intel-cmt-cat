@@ -2467,27 +2467,41 @@ os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
          * groups. Obtain monitoring group name
          */
         ret_mon = resctrl_mon_assoc_get_pid(task, mon_group, sizeof(mon_group));
-        if (ret_mon == PQOS_RETVAL_PARAM)
+        if (ret_mon == PQOS_RETVAL_PARAM) {
                 LOG_DEBUG("Skipping monitoring group lookup for task %d: "
                           "task no longer exists (benign race during reset).\n",
                           task);
-        else if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
-                LOG_WARN("Failed to obtain monitoring group assignment for "
-                         "task %d\n",
-                         task);
+        } else if (ret_mon != PQOS_RETVAL_OK &&
+                   ret_mon != PQOS_RETVAL_RESOURCE) {
+                /* a task whose monitoring group is not known is not moved:
+                 * the move would take it out of a group it may be in, with
+                 * no name to put it back in
+                 */
+                LOG_ERROR("Failed to obtain monitoring group assignment for "
+                          "task %d\n",
+                          task);
+                ret = ret_mon;
+                goto os_alloc_assoc_set_pid_exit;
+        }
 
         /* Write to tasks file */
         ret = resctrl_alloc_assoc_set_pid(task, class_id);
         if (ret != PQOS_RETVAL_OK)
                 goto os_alloc_assoc_set_pid_exit;
 
-        /* Task monitoring was started assign it back to monitoring group */
+        /* Task monitoring was started assign it back to monitoring group. A
+         * task that ended since its move is in no group any more, which is
+         * no failure; any other failure is the call's, as the move has taken
+         * the task out of its monitoring
+         */
         if (ret_mon == PQOS_RETVAL_OK) {
-                ret_mon = resctrl_mon_assoc_set_pid(task, mon_group);
-                if (ret_mon != PQOS_RETVAL_OK)
-                        LOG_WARN("Could not assign task %d back to monitoring "
-                                 "group\n",
-                                 task);
+                ret = resctrl_mon_assoc_set_pid(task, mon_group);
+                if (ret == PQOS_RETVAL_PARAM)
+                        ret = PQOS_RETVAL_OK;
+                else if (ret != PQOS_RETVAL_OK)
+                        LOG_ERROR("Could not assign task %d back to "
+                                  "monitoring group\n",
+                                  task);
         }
 
 os_alloc_assoc_set_pid_exit:

@@ -525,6 +525,7 @@ resctrl_alloc_task_search(unsigned *class_id,
 {
         FILE *fd;
         unsigned i, max_clos = 0;
+        unsigned unread = 0, num_unread = 0;
         int ret;
 
         /* Check if task exists */
@@ -573,12 +574,14 @@ resctrl_alloc_task_search(unsigned *class_id,
                         }
                 }
                 /* a read that failed is not the end of the file: the task
-                 * may be in the rest of it, and would be found in no class
+                 * may be in the rest of it. A task is in one class only, so
+                 * the others are searched all the same, and the class that
+                 * could not be read is named if the task is in none of them
                  */
                 if (ferror(fd)) {
-                        LOG_ERROR("Could not read tasks file for CLOS %u\n", i);
-                        resctrl_alloc_fclose(fd);
-                        return PQOS_RETVAL_ERROR;
+                        LOG_DEBUG("Could not read tasks file for CLOS %u\n", i);
+                        if (num_unread++ == 0)
+                                unread = i;
                 }
                 if (resctrl_alloc_fclose(fd) != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
@@ -590,6 +593,18 @@ resctrl_alloc_task_search(unsigned *class_id,
                           "task that ended before the search.\n",
                           (int)task);
                 return PQOS_RETVAL_PARAM;
+        }
+        if (num_unread == 1) {
+                LOG_ERROR("Failed to get association for task %d: tasks file "
+                          "for CLOS %u could not be read\n",
+                          (int)task, unread);
+                return PQOS_RETVAL_ERROR;
+        }
+        if (num_unread > 1) {
+                LOG_ERROR("Failed to get association for task %d: tasks files "
+                          "for %u CLOS could not be read, CLOS %u among them\n",
+                          (int)task, num_unread, unread);
+                return PQOS_RETVAL_ERROR;
         }
         /* If not found in any CLOS group - return error */
         LOG_ERROR("Failed to get association for task %d!\n", (int)task);
