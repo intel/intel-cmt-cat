@@ -42,6 +42,49 @@
 
 /* ======== mock ======== */
 
+void __real_free(void *ptr);
+
+/* the pointers a case watches being freed, and how many times each was. A
+ * stop's tests check that what a group holds is released, and not just that
+ * the group's pointers to it are cleared
+ */
+static void *watched[3];
+static unsigned frees_of_watched[3];
+
+void
+__wrap_free(void *ptr)
+{
+        unsigned i;
+
+        for (i = 0; i < DIM(watched); i++)
+                if (ptr != NULL && ptr == watched[i])
+                        frees_of_watched[i]++;
+        __real_free(ptr);
+}
+
+static void
+watch_frees(void *a, void *b, void *c)
+{
+        watched[0] = a;
+        watched[1] = b;
+        watched[2] = c;
+        memset(frees_of_watched, 0, sizeof(frees_of_watched));
+}
+
+/* each pointer watched was freed once; the watch ends, as an address freed
+ * can be given out again
+ */
+static void
+assert_watched_freed_once(void)
+{
+        unsigned i;
+
+        for (i = 0; i < DIM(watched); i++)
+                if (watched[i] != NULL)
+                        assert_int_equal(frees_of_watched[i], 1);
+        memset(watched, 0, sizeof(watched));
+}
+
 int
 resctrl_mon_is_supported(void)
 {
@@ -1212,6 +1255,7 @@ test_resctrl_mon_stop_pid_thread_not_moved_back(void **state)
         intl.resctrl.pkgids = calloc(1, sizeof(*intl.resctrl.pkgids));
         assert_non_null(intl.resctrl.pkgids);
         intl.resctrl.num_pkgids = 1;
+        watch_frees(intl.resctrl.mon_group, intl.resctrl.pkgids, NULL);
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
@@ -1240,6 +1284,7 @@ test_resctrl_mon_stop_pid_thread_not_moved_back(void **state)
         assert_null(intl.resctrl.mon_group);
         assert_null(intl.resctrl.pkgids);
         assert_int_equal(intl.resctrl.num_pkgids, 0);
+        assert_watched_freed_once();
 }
 
 /* a directory that cannot be removed fails the stop, and what the group held
@@ -1258,6 +1303,7 @@ test_resctrl_mon_stop_pid_directory_not_removed(void **state)
         pid_group(&group, &intl, &pid, tids, DIM(tids));
         intl.resctrl.mon_group = strdup("test");
         assert_non_null(intl.resctrl.mon_group);
+        watch_frees(intl.resctrl.mon_group, NULL, NULL);
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
@@ -1279,6 +1325,7 @@ test_resctrl_mon_stop_pid_directory_not_removed(void **state)
         ret = resctrl_mon_stop(&group);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
         assert_null(intl.resctrl.mon_group);
+        assert_watched_freed_once();
 }
 
 /* with no count of classes, nothing can be taken out of them, and what the
@@ -1297,6 +1344,7 @@ test_resctrl_mon_stop_pid_no_classes(void **state)
         pid_group(&group, &intl, &pid, tids, DIM(tids));
         intl.resctrl.mon_group = strdup("test");
         assert_non_null(intl.resctrl.mon_group);
+        watch_frees(intl.resctrl.mon_group, NULL, NULL);
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
@@ -1307,6 +1355,7 @@ test_resctrl_mon_stop_pid_no_classes(void **state)
         ret = resctrl_mon_stop(&group);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
         assert_null(intl.resctrl.mon_group);
+        assert_watched_freed_once();
 }
 
 static void
@@ -2221,6 +2270,70 @@ test_resctrl_mon_stop_of_a_directory_already_gone(void **state)
         core_group_free(&intl_a);
 }
 
+/* a core group's stop whose mask write fails goes on: the group's directory,
+ * which gives its class the cores still in it, is removed, the group's name
+ * and L3 IDs are freed, and the stop fails with the write's failure
+ */
+static void
+test_resctrl_mon_stop_core_group_mask_write_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data a;
+        struct pqos_mon_data_internal intl_a;
+        unsigned cores_a[] = {2};
+        unsigned i;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 0);
+
+        start_core_group(&a, &intl_a, cores_a, DIM(cores_a), "pqos-a");
+        assert_non_null(intl_a.resctrl.l3id);
+        watch_frees(intl_a.resctrl.mon_group, intl_a.resctrl.l3id, NULL);
+
+        for (i = 0; i < 3; i++) {
+                will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_alloc_get_grps_num, 1);
+        }
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_resctrl_cpumask_unset, lcore, 2);
+        expect_value(__wrap_resctrl_mon_cpumask_write, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_write, resctrl_group,
+                      "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_write, PQOS_RETVAL_ERROR);
+        /* the check for another group in the directory, which finds none */
+        expect_string(__wrap_pqos_dir_exists, path,
+                      RESCTRL_PATH "/mon_groups/pqos-a");
+        will_return(__wrap_pqos_dir_exists, 1);
+        expect_value(__wrap_resctrl_mon_cpumask_read, class_id, 0);
+        expect_string(__wrap_resctrl_mon_cpumask_read, resctrl_group, "pqos-a");
+        will_return(__wrap_resctrl_mon_cpumask_read, PQOS_RETVAL_OK);
+        for (i = 0; i < data->cpu->num_cores; ++i) {
+                expect_value(__wrap_resctrl_cpumask_get, lcore,
+                             data->cpu->cores[i].lcore);
+                will_return(__wrap_resctrl_cpumask_get, 0);
+        }
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "pqos-a");
+        will_return(__wrap_resctrl_mon_rmdir, PQOS_RETVAL_OK);
+
+        ret = resctrl_mon_stop(&a);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_null(intl_a.resctrl.mon_group);
+        assert_null(intl_a.resctrl.l3id);
+        assert_int_equal(intl_a.resctrl.num_l3id, 0);
+        assert_watched_freed_once();
+
+        core_group_free(&intl_a);
+}
+
 /* after a pqos_mon_reset(), the purge marks the group with the count of
  * resets the restore then compares, so that the directory it removes is made
  * again: the mark is 2 after one reset
@@ -2358,6 +2471,7 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_stop_pid_thread_not_moved_back),
             cmocka_unit_test(test_resctrl_mon_stop_pid_directory_not_removed),
             cmocka_unit_test(test_resctrl_mon_stop_pid_no_classes),
+            cmocka_unit_test(test_resctrl_mon_stop_core_group_mask_write_fails),
             cmocka_unit_test(
                 test_resctrl_mon_start_pid_add_fails_before_any_thread),
             cmocka_unit_test(test_resctrl_mon_start_pid_unnamed),

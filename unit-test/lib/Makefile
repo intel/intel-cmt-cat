@@ -720,6 +720,7 @@ $(BIN_DIR)/test_resctrl_mon_assoc: test_resctrl_mon_assoc.c $(LIB_OBJS)
 $(BIN_DIR)/test_resctrl_mon_start: test_resctrl_mon_start.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=free \
 		-Wl,--wrap=scandir \
 		-Wl,--wrap=pqos_fopen \
 		-Wl,--wrap=pqos_fclose \
