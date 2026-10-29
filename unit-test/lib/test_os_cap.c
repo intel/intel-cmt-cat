@@ -472,10 +472,9 @@ test_os_cap_mba_discover_legacy_control_mode(void **state)
         will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
-        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
-        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
-        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_file_contains, 0);
+        expect_string(__wrap_resctrl_mounted_with, option, "mba_MBps");
+        will_return(__wrap_resctrl_mounted_with, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mounted_with, 0);
 
         expect_string(__wrap_pqos_fread_uint64, fname,
                       "/sys/fs/resctrl/info/MB/min_bandwidth");
@@ -527,10 +526,9 @@ test_os_cap_mba_discover_empty_throttle_value(void **state)
         will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
-        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
-        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
-        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_file_contains, 0);
+        expect_string(__wrap_resctrl_mounted_with, option, "mba_MBps");
+        will_return(__wrap_resctrl_mounted_with, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mounted_with, 0);
 
         /* min_bandwidth holds nothing */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -565,10 +563,9 @@ test_os_cap_mba_discover_empty_delay_linear(void **state)
         will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
-        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
-        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
-        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_file_contains, 0);
+        expect_string(__wrap_resctrl_mounted_with, option, "mba_MBps");
+        will_return(__wrap_resctrl_mounted_with, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mounted_with, 0);
 
         expect_string(__wrap_pqos_fread_uint64, fname,
                       "/sys/fs/resctrl/info/MB/min_bandwidth");
@@ -613,10 +610,9 @@ test_os_cap_mba_discover_default(void **state)
         will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* check if ctrl is enabled */
-        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
-        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
-        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_file_contains, 0);
+        expect_string(__wrap_resctrl_mounted_with, option, "mba_MBps");
+        will_return(__wrap_resctrl_mounted_with, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mounted_with, 0);
 
         /* read throttle_max */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -668,10 +664,9 @@ test_os_cap_mba_discover_ctrl(void **state)
         will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* check if ctrl is enabled */
-        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
-        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
-        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_file_contains, 1);
+        expect_string(__wrap_resctrl_mounted_with, option, "mba_MBps");
+        will_return(__wrap_resctrl_mounted_with, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mounted_with, 1);
 
         /* read throttle_max */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -801,6 +796,32 @@ test_os_cap_get_mba_ctrl_mounted_mbps(void **state)
 
         expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
         will_return(__wrap_pqos_file_exists, 1);
+
+        ret = os_cap_get_mba_ctrl(data->cap, data->cpu, &supported, &enabled);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(supported, 1);
+        assert_int_equal(enabled, 1);
+}
+
+static void
+test_os_cap_get_mba_ctrl_mount_options(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int supported;
+        int enabled;
+        int ret;
+
+        /* the state not known from discovery: resctrl's mount options say
+         * mba_MBps, so it is on, and supported
+         */
+        data->cap_mba.ctrl = -1;
+        data->cap_mba.ctrl_on = -1;
+
+        expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
+        will_return(__wrap_pqos_file_exists, 1);
+        expect_string(__wrap_resctrl_mounted_with, option, "mba_MBps");
+        will_return(__wrap_resctrl_mounted_with, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_mounted_with, 1);
 
         ret = os_cap_get_mba_ctrl(data->cap, data->cpu, &supported, &enabled);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -1166,7 +1187,8 @@ main(void)
             cmocka_unit_test(test_os_cap_get_mba_ctrl_local_bw),
             cmocka_unit_test(test_os_cap_get_mba_ctrl_total_bw),
             cmocka_unit_test(test_os_cap_get_mba_ctrl_no_bw),
-            cmocka_unit_test(test_os_cap_get_mba_ctrl_mounted_mbps)};
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_mounted_mbps),
+            cmocka_unit_test(test_os_cap_get_mba_ctrl_mount_options)};
 
         const struct CMUnitTest tests_mon[] = {
             cmocka_unit_test(test_os_cap_mon_discover_resctrl_llc),

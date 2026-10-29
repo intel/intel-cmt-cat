@@ -135,6 +135,23 @@ PQOS_LOCAL int resctrl_mount_option_supported(const char *option,
                                               int *supported);
 
 /**
+ * @brief Whether resctrl is mounted with a mount option
+ *
+ * The resctrl lines of /proc/mounts are read, and their options compared one
+ * by one, so that neither another filesystem's line nor an option whose name
+ * begins with this one counts.
+ *
+ * @param [in] option mount option, such as "mba_MBps"
+ * @param [out] found 1 where a resctrl mount has it, 0 where none has, or
+ *              /proc/mounts cannot be read
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM on a NULL parameter
+ */
+PQOS_LOCAL int resctrl_mounted_with(const char *option, int *found);
+
+/**
  * @brief Structure to hold parsed cpu mask
  *
  * Structure contains table with cpu bit mask. Each table item holds

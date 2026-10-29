@@ -706,7 +706,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 
         /* check mount flags */
         if (*enabled == -1) {
-                ret = pqos_file_contains(PROC_MOUNTS, "mba_MBps", enabled);
+                ret = resctrl_mounted_with("mba_MBps", enabled);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }
@@ -948,7 +948,7 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
                 return ret;
 
         /* Detect MBA CTRL status */
-        ret = pqos_file_contains(PROC_MOUNTS, "mba_MBps", &(cap->ctrl_on));
+        ret = resctrl_mounted_with("mba_MBps", &(cap->ctrl_on));
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         if (cap->ctrl_on == 1)

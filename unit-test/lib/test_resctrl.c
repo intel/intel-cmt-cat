@@ -38,6 +38,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <mntent.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -315,6 +316,56 @@ probe_log_check(void *context __attribute__((unused)),
                 probe_logged_uncancellable++;
 }
 
+/* /proc/mounts as the case queued it, or NULL where it is not to be read */
+FILE *
+__wrap_setmntent(const char *filename, const char *type)
+{
+        static char buf[512];
+        const char *text;
+
+        assert_string_equal(filename, "/proc/mounts");
+        assert_string_equal(type, "re");
+
+        text = mock_ptr_type(const char *);
+        if (text == NULL)
+                return NULL;
+
+        /* fmemopen() takes a buffer it may write */
+        assert_true(strlen(text) < sizeof(buf));
+        strcpy(buf, text);
+
+        return fmemopen(buf, strlen(buf), "r");
+}
+
+/* lines getmntent_r() is to skip as too long, as musl's does: the line read
+ * past, NULL answered and errno ERANGE
+ */
+static int mounts_long_lines;
+
+/* through a typedef, as checkpatch reads the plain declaration as an extern
+ * in a .c file
+ */
+typedef struct mntent *
+getmntent_r_fn(FILE *stream, struct mntent *mnt, char *buf, int buflen);
+getmntent_r_fn __real_getmntent_r;
+
+struct mntent *
+__wrap_getmntent_r(FILE *stream, struct mntent *mnt, char *buf, int buflen)
+{
+        int c;
+
+        if (mounts_long_lines == 0)
+                return __real_getmntent_r(stream, mnt, buf, buflen);
+
+        mounts_long_lines--;
+        do
+                c = fgetc(stream);
+        while (c != EOF && c != '\n');
+        errno = ERANGE;
+
+        return NULL;
+}
+
 /* ======== resctrl_mount ======== */
 
 static void
@@ -541,6 +592,63 @@ test_resctrl_mount_option_not_asked(void **state __attribute__((unused)))
         assert_mount_option(0, -ENOMEM, 1, -1);
 }
 #endif
+
+/* ======== resctrl_mounted_with ======== */
+
+/**
+ * resctrl's own line, after another filesystem's whose options name mba_MBps
+ */
+static const char *mounts_resctrl_mbps =
+    "tmpfs /run tmpfs rw,nosuid,mode=755 0 0\n"
+    "resctrl /sys/fs/resctrl resctrl rw,relatime,mba_MBps 0 0\n";
+
+static const char *mounts_resctrl_default =
+    "fuse.x /mnt/x fuse.x rw,mba_MBps,user_id=0 0 0\n"
+    "resctrl /sys/fs/resctrl resctrl rw,relatime,cdp,mba_MBps_x 0 0\n";
+
+static const char *mounts_none = "proc /proc proc rw,relatime 0 0\n";
+
+static void
+assert_mounted_with(const char *mounts, const int expected)
+{
+        int found = 2;
+
+        will_return(__wrap_setmntent, mounts);
+        assert_int_equal(resctrl_mounted_with("mba_MBps", &found),
+                         PQOS_RETVAL_OK);
+        assert_int_equal(found, expected);
+}
+
+static void
+test_resctrl_mounted_with(void **state __attribute__((unused)))
+{
+        int found;
+
+        assert_mounted_with(mounts_resctrl_mbps, 1);
+        /* another filesystem's option, and one whose name only begins with
+         * mba_MBps, are not resctrl mounted with it
+         */
+        assert_mounted_with(mounts_resctrl_default, 0);
+        assert_mounted_with(mounts_none, 0);
+        /* /proc/mounts not read: not mounted with it, as for a file that is
+         * not there
+         */
+        assert_mounted_with(NULL, 0);
+        /* a line before resctrl's too long for the buffer, as musl reads one:
+         * the lines after it are read all the same
+         */
+        mounts_long_lines = 1;
+        assert_mounted_with(mounts_resctrl_mbps, 1);
+        assert_int_equal(mounts_long_lines, 0);
+        /* and where it is the last line, the end of the file ends the read */
+        mounts_long_lines = 1;
+        assert_mounted_with(mounts_none, 0);
+        assert_int_equal(mounts_long_lines, 0);
+
+        assert_int_equal(resctrl_mounted_with(NULL, &found), PQOS_RETVAL_PARAM);
+        assert_int_equal(resctrl_mounted_with("mba_MBps", NULL),
+                         PQOS_RETVAL_PARAM);
+}
 
 /* ======== resctrl_cpumask_set ======== */
 
@@ -1597,6 +1705,7 @@ main(void)
             cmocka_unit_test(test_resctrl_mount_option_not_asked),
 #endif
             cmocka_unit_test(test_resctrl_mount_option_param),
+            cmocka_unit_test(test_resctrl_mounted_with),
             cmocka_unit_test(test_resctrl_cpumask_set),
             cmocka_unit_test(test_resctrl_cpumask_unset),
             cmocka_unit_test(test_resctrl_cpumask_read),

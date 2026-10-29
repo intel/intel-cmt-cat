@@ -50,6 +50,7 @@ int __wrap_resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
                          const enum pqos_mba_config mba_cfg);
 int __wrap_resctrl_umount(void);
 int __wrap_resctrl_mount_option_supported(const char *option, int *supported);
+int __wrap_resctrl_mounted_with(const char *option, int *found);
 int __wrap_resctrl_lock_shared(void);
 int __wrap_resctrl_lock_exclusive(void);
 int __wrap_resctrl_lock_release(void);

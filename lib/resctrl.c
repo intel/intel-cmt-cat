@@ -39,6 +39,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <mntent.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -325,6 +326,57 @@ resctrl_umount(void)
                 LOG_ERROR("Could not umount resctrl filesystem!\n");
                 return none ? PQOS_RETVAL_RESOURCE : PQOS_RETVAL_ERROR;
         }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_mounted_with(const char *option, int *found)
+{
+        FILE *mounts;
+        struct mntent entry;
+        struct mntent *ent;
+        /* getmntent() answers in storage the whole process shares, which a
+         * thread of the caller's can overwrite before the entry is read;
+         * getmntent_r() answers here
+         */
+        char strings[4096];
+
+        if (option == NULL || found == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        *found = 0;
+
+        /* "e" for close-on-exec, which glibc's setmntent() adds of itself
+         * and musl's does not: a thread of the caller's that starts a
+         * program meanwhile would otherwise hand it the descriptor
+         */
+        mounts = setmntent(PROC_MOUNTS, "re");
+        if (mounts == NULL) {
+                LOG_DEBUG("%s not read.\n", PROC_MOUNTS);
+                return PQOS_RETVAL_OK;
+        }
+
+        for (;;) {
+                errno = 0;
+                ent = getmntent_r(mounts, &entry, strings, sizeof(strings));
+                if (ent == NULL) {
+                        /* a line too long for the buffer: glibc goes on to
+                         * the next line itself, and musl skips the line and
+                         * answers NULL with ERANGE, which is no end of file
+                         */
+                        if (errno == ERANGE && !feof(mounts))
+                                continue;
+                        break;
+                }
+                if (strcmp(ent->mnt_type, "resctrl") == 0 &&
+                    hasmntopt(ent, option) != NULL) {
+                        *found = 1;
+                        break;
+                }
+        }
+
+        endmntent(mounts);
 
         return PQOS_RETVAL_OK;
 }
