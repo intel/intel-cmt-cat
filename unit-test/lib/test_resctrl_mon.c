@@ -36,16 +36,39 @@
 
 #include <errno.h>
 #include <sys/stat.h>
+#include <time.h>
 
 /* ======== mock ======== */
 
+/* a negative value queued is the errno the call fails with */
 int
 __wrap_mkdir(const char *path, mode_t mode)
 {
+        int ret;
+
         check_expected(path);
         check_expected(mode);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret >= 0)
+                return ret;
+        errno = -ret;
+        return -1;
+}
+
+/* the waits between the tries of a mkdir, which take no time here */
+static unsigned nanosleep_calls;
+
+int
+__wrap_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+        (void)rem;
+        assert_non_null(req);
+        assert_int_equal(req->tv_sec, 0);
+        assert_int_equal(req->tv_nsec, 100000000L);
+        nanosleep_calls++;
+
+        return 0;
 }
 
 /* a case that has rmdir() fail, with -1, queues the errno it fails with */
@@ -83,11 +106,130 @@ test_resctrl_mon_mkdir(void **state __attribute__((unused)))
 
         expect_string(__wrap_mkdir, path, RESCTRL_PATH "/COS2/mon_groups/test");
         expect_value(__wrap_mkdir, mode, 0755);
-        will_return(__wrap_mkdir, -1);
-        errno = ENOSPC;
+        will_return(__wrap_mkdir, -EEXIST);
 
         ret = resctrl_mon_mkdir(2, "test");
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* has the mkdir of group "test" in class 1 fail with each error of errors,
+ * and then, if made, succeed; returns what resctrl_mon_mkdir() returns, and
+ * says how many messages it logged and how many waits it made
+ */
+static int
+mkdir_after(const int *errors,
+            const unsigned num_errors,
+            const int made,
+            unsigned *logged,
+            unsigned *waits)
+{
+        unsigned i;
+        int ret;
+
+        for (i = 0; i < num_errors + (made ? 1 : 0); i++) {
+                expect_string(__wrap_mkdir, path,
+                              RESCTRL_PATH "/COS1/mon_groups/test");
+                expect_value(__wrap_mkdir, mode, 0755);
+                will_return(__wrap_mkdir, i < num_errors ? -errors[i] : 0);
+        }
+
+        nanosleep_calls = 0;
+        test_log_count_start();
+        ret = resctrl_mon_mkdir(1, "test");
+        *logged = test_log_count_stop();
+        *waits = nanosleep_calls;
+
+        return ret;
+}
+
+/* every free RMID in the kernel's limbo for a while: the mkdir is tried again
+ * until one is freed, and nothing is said
+ */
+static void
+test_resctrl_mon_mkdir_busy_for_a_while(void **state __attribute__((unused)))
+{
+        const int errors[] = {EBUSY, EBUSY, EBUSY};
+        unsigned logged, waits;
+        int ret;
+
+        ret = mkdir_after(errors, DIM(errors), 1, &logged, &waits);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(waits, 3);
+        assert_int_equal(logged, 0);
+}
+
+/* every free RMID in limbo for longer than the tries: the group is busy */
+static void
+test_resctrl_mon_mkdir_busy_throughout(void **state __attribute__((unused)))
+{
+        int errors[30];
+        unsigned i, logged, waits;
+        int ret;
+
+        for (i = 0; i < DIM(errors); i++)
+                errors[i] = EBUSY;
+
+        ret = mkdir_after(errors, DIM(errors), 0, &logged, &waits);
         assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        assert_int_equal(waits, 29);
+        assert_int_equal(logged, 1);
+}
+
+/* no RMID left at all: not tried again, and not busy */
+static void
+test_resctrl_mon_mkdir_no_rmid(void **state __attribute__((unused)))
+{
+        const int errors[] = {ENOSPC};
+        unsigned logged, waits;
+        int ret;
+
+        ret = mkdir_after(errors, DIM(errors), 0, &logged, &waits);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(waits, 0);
+        assert_int_equal(logged, 1);
+}
+
+/* no RMID left after waiting for one in limbo: not busy either */
+static void
+test_resctrl_mon_mkdir_busy_then_no_rmid(void **state __attribute__((unused)))
+{
+        const int errors[] = {EBUSY, ENOSPC};
+        unsigned logged, waits;
+        int ret;
+
+        ret = mkdir_after(errors, DIM(errors), 0, &logged, &waits);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_int_equal(waits, 1);
+        assert_int_equal(logged, 1);
+}
+
+/* another failure is neither: not tried again */
+static void
+test_resctrl_mon_mkdir_error(void **state __attribute__((unused)))
+{
+        const int errors[] = {EACCES};
+        unsigned logged, waits;
+        int ret;
+
+        ret = mkdir_after(errors, DIM(errors), 0, &logged, &waits);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(waits, 0);
+        assert_int_equal(logged, 1);
+}
+
+/* a group made by another while its mkdir waited is there all the same */
+static void
+test_resctrl_mon_mkdir_busy_then_made_by_another(void **state
+                                                 __attribute__((unused)))
+{
+        const int errors[] = {EBUSY, EEXIST};
+        unsigned logged, waits;
+        int ret;
+
+        ret = mkdir_after(errors, DIM(errors), 0, &logged, &waits);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(waits, 1);
+        assert_int_equal(logged, 0);
 }
 
 /* ======== resctrl_mon_rmdir ======== */
@@ -302,6 +444,12 @@ main(void)
 {
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_resctrl_mon_mkdir),
+            cmocka_unit_test(test_resctrl_mon_mkdir_busy_for_a_while),
+            cmocka_unit_test(test_resctrl_mon_mkdir_busy_throughout),
+            cmocka_unit_test(test_resctrl_mon_mkdir_no_rmid),
+            cmocka_unit_test(test_resctrl_mon_mkdir_busy_then_no_rmid),
+            cmocka_unit_test(test_resctrl_mon_mkdir_error),
+            cmocka_unit_test(test_resctrl_mon_mkdir_busy_then_made_by_another),
             cmocka_unit_test(test_resctrl_mon_rmdir),
             cmocka_unit_test(test_resctrl_mon_rmdir_not_there),
             cmocka_unit_test(test_resctrl_mon_read_counter),

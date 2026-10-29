@@ -739,6 +739,7 @@ $(BIN_DIR)/test_resctrl_mon: test_resctrl_mon.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=mkdir \
+		-Wl,--wrap=nanosleep \
 		-Wl,--wrap=rmdir \
 		-Wl,--wrap=pqos_fopen \
 		-Wl,--start-group \
