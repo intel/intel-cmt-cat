@@ -36,9 +36,32 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <pthread.h>
 #include <time.h>
 
 /* ======== mock ======== */
+
+/* the points at which a real start's file accesses, or a real wait, would act
+ * on a pending cancellation: how many were reached, and how many of them with
+ * the thread's cancellation on
+ */
+static unsigned cancel_points;
+static unsigned cancel_points_on;
+
+static void
+cancel_point(void)
+{
+        int found;
+        int set;
+
+        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found),
+                         0);
+        assert_int_equal(pthread_setcancelstate(found, &set), 0);
+        cancel_points++;
+        if (found == PTHREAD_CANCEL_ENABLE)
+                cancel_points_on++;
+}
+
 int
 os_mon_stop_events(struct pqos_mon_data *group)
 {
@@ -58,6 +81,7 @@ os_mon_start_events(struct pqos_mon_data *group)
         unsigned num_ctrs = 0;
         int ret;
 
+        cancel_point();
         assert_non_null(group);
         check_expected_ptr(group);
 
@@ -90,6 +114,7 @@ static unsigned waits_cut_short;
 int
 __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
 {
+        cancel_point();
         assert_non_null(req);
         assert_int_equal(req->tv_sec, 0);
         if (waits < DIM(wait_ns))
@@ -599,6 +624,68 @@ test_os_mon_start_cores_wait_after_a_signal(void **state)
         assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
 }
 
+/* a thread cancelled during a start is cancelled once the start has
+ * returned: no try, and no wait, finds the thread's cancellation on, where one
+ * acted on would lose the group; and it is on again after the start
+ */
+static void
+test_os_mon_start_cores_not_cancelled_midway(void **state)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned logged;
+        int after;
+        int ret;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+        cancel_points = 0;
+        cancel_points_on = 0;
+
+        ret = start_cores_tried((struct test_data *)*state, &group, 3,
+                                PQOS_RETVAL_OK, &logged);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        /* three tries, and two waits */
+        assert_int_equal(cancel_points, 5);
+        assert_int_equal(cancel_points_on, 0);
+        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &after),
+                         0);
+        assert_int_equal(after, PTHREAD_CANCEL_ENABLE);
+
+        expect_value(os_mon_stop_events, group, &group);
+        will_return(os_mon_stop_events, PQOS_RETVAL_OK);
+        assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
+}
+
+/* and a start made with cancellation off leaves it off */
+static void
+test_os_mon_start_cores_cancellation_left_off(void **state)
+{
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        unsigned logged;
+        int found;
+        int left;
+        int ret;
+
+        memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
+        group.intl = &intl;
+
+        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found),
+                         0);
+        ret = start_cores_tried((struct test_data *)*state, &group, 2,
+                                PQOS_RETVAL_OK, &logged);
+        assert_int_equal(pthread_setcancelstate(found, &left), 0);
+        assert_int_equal(left, PTHREAD_CANCEL_DISABLE);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        expect_value(os_mon_stop_events, group, &group);
+        will_return(os_mon_stop_events, PQOS_RETVAL_OK);
+        assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
+}
+
 /* ======== os_mon_start_pids ======== */
 
 static void
@@ -954,6 +1041,8 @@ main(void)
             cmocka_unit_test(test_os_mon_start_cores_error_not_tried_again),
             cmocka_unit_test(test_os_mon_start_cores_core_taken_during_a_wait),
             cmocka_unit_test(test_os_mon_start_cores_wait_after_a_signal),
+            cmocka_unit_test(test_os_mon_start_cores_not_cancelled_midway),
+            cmocka_unit_test(test_os_mon_start_cores_cancellation_left_off),
             cmocka_unit_test(test_os_mon_start_pids_param),
             cmocka_unit_test(test_os_mon_start_pids),
             cmocka_unit_test(test_os_mon_start_pids_busy_not_tried_again),

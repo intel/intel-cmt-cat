@@ -42,6 +42,7 @@
 
 #include <dirent.h> /**< scandir() */
 #include <errno.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -485,10 +486,14 @@ os_mon_validate_event(const enum pqos_mon_event event)
  * a start does not wait.
  *
  * Each try is a start of its own, with the resctrl lock taken for it alone,
- * so the waits hold off no other process, and nothing a try found is kept for
- * the next one, which looks at the cores, their classes and their groups
- * again. A task group's start is not tried again: a task found before the
- * waits may have ended, and its ID gone to another task, by the next try.
+ * so that another process may change resctrl during the waits, and nothing a
+ * try found is kept for the next one, which looks at the cores, their classes
+ * and their groups again. The library's own lock is held throughout, as it is
+ * for any API call: the process's other threads wait for the start, and the
+ * lock file keeps other processes using the library out, as it does for the
+ * whole of a session. A library built with -DUNLOCK_CUSTOM has no lock of its
+ * own. A task group's start is not tried again: a task found before the waits
+ * may have ended, and its ID gone to another task, by the next try.
  */
 #define OS_MON_START_TRIES   30
 #define OS_MON_START_WAIT_NS 100000000L
@@ -559,14 +564,20 @@ os_mon_cores_free(const struct pqos_cpuinfo *cpu,
         return PQOS_RETVAL_OK;
 }
 
-int
-os_mon_start_cores(const unsigned num_cores,
-                   const unsigned *cores,
-                   const enum pqos_mon_event event,
-                   void *context,
-                   struct pqos_mon_mem_region *mem_region,
-                   struct pqos_mon_data *group,
-                   const struct pqos_mon_options *opt)
+/**
+ * @brief Starts a core group, trying the start again while every free RMID is
+ *        in the kernel's limbo
+ *
+ * Its parameters and its status are os_mon_start_cores()'s.
+ */
+static int
+os_mon_start_cores_tried(const unsigned num_cores,
+                         const unsigned *cores,
+                         const enum pqos_mon_event event,
+                         void *context,
+                         struct pqos_mon_mem_region *mem_region,
+                         struct pqos_mon_data *group,
+                         const struct pqos_mon_options *opt)
 {
         unsigned i = 0;
         unsigned tries;
@@ -626,6 +637,34 @@ os_mon_start_cores(const unsigned num_cores,
                 free(group->cores);
                 group->cores = NULL;
         }
+
+        return ret;
+}
+
+/**
+ * A thread cancelled during a core group's start is cancelled once the start
+ * has returned, since the whole start, the waits between its tries included,
+ * runs with the thread's cancellation off. The waits are cancellation points,
+ * and so are the file accesses of each try. A cancellation acted on in either
+ * would lose the group, which the caller has not been given yet, and in a try
+ * could leave the resctrl lock held.
+ */
+int
+os_mon_start_cores(const unsigned num_cores,
+                   const unsigned *cores,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_mem_region *mem_region,
+                   struct pqos_mon_data *group,
+                   const struct pqos_mon_options *opt)
+{
+        int state;
+        int ret;
+
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
+        ret = os_mon_start_cores_tried(num_cores, cores, event, context,
+                                       mem_region, group, opt);
+        (void)pthread_setcancelstate(state, &state);
 
         return ret;
 }

@@ -469,7 +469,13 @@ test_a_signal_during_a_start_starts_no_more_groups(void **state)
         assert_int_equal(g_starts, 1);
         assert_int_equal(stop_monitoring_loop, 1);
 
-        run_void_function(monitor_loop);
+        /* the loop does not run, and returns: an exit() would leave the
+         * group started running, with nothing to stop it
+         */
+        ret = -1;
+        run_function(monitor_loop, ret);
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, 0);
         assert_int_equal(g_polls, 0);
         stop_selection();
         assert_int_equal(g_stops, 1);
