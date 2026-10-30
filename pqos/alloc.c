@@ -2222,7 +2222,11 @@ print_core_assoc(const int is_alloc,
 
         if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO &&
             cores_domains != NULL && cores_domains->domains != NULL) {
-                if (ci->lcore < cores_domains->num_cores)
+                if (ci->lcore < cores_domains->num_cores &&
+                    cores_domains->domains[ci->lcore] ==
+                        PQOS_CORES_DOMAINS_NONE)
+                        printf("    Domain ID  none => ");
+                else if (ci->lcore < cores_domains->num_cores)
                         printf("    Domain ID  0x%x => ",
                                cores_domains->domains[ci->lcore]);
                 else

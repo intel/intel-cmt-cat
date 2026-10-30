@@ -1010,8 +1010,13 @@ pqos_init(const struct pqos_config *config)
          */
         if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
                 ret = cores_domains_init(cpu->num_cores, erdt, &cores_domains);
-                if (ret != PQOS_RETVAL_OK)
+                if (ret != PQOS_RETVAL_OK) {
+                        /* an init that failed is not finalised by pqos_fini(),
+                         * so the ERDT read above is freed here
+                         */
+                        erdt_fini();
                         goto machine_init_error;
+                }
 
                 cap_limit_num_classes_to_erdt(cap, erdt);
 

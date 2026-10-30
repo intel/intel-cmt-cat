@@ -775,6 +775,55 @@ test_print_domain_alloc_config_skips_domain_without_marc(void **state)
         data->sys->mrrm = saved_mrrm;
 }
 
+/* a core no CACD lists is in no domain, which the display says, rather than
+ * the value that marks it
+ */
+static void
+test_print_domain_alloc_config_core_in_no_domain(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm = {0};
+        struct pqos_erdt_info *saved_erdt = data->sys->erdt;
+        struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
+        struct pqos_cores_domains *saved_map = data->sys->cores_domains;
+        struct pqos_cores_domains map;
+        uint16_t domains[64];
+        unsigned i;
+
+        assert_true(data->cpu_info->num_cores >= 2);
+        assert_true(data->cpu_info->num_cores <= DIM(domains));
+        for (i = 0; i < data->cpu_info->num_cores; i++)
+                domains[i] = 1;
+        domains[1] = PQOS_CORES_DOMAINS_NONE;
+        map.num_cores = data->cpu_info->num_cores;
+        map.domains = domains;
+
+        erdt.max_clos = 1;
+        data->sys->erdt = &erdt;
+        data->sys->mrrm = &mrrm;
+        data->sys->cores_domains = &map;
+
+        /* print_core_assoc() per core, plus one for print_iordt_alloc() */
+        mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
+        for (i = 0; i < data->cpu_info->num_cores; i++) {
+                expect_value(__wrap_pqos_alloc_assoc_get, lcore, i);
+                will_return(__wrap_pqos_alloc_assoc_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_alloc_assoc_get, 0);
+        }
+
+        run_void_function(print_domain_alloc_config, NULL, NULL, NULL,
+                          data->cap_mba, data->sys);
+
+        data->sys->erdt = saved_erdt;
+        data->sys->mrrm = saved_mrrm;
+        data->sys->cores_domains = saved_map;
+
+        assert_true(output_has_text("Domain ID  0x1 => "));
+        assert_true(output_has_text("Domain ID  none => "));
+        assert_false(output_has_text("Domain ID  0xffff"));
+}
+
 static void
 test_print_domain_alloc_config_skips_domain_without_card(void **state)
 {
@@ -2250,6 +2299,7 @@ main(void)
             cmocka_unit_test(test_alloc_print_config_os),
             cmocka_unit_test(
                 test_print_domain_alloc_config_skips_domain_without_marc),
+            cmocka_unit_test(test_print_domain_alloc_config_core_in_no_domain),
             cmocka_unit_test(
                 test_print_domain_alloc_config_skips_domain_without_card),
             cmocka_unit_test(test_alloc_apply_mba),

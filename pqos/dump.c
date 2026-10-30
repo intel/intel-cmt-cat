@@ -500,9 +500,10 @@ find_shared_enumeration_id(const struct pqos_erdt_info *erdt,
  *
  * The core to domain mapping covers the logical CPUs from 0 to its num_cores
  * minus 1. A CPU it covers that the topology does not list, as a cpuset can
- * leave one out, may be one a CACD enumerates, and a core that no CACD lists
- * can then stand in for it in the count of its domain's cores. A CPU the
- * topology lists beyond the mapping has no domain to read.
+ * leave one out, may be one a CACD enumerates, and its domain's cores would
+ * then be counted short of what the CACD lists, with the domain's socket judged
+ * from the others. A CPU the topology lists beyond the mapping has no domain
+ * to read.
  *
  * @param [in] sys system configuration
  *
@@ -565,13 +566,13 @@ check_topology_coverage_exit:
  * cores to place it by, so device domains are still taken
  * DEVICE_AGENTS_PER_SOCKET at a time in ERDT order.
  *
- * The mapping is zero-filled, and a core no CACD enumerates reads as domain 0,
- * so the mapping is taken only where it agrees with ERDT. The topology has to
- * list exactly the CPUs the mapping covers, so that every core a CACD lists is
- * in it, and no two CACDs may list the same core, since the mapping keeps only
- * one of them for it. Then the mapping gives each domain the cores its CACD
- * lists and, for domain 0, the cores no CACD lists, and a CPU domain is placed
- * by its cores only when there are as many as its CACD enumerates, all on one
+ * A core no CACD enumerates is in no domain in the mapping
+ * (PQOS_CORES_DOMAINS_NONE), and the mapping is taken only where it agrees
+ * with ERDT. The topology has to list exactly the CPUs the mapping covers, so
+ * that every core a CACD lists is in it, and no two CACDs may list the same
+ * core, since the mapping keeps only one of them for it. Then the mapping
+ * gives each domain the cores its CACD lists, and a CPU domain is placed by
+ * its cores only when there are as many as its CACD enumerates, all on one
  * socket. Any other domain refuses the selection, which would otherwise leave
  * it out of a socket's dump or put it on a socket by a stray core. The counts
  * are checked before the IDs are compared, so that the IDs left to compare

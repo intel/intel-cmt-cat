@@ -1415,11 +1415,20 @@ struct pqos_mem_regions {
 
 /**
  * Cores to Domains Mapping Structure
+ *
+ * \a domains holds the CPU domain of each logical core, as the CACDs of ERDT
+ * list the cores. A core that no CACD lists holds PQOS_CORES_DOMAINS_NONE:
+ * CPU domain 0 is a domain like any other, so 0 cannot stand for none.
  */
 struct pqos_cores_domains {
         unsigned int num_cores;
         uint16_t *domains;
 };
+
+/**
+ * The domain of a core that no CACD lists, in pqos_cores_domains
+ */
+#define PQOS_CORES_DOMAINS_NONE 0xffff
 
 /**
  * Channels to Domains Mapping Structure

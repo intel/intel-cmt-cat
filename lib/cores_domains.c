@@ -34,6 +34,7 @@
 #include "cores_domains.h"
 
 #include "common.h"
+#include "log.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -133,7 +134,9 @@ cores_domains_init(unsigned int num_cores,
         if (domains == NULL)
                 goto out_apic2cpu;
 
-        memset(domains, 0, num_cores * sizeof(uint16_t));
+        /* a core no CACD lists is in no domain: 0 is domain 0's ID */
+        for (unsigned i = 0; i < num_cores; i++)
+                domains[i] = PQOS_CORES_DOMAINS_NONE;
         memset(cpu2apic, 0, num_cores * sizeof(uint32_t));
 
         if (build_apic_to_cpu_map(cpu2apic, num_cores) != PQOS_RETVAL_OK)
@@ -141,6 +144,12 @@ cores_domains_init(unsigned int num_cores,
 
         for (unsigned i = 0; i < erdt->num_cpu_agents; i++) {
                 cacd = erdt->cpu_agents[i].cacd;
+                if (cacd.rmdd_domain_id == PQOS_CORES_DOMAINS_NONE) {
+                        LOG_ERROR("CACD domain ID 0x%x is the one a core in no "
+                                  "domain is mapped to\n",
+                                  PQOS_CORES_DOMAINS_NONE);
+                        goto out_domains;
+                }
                 for (unsigned j = 0; j < cacd.enum_ids_length; j++) {
                         int cpu = get_cpu_by_apic_id(cpu2apic, num_cores,
                                                      cacd.enumeration_ids[j]);

@@ -101,12 +101,11 @@ static struct pqos_cores_domains cbb_cores_domains = {
 static struct pqos_sysconfig cbb_sys = {.erdt = &cbb_erdt,
                                         .cores_domains = &cbb_cores_domains};
 
-/* Domain 0 on socket 0 and domain 4 on socket 1, where CPU 3, on socket 1,
- * is in no CACD. The mapping is zero-filled, so it reads as domain 0, which
- * the mapping then has on both sockets. Domain 0's CACD enumerates CPUs 0 and
- * 1, and domain 4's CPU 2.
+/* Domain 0 on socket 0 and domain 4 on socket 1, where domain 0's CACD also
+ * enumerates CPU 3, on socket 1: the mapping has domain 0 on both sockets.
+ * Domain 0's CACD enumerates CPUs 0, 1 and 3, and domain 4's CPU 2.
  */
-static uint32_t stray_ids_0[] = {0, 1};
+static uint32_t stray_ids_0[] = {0, 1, 3};
 static uint32_t stray_ids_4[] = {2};
 static struct pqos_cpu_agent_info stray_agents[] = {
     {.rmdd = {.domain_id = 0}, .cacd = CACD(stray_ids_0)},
@@ -123,6 +122,28 @@ static struct pqos_sysconfig stray_sys = {.erdt = &stray_erdt,
                                           .cores_domains =
                                               &stray_cores_domains};
 
+/* Domain 0 on socket 0 and domain 4 on socket 1, where CPU 3, on socket 1,
+ * is in no CACD: the mapping has it in no domain, so it places neither.
+ * Domain 0's CACD enumerates CPUs 0 and 1, and domain 4's CPU 2.
+ */
+static uint32_t unlisted_ids_0[] = {0, 1};
+static uint32_t unlisted_ids_4[] = {2};
+static struct pqos_cpu_agent_info unlisted_agents[] = {
+    {.rmdd = {.domain_id = 0}, .cacd = CACD(unlisted_ids_0)},
+    {.rmdd = {.domain_id = 4}, .cacd = CACD(unlisted_ids_4)}};
+static struct pqos_erdt_info unlisted_erdt = {.num_cpu_agents =
+                                                  DIM(unlisted_agents),
+                                              .cpu_agents = unlisted_agents};
+static uint16_t unlisted_core_domains[] = {0, 0, 4, PQOS_CORES_DOMAINS_NONE};
+static const unsigned unlisted_lcores[] = {0, 1, 2, 3};
+static const unsigned unlisted_sockets[] = {0, 0, 1, 1};
+static struct pqos_cores_domains unlisted_cores_domains = {
+    .num_cores = DIM(unlisted_core_domains),
+    .domains = unlisted_core_domains};
+static struct pqos_sysconfig unlisted_sys = {.erdt = &unlisted_erdt,
+                                             .cores_domains =
+                                                 &unlisted_cores_domains};
+
 /* The agents of cbb_erdt and a fourth, domain 5, whose CACD enumerates no
  * core: its socket cannot be told either. The cases using it take the
  * topology and core map of cbb_sys.
@@ -137,8 +158,7 @@ static struct pqos_erdt_info unplaced_erdt = {.num_cpu_agents =
                                               .cpu_agents = unplaced_agents};
 
 /* Domain 0's CACD enumerates no core, and CPU 1, on socket 1, is in no CACD:
- * the zero-filled mapping reads it as domain 0, which would put domain 0 on
- * socket 1 by that CPU alone.
+ * a domain with no core cannot be placed, whatever the other CPUs are.
  */
 static uint32_t empty0_ids_1[] = {0};
 static struct pqos_cpu_agent_info empty0_agents[] = {
@@ -147,7 +167,7 @@ static struct pqos_cpu_agent_info empty0_agents[] = {
 static struct pqos_erdt_info empty0_erdt = {.num_cpu_agents =
                                                 DIM(empty0_agents),
                                             .cpu_agents = empty0_agents};
-static uint16_t empty0_core_domains[] = {1, 0};
+static uint16_t empty0_core_domains[] = {1, PQOS_CORES_DOMAINS_NONE};
 static const unsigned empty0_lcores[] = {0, 1};
 static const unsigned empty0_sockets[] = {0, 1};
 static struct pqos_cores_domains empty0_cores_domains = {
@@ -157,14 +177,16 @@ static struct pqos_sysconfig empty0_sys = {.erdt = &empty0_erdt,
                                            .cores_domains =
                                                &empty0_cores_domains};
 
-/* Domain 0's CACD enumerates CPUs 0 and 1, and CPU 2, on the same socket, is
- * in no CACD: the mapping gives domain 0 three cores where its CACD lists two,
- * so the mapping cannot be told from ERDT for it.
+/* Two CACDs have domain 0: one enumerates CPUs 0 and 1, and the other CPU 2,
+ * on the same socket. The mapping gives domain 0 three cores where the first
+ * CACD lists two, so the mapping cannot be told from ERDT for it.
  */
 static uint32_t extra0_ids_0[] = {0, 1};
+static uint32_t extra0_ids_0b[] = {2};
 static uint32_t extra0_ids_4[] = {3};
 static struct pqos_cpu_agent_info extra0_agents[] = {
     {.rmdd = {.domain_id = 0}, .cacd = CACD(extra0_ids_0)},
+    {.rmdd = {.domain_id = 0}, .cacd = CACD(extra0_ids_0b)},
     {.rmdd = {.domain_id = 4}, .cacd = CACD(extra0_ids_4)}};
 static struct pqos_erdt_info extra0_erdt = {.num_cpu_agents =
                                                 DIM(extra0_agents),
@@ -179,19 +201,21 @@ static struct pqos_sysconfig extra0_sys = {.erdt = &extra0_erdt,
                                            .cores_domains =
                                                &extra0_cores_domains};
 
-/* Domains 0 and 1 both enumerate CPUs 0 and 1, on socket 0, and CPUs 2 and 3,
- * on socket 1, are in no CACD. The mapping gives a CPU two CACDs list to the
- * one written last, domain 1, and reads CPUs 2 and 3 as domain 0, so each
- * domain has as many cores as its CACD lists, and domain 0's are on socket 1.
+/* Two CACDs of domain 1 both enumerate CPUs 0 and 1, on socket 0, and CPUs 2
+ * and 3, on socket 1, are in no CACD. Each CACD lists as many cores as the
+ * mapping gives domain 1, so the counts agree, and only the IDs the two share
+ * tell the duplicate apart. A CACD of another domain that lists a core
+ * already listed loses it to the one written last, and fails its count.
  */
 static uint32_t overlap_ids[] = {0, 1};
 static struct pqos_cpu_agent_info overlap_agents[] = {
-    {.rmdd = {.domain_id = 0}, .cacd = CACD(overlap_ids)},
+    {.rmdd = {.domain_id = 1}, .cacd = CACD(overlap_ids)},
     {.rmdd = {.domain_id = 1}, .cacd = CACD(overlap_ids)}};
 static struct pqos_erdt_info overlap_erdt = {.num_cpu_agents =
                                                  DIM(overlap_agents),
                                              .cpu_agents = overlap_agents};
-static uint16_t overlap_core_domains[] = {1, 1, 0, 0};
+static uint16_t overlap_core_domains[] = {1, 1, PQOS_CORES_DOMAINS_NONE,
+                                          PQOS_CORES_DOMAINS_NONE};
 static const unsigned overlap_lcores[] = {0, 1, 2, 3};
 static const unsigned overlap_sockets[] = {0, 0, 1, 1};
 static struct pqos_cores_domains overlap_cores_domains = {
@@ -203,10 +227,9 @@ static struct pqos_sysconfig overlap_sys = {.erdt = &overlap_erdt,
 
 /* A topology that a cpuset can leave without CPU 0, whose CACD is domain
  * 0's: domains 0-3 each enumerate one CPU, 0-3, and CPU 4, on socket 1, is in
- * no CACD, so the mapping reads it as domain 0. CPU 4 then stands in for CPU 0,
- * one core for the one domain 0 lists, and only a check that the topology has
- * every CPU the mapping covers tells the two apart. The second topology also
- * lists CPU 5, which the mapping does not cover, as the review's case has it.
+ * no CACD. The check that the topology has every CPU the mapping covers finds
+ * CPU 0 missing. The second topology also lists CPU 5, which the mapping does
+ * not cover, as the review's case has it.
  */
 static uint32_t cpuset_ids_0[] = {0};
 static uint32_t cpuset_ids_1[] = {1};
@@ -220,7 +243,7 @@ static struct pqos_cpu_agent_info cpuset_agents[] = {
 static struct pqos_erdt_info cpuset_erdt = {.num_cpu_agents =
                                                 DIM(cpuset_agents),
                                             .cpu_agents = cpuset_agents};
-static uint16_t cpuset_core_domains[] = {0, 1, 2, 3, 0};
+static uint16_t cpuset_core_domains[] = {0, 1, 2, 3, PQOS_CORES_DOMAINS_NONE};
 static struct pqos_cores_domains cpuset_cores_domains = {
     .num_cores = DIM(cpuset_core_domains),
     .domains = cpuset_core_domains};
@@ -236,10 +259,10 @@ static struct pqos_sysconfig cpuset5_sys = {.erdt = &cpuset_erdt,
                                                 &cpuset_cores_domains};
 
 /* Domain 0's CACD repeats enumeration ID 0 four times, and domain 1's lists
- * it once too. The mapping gives CPU 0 to domain 1 and reads CPUs 1 and 2,
- * in no CACD, as domain 0: two cores where domain 0's CACD lists four. The
- * counts are checked first, which bounds the IDs left to compare to the
- * cores, so this ERDT is refused for its counts and not for its shared ID.
+ * it once too. The mapping gives CPU 0 to domain 1, and CPUs 1 and 2 are in
+ * no CACD: no core where domain 0's CACD lists four. The counts are checked
+ * first, which bounds the IDs left to compare to the cores, so this ERDT is
+ * refused for its counts and not for its shared ID.
  */
 static uint32_t repeat_ids_0[] = {0, 0, 0, 0};
 static uint32_t repeat_ids_1[] = {0};
@@ -249,7 +272,8 @@ static struct pqos_cpu_agent_info repeat_agents[] = {
 static struct pqos_erdt_info repeat_erdt = {.num_cpu_agents =
                                                 DIM(repeat_agents),
                                             .cpu_agents = repeat_agents};
-static uint16_t repeat_core_domains[] = {1, 0, 0};
+static uint16_t repeat_core_domains[] = {1, PQOS_CORES_DOMAINS_NONE,
+                                         PQOS_CORES_DOMAINS_NONE};
 static const unsigned repeat_lcores[] = {0, 1, 2};
 static const unsigned repeat_sockets[] = {0, 0, 0};
 static struct pqos_cores_domains repeat_cores_domains = {
@@ -347,6 +371,8 @@ cbb_setup(void **state)
         cbb_sys.cpu = make_cpu(cbb_lcores, cbb_sockets, DIM(cbb_lcores));
         stray_sys.cpu =
             make_cpu(stray_lcores, stray_sockets, DIM(stray_lcores));
+        unlisted_sys.cpu =
+            make_cpu(unlisted_lcores, unlisted_sockets, DIM(unlisted_lcores));
         empty0_sys.cpu =
             make_cpu(empty0_lcores, empty0_sockets, DIM(empty0_lcores));
         extra0_sys.cpu =
@@ -361,9 +387,10 @@ cbb_setup(void **state)
             make_cpu(repeat_lcores, repeat_sockets, DIM(repeat_lcores));
 
         return cbb_sys.cpu != NULL && stray_sys.cpu != NULL &&
-                       empty0_sys.cpu != NULL && extra0_sys.cpu != NULL &&
-                       overlap_sys.cpu != NULL && cpuset_sys.cpu != NULL &&
-                       cpuset5_sys.cpu != NULL && repeat_sys.cpu != NULL
+                       unlisted_sys.cpu != NULL && empty0_sys.cpu != NULL &&
+                       extra0_sys.cpu != NULL && overlap_sys.cpu != NULL &&
+                       cpuset_sys.cpu != NULL && cpuset5_sys.cpu != NULL &&
+                       repeat_sys.cpu != NULL
                    ? 0
                    : -1;
 }
@@ -375,6 +402,7 @@ cbb_teardown(void **state)
 
         free(cbb_sys.cpu);
         free(stray_sys.cpu);
+        free(unlisted_sys.cpu);
         free(empty0_sys.cpu);
         free(extra0_sys.cpu);
         free(overlap_sys.cpu);
@@ -559,9 +587,10 @@ test_dump_mmio_regs_refuses_a_domain_on_two_sockets(void **state)
 
         UNUSED_ARG(state);
 
-        /* socket 1 holds domain 4, and holds domain 0 only by the CPU no CACD
-         * lists; which socket domain 0 is on cannot be told, so neither is
-         * taken for it, and the dump is not reached
+        /* socket 1 holds domain 4, and domain 0 by one of the CPUs its CACD
+         * lists, as socket 0 does by the others; which socket domain 0 is on
+         * cannot be told, so neither is taken for it, and the dump is not
+         * reached
          */
         select_socket("1");
 
@@ -574,6 +603,31 @@ test_dump_mmio_regs_refuses_a_domain_on_two_sockets(void **state)
                          1);
         assert_int_equal(
             output_has_text("Unable to get domain ids for socket 1"), 1);
+}
+
+static void
+test_dump_mmio_regs_leaves_out_a_cpu_in_no_cacd(void **state)
+{
+        static const uint16_t domain_ids[] = {4};
+        int ret = PQOS_RETVAL_ERROR;
+
+        UNUSED_ARG(state);
+
+        /* socket 1 holds domain 4, and CPU 3, which no CACD lists: the mapping
+         * has that CPU in no domain, so it takes nothing to socket 1. Before
+         * PSWD-20387 the mapping read it as domain 0, which was then on both
+         * sockets, and the selection was refused
+         */
+        select_socket("1");
+
+        expect_value(__wrap_pqos_dump, num_domain_ids, DIM(domain_ids));
+        expect_memory(__wrap_pqos_dump, domain_ids, domain_ids,
+                      sizeof(domain_ids));
+
+        run_function(dump_mmio_regs, ret, &unlisted_sys);
+
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
 static void
@@ -609,9 +663,8 @@ test_dump_mmio_regs_refuses_a_domain_with_an_empty_cacd(void **state)
 
         UNUSED_ARG(state);
 
-        /* domain 0 enumerates no core, and the only core the mapping gives it
-         * is the CPU that no CACD lists, on socket 1: that is no evidence it
-         * is on socket 1, so the dump is not reached
+        /* domain 0's CACD enumerates no core, so the mapping gives it none,
+         * and its socket is unknown: the dump is not reached
          */
         select_socket("1");
 
@@ -633,9 +686,9 @@ test_dump_mmio_regs_refuses_a_domain_with_extra_cores(void **state)
 
         UNUSED_ARG(state);
 
-        /* the mapping gives domain 0 a third core, the CPU no CACD lists; the
-         * mapping and ERDT disagree about domain 0, so it is not placed, though
-         * the stray core is on its socket
+        /* the mapping gives domain 0 a third core, the one its second CACD
+         * lists; the mapping and the first CACD disagree about domain 0, so it
+         * is not placed, though the third core is on its socket
          */
         select_socket("0");
 
@@ -658,9 +711,9 @@ test_dump_mmio_regs_refuses_overlapping_cacds(void **state)
 
         UNUSED_ARG(state);
 
-        /* domain 0 has as many cores as its CACD lists, but they are not the
-         * ones it lists: those went to domain 1, which lists them too, so the
-         * dump is not reached
+        /* each CACD of domain 1 has as many cores as it lists, but they are
+         * the same cores, which the other CACD lists too, so the dump is not
+         * reached
          */
         select_socket("1");
 
@@ -668,7 +721,7 @@ test_dump_mmio_regs_refuses_overlapping_cacds(void **state)
 
         assert_int_equal(output_exit_was_called(), 0);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
-        assert_int_equal(output_has_text("Domain IDs 0 and 1 both list "
+        assert_int_equal(output_has_text("Domain IDs 1 and 1 both list "
                                          "enumeration ID 0x0 in their CACDs"),
                          1);
         assert_int_equal(
@@ -682,8 +735,7 @@ test_dump_mmio_regs_refuses_a_cpu_the_topology_lacks(void **state)
 
         UNUSED_ARG(state);
 
-        /* CPU 0, domain 0's, is not in the topology, and CPU 4, in no CACD,
-         * would have put domain 0 on socket 1; the dump is not reached
+        /* CPU 0, domain 0's, is not in the topology; the dump is not reached
          */
         select_socket("1");
 
@@ -750,7 +802,7 @@ test_dump_mmio_regs_checks_counts_before_comparing_ids(void **state)
 
         assert_int_equal(output_exit_was_called(), 0);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
-        assert_int_equal(output_has_text("Domain ID 0 has 2 cores in the CPU "
+        assert_int_equal(output_has_text("Domain ID 0 has 0 cores in the CPU "
                                          "topology where its CACD lists 4"),
                          1);
         assert_int_equal(output_has_text("both list enumeration ID"), 0);
@@ -1004,6 +1056,7 @@ main(void)
                 test_dump_mmio_regs_refuses_a_socket_without_cpu_domains),
             cmocka_unit_test(
                 test_dump_mmio_regs_refuses_a_domain_on_two_sockets),
+            cmocka_unit_test(test_dump_mmio_regs_leaves_out_a_cpu_in_no_cacd),
             cmocka_unit_test(test_dump_mmio_regs_refuses_a_domain_on_no_socket),
             cmocka_unit_test(
                 test_dump_mmio_regs_refuses_a_domain_with_an_empty_cacd),

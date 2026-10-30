@@ -82,6 +82,9 @@ get_cpu_agent_by_core(const struct pqos_erdt_info *erdt, unsigned lcore)
             cores_domains->domains == NULL || lcore >= cores_domains->num_cores)
                 return NULL;
 
+        /* a core no CACD lists has PQOS_CORES_DOMAINS_NONE, which no agent
+         * has: cores_domains_init() refuses a CACD with it
+         */
         idx =
             get_cpu_agent_idx_by_domain_id(erdt, cores_domains->domains[lcore]);
 
