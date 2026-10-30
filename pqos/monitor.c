@@ -1764,14 +1764,19 @@ monitoring_ctrlc(int signo)
  * the first message it wrote; libpqos says only the first of those failures,
  * on stderr.
  *
+ * SIGXFSZ's default action ends the process, with its groups running, at a
+ * write that takes a file past the process's file size limit (RLIMIT_FSIZE):
+ * the output's, where -o names a file or stdout is one. Ignored, it leaves
+ * that write to fail with EFBIG, which is recorded and said as EPIPE is.
+ *
  * A handler that cannot be set fails the setup, before any group starts:
  * left at its default action, that signal would end the process with its
  * groups running, which is what setting the handlers here is for. The same
- * holds for SIGPIPE where it cannot be ignored.
+ * holds for SIGPIPE and SIGXFSZ where they cannot be ignored.
  *
  * @return Operational status
  * @retval 0 on success
- * @retval -1 if a handler could not be set, or SIGPIPE not ignored
+ * @retval -1 if a handler could not be set, or SIGPIPE or SIGXFSZ not ignored
  */
 static int
 monitoring_catch_signals(void)
@@ -1798,6 +1803,11 @@ monitoring_catch_signals(void)
         sa.sa_handler = SIG_IGN;
         if (sigaction(SIGPIPE, &sa, NULL) == -1) {
                 fprintf(stderr, "Failed to ignore SIGPIPE: %s\n",
+                        strerror(errno));
+                return -1;
+        }
+        if (sigaction(SIGXFSZ, &sa, NULL) == -1) {
+                fprintf(stderr, "Failed to ignore SIGXFSZ: %s\n",
                         strerror(errno));
                 return -1;
         }

@@ -39,7 +39,8 @@
  * a pipeline such as "pqos | tee", and where it ends the reader of the output,
  * the next write to the pipe fails with EPIPE, which monitor_flush() reports
  * and returns from, rather than ending the process the way SIGPIPE's default
- * action does.
+ * action does. So it has SIGXFSZ, for a write of the output past the file size
+ * limit, which fails with EFBIG instead.
  *
  * monitor.c is included rather than linked, because what the cases check and
  * reset is private to it: the flag the handler sets, and the selection and
@@ -63,6 +64,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <unistd.h>
 /* clang-format off */
 #include <cmocka.h>
@@ -110,6 +112,16 @@ count_sigpipe(int signo)
 {
         (void)signo;
         __atomic_add_fetch(&g_sigpipes, 1, __ATOMIC_RELAXED);
+}
+
+/** and how many SIGXFSZs, likewise */
+static int g_sigxfszs;
+
+static void
+count_sigxfsz(int signo)
+{
+        (void)signo;
+        __atomic_add_fetch(&g_sigxfszs, 1, __ATOMIC_RELAXED);
 }
 
 /**
@@ -344,11 +356,13 @@ reset(void **state)
                 g_reader = -1;
         }
         default_action(SIGPIPE);
+        default_action(SIGXFSZ);
         monitor_cleanup();
         g_signal_at_start = 0;
         g_signal_at_poll = 0;
         g_sigaction_refuses = 0;
         __atomic_store_n(&g_sigpipes, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&g_sigxfszs, 0, __ATOMIC_RELAXED);
         g_starts = 0;
         g_polls = 0;
         g_stops = 0;
@@ -612,6 +626,74 @@ test_sigint_ending_the_reader_in_the_loop_ends_it(void **state)
 }
 
 /**
+ * @brief A write of the output past the file size limit fails, unsignalled
+ *
+ * The output is a file, as -o names one, and the loop ends at a stop at its
+ * first poll, having flushed nothing. The process's file size limit
+ * (RLIMIT_FSIZE) is then put below what the output holds, for the flush of the
+ * output's end that monitor_flush() makes once the group is stopped. That
+ * write fails with EFBIG, which monitor_flush() says, once, closing the
+ * output. A handler counts SIGXFSZ until the setup has it ignored: at its
+ * default action, it would have ended the process. stdout is flushed before
+ * the limit is put in, as monitor_flush() flushes it too, and the limit is
+ * put back as soon as monitor_flush() returns.
+ */
+static void
+test_a_write_past_the_file_size_limit_is_said(void **state)
+{
+        struct sigaction sa;
+        struct rlimit found;
+        struct rlimit limit;
+        const char *said;
+        int closed;
+        int limited;
+        int ret = -1;
+
+        (void)state;
+        g_writer = tmpfile();
+        assert_non_null(g_writer);
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = count_sigxfsz;
+        sigemptyset(&sa.sa_mask);
+        assert_int_equal(sigaction(SIGXFSZ, &sa, NULL), 0);
+
+        g_signal_at_poll = SIGINT;
+        assert_int_equal(setup(), 0);
+        fp_monitor = g_writer;
+
+        run_function(monitor_loop, ret);
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, 0);
+        stop_selection();
+        assert_int_equal(g_stops, 1);
+
+        (void)fputs("TIME 2026-10-20 16:00:00\n", g_writer);
+        assert_int_equal(getrlimit(RLIMIT_FSIZE, &found), 0);
+        limit = found;
+        limit.rlim_cur = 8;
+        (void)fflush(stdout);
+        limited = setrlimit(RLIMIT_FSIZE, &limit) == 0;
+        run_function(monitor_flush, ret);
+        if (limited)
+                (void)setrlimit(RLIMIT_FSIZE, &found);
+        assert_true(limited);
+
+        closed = fp_monitor == NULL;
+        if (closed)
+                g_writer = NULL;
+        assert_false(output_exit_was_called());
+        assert_int_equal(ret, -1);
+        assert_true(closed);
+        assert_true(output_has_text("Failed to write monitoring output: %s",
+                                    strerror(EFBIG)));
+        said = strstr(output_get(), "Failed to write");
+        assert_non_null(said);
+        assert_null(strstr(said + 1, "Failed to write"));
+        assert_int_equal(__atomic_load_n(&g_sigxfszs, __ATOMIC_RELAXED), 0);
+}
+
+/**
  * @brief SIGPIPE that cannot be ignored fails the setup before any group starts
  *
  * Left at its default action, a write to a pipe whose reader has gone would
@@ -627,6 +709,24 @@ test_no_group_starts_where_sigpipe_cannot_be_ignored(void **state)
         assert_int_equal(setup(), -1);
         assert_true(
             output_has_text("Failed to ignore SIGPIPE: %s\n", strerror(EPERM)));
+        assert_int_equal(g_starts, 0);
+}
+
+/**
+ * @brief Nor does any where SIGXFSZ cannot be ignored
+ *
+ * At its default action, a write of the output past the file size limit would
+ * end the process with its groups running.
+ */
+static void
+test_no_group_starts_where_sigxfsz_cannot_be_ignored(void **state)
+{
+        (void)state;
+        g_sigaction_refuses = SIGXFSZ;
+
+        assert_int_equal(setup(), -1);
+        assert_true(
+            output_has_text("Failed to ignore SIGXFSZ: %s\n", strerror(EPERM)));
         assert_int_equal(g_starts, 0);
 }
 
@@ -655,6 +755,11 @@ main(void)
                 reset),
             cmocka_unit_test_setup_teardown(
                 test_no_group_starts_where_sigpipe_cannot_be_ignored, reset,
+                reset),
+            cmocka_unit_test_setup_teardown(
+                test_a_write_past_the_file_size_limit_is_said, reset, reset),
+            cmocka_unit_test_setup_teardown(
+                test_no_group_starts_where_sigxfsz_cannot_be_ignored, reset,
                 reset),
         };
 
