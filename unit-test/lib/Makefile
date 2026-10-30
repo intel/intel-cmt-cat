@@ -757,6 +757,17 @@ $(BIN_DIR)/test_cores_domains: test_cores_domains.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_mmio_monitoring: test_mmio_monitoring.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=_pqos_get_erdt \
+		-Wl,--wrap=_pqos_get_cores_domains \
+		-Wl,--wrap=mon_assoc_read \
+		-Wl,--wrap=mon_start_perf \
+		-Wl,--wrap=mon_stop_perf \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_aet_telemetry: test_aet_telemetry.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
@@ -1068,6 +1079,9 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=lock_fini \
 		-Wl,--wrap=lock_get \
 		-Wl,--wrap=lock_release \
+		-Wl,--wrap=erdt_init \
+		-Wl,--wrap=erdt_fini \
+		-Wl,--wrap=cores_domains_init \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

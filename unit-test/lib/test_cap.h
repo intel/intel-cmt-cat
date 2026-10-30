@@ -39,4 +39,18 @@
 void *__real_malloc(size_t size);
 char *__real_getenv(const char *name);
 
+struct pqos_cap;
+struct pqos_cpuinfo;
+struct pqos_erdt_info;
+struct pqos_cores_domains;
+
+/* test_cap wraps these, and calls the originals outside its MMIO case */
+int __real_erdt_init(const struct pqos_cap *cap,
+                     struct pqos_cpuinfo *cpu,
+                     struct pqos_erdt_info **erdt_info);
+void __real_erdt_fini(void);
+int __real_cores_domains_init(unsigned int num_cores,
+                              const struct pqos_erdt_info *erdt,
+                              struct pqos_cores_domains **cores_domains);
+
 #endif /* TEST_CAP_H_ */

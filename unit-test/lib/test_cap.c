@@ -30,6 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "test_cap.h"
+
 #include "cap.h"
 #include "log.h"
 #include "mock_cap.h"
@@ -167,6 +169,47 @@ __wrap_os_cap_init(const enum pqos_interface inter)
         function_called();
         assert_in_set(inter, valid_inters, DIM(valid_inters));
         return PQOS_RETVAL_OK;
+}
+
+/* the MMIO case's ERDT: where the case sets mmio_case, the wrapped
+ * erdt_init() gives it and the core to domain map's init fails. Elsewhere
+ * the originals run, and find no table
+ */
+static int mmio_case;
+static struct pqos_erdt_info mmio_erdt;
+
+int
+__wrap_erdt_init(const struct pqos_cap *cap,
+                 struct pqos_cpuinfo *cpu,
+                 struct pqos_erdt_info **erdt_info)
+{
+        if (!mmio_case)
+                return __real_erdt_init(cap, cpu, erdt_info);
+
+        *erdt_info = &mmio_erdt;
+        return PQOS_RETVAL_OK;
+}
+
+void
+__wrap_erdt_fini(void)
+{
+        if (mmio_case)
+                function_called();
+        else
+                __real_erdt_fini();
+}
+
+int
+__wrap_cores_domains_init(unsigned int num_cores,
+                          const struct pqos_erdt_info *erdt,
+                          struct pqos_cores_domains **cores_domains)
+{
+        if (!mmio_case)
+                return __real_cores_domains_init(num_cores, erdt,
+                                                 cores_domains);
+
+        assert_ptr_equal(erdt, &mmio_erdt);
+        return PQOS_RETVAL_ERROR;
 }
 
 /* ======== setup ========*/
@@ -371,6 +414,45 @@ test_pqos_init(void **state __attribute__((unused)))
 
         ret = pqos_init(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* an init over MMIO whose core to domain map fails, fails, and frees the
+ * ERDT read before it: no pqos_fini() follows a failed init to free it
+ */
+static void
+test_pqos_init_mmio_map_failure_frees_the_erdt(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_config cfg;
+        int ret;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.verbose = LOG_VER_SILENT;
+        cfg.fd_log = -1;
+        cfg.interface = PQOS_INTER_MMIO;
+
+        expect_function_call(__wrap_lock_init);
+        will_return(__wrap_lock_init, 0);
+        expect_function_call(__wrap_lock_get);
+        will_return(__wrap_cpuinfo_init, data->cpu);
+        will_return(__wrap_machine_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_machine_init);
+        will_return(__wrap_hw_cap_mon_discover, data->cap_mon);
+        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+        will_return(__wrap_hw_cap_mba_discover, &(data->cap_mba));
+        expect_function_call(__wrap_hw_cap_mon_discover);
+        expect_function_call(__wrap_erdt_fini);
+        expect_function_call(__wrap_machine_fini);
+        will_return(__wrap_machine_fini, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_lock_fini);
+        will_return(__wrap_lock_fini, 0);
+
+        mmio_case = 1;
+        ret = pqos_init(&cfg);
+        mmio_case = 0;
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
 /* ======== pqos_fini ======== */
@@ -675,6 +757,10 @@ main(void)
             cmocka_unit_test(test_pqos_fini),
         };
 
+        const struct CMUnitTest tests_cap_init_mmio[] = {
+            cmocka_unit_test(test_pqos_init_mmio_map_failure_frees_the_erdt),
+        };
+
         result += cmocka_run_group_tests(tests_cap_param, NULL, NULL);
         result += cmocka_run_group_tests(tests_cap_init, setup_cap_init_msr,
                                          test_fini);
@@ -684,5 +770,7 @@ main(void)
         result += cmocka_run_group_tests(
             tests_cap_init, setup_cap_init_os_resctrl_mon, test_fini);
 #endif
+        result += cmocka_run_group_tests(tests_cap_init_mmio,
+                                         setup_cap_init_msr, test_fini);
         return result;
 }

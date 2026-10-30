@@ -707,6 +707,7 @@ mmio_mon_start_cores(const unsigned num_cores,
         int retval = PQOS_RETVAL_OK;
         const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
         enum pqos_mon_event req_events;
         enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
 
@@ -747,6 +748,16 @@ mmio_mon_start_cores(const unsigned num_cores,
                 ret = pqos_cpu_check_core(cpu, lcore);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
+
+                /* here, before any counter is started: the RMID setup below
+                 * refuses such a core too, but only once the performance
+                 * counters of every requested core have been set
+                 */
+                if (get_cpu_agent_by_core(erdt, lcore) == NULL) {
+                        LOG_ERROR("Core %u is in no CPU domain of the ERDT\n",
+                                  lcore);
+                        return PQOS_RETVAL_PARAM;
+                }
 
                 ret = mmio_mon_assoc_read(lcore, &rmid);
                 if (ret != PQOS_RETVAL_OK)
