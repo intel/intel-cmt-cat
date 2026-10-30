@@ -241,6 +241,12 @@ resctrl_alloc_fclose(FILE *fd)
         case EINVAL:
                 LOG_ERROR("Invalid file arguments!\n");
                 break;
+        case ESRCH:
+                /* the kernel's answer to a tasks-file write for a task that
+                 * has ended since its check: resctrl_alloc_task_write() takes
+                 * that for the task gone, and says so at debug level
+                 */
+                break;
         default:
                 LOG_ERROR("Error closing file!\n");
         }

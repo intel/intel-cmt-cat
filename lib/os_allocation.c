@@ -777,8 +777,7 @@ os_alloc_reset_class_tasks(const unsigned class_id)
                          * if the task is already gone. A small TOCTOU window
                          * remains between this check and the actual resctrl
                          * write; the callees return PQOS_RETVAL_PARAM for that
-                         * case too, below, though resctrl_alloc_fclose() logs
-                         * an error for the failed close first.
+                         * case too, below, and say it at debug level only.
                          */
                         if (resctrl_alloc_task_validate(pid) !=
                             PQOS_RETVAL_OK) {

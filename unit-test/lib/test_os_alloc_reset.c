@@ -347,10 +347,8 @@ test_os_alloc_reset_tasks_exited(void **state)
         expect_class_read(1, NULL, 0);
         expect_classes_empty(state, 2);
 
-        /* a race the reset takes in its stride, with no message of its own.
-         * resctrl_alloc_fclose() logs one for the task gone at the write,
-         * which the wrap of resctrl_alloc_assoc_set_pid() leaves out here
-         * (PSWD-20371)
+        /* a race the reset takes in its stride, with no message: nor has the
+         * write of a task gone at it one (test_resctrl_alloc_task_write)
          */
         test_log_count_start();
         ret = os_alloc_reset_tasks();
@@ -621,9 +619,8 @@ test_os_alloc_reset_tasks_unmovable_task_ends_class(void **state)
         expect_task_not_moved(11);
         expect_classes_empty(state, 2);
 
-        /* no message of the reset's own. resctrl_alloc_fclose() logs one for
-         * the ESRCH at the write, which the wrap of
-         * resctrl_alloc_assoc_set_pid() leaves out here (PSWD-20371)
+        /* no message: nor has the write that the ESRCH answers one
+         * (test_resctrl_alloc_task_write)
          */
         test_log_count_start();
         ret = os_alloc_reset_tasks();
