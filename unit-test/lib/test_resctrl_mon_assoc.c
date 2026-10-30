@@ -73,6 +73,9 @@ resctrl_mon_cpumask_write(const unsigned class_id,
         return __wrap_resctrl_mon_cpumask_write(class_id, resctrl_group, mask);
 }
 
+/* the groups a listing of more than one finds, as many as it says */
+static const char *const *listed;
+
 int
 __wrap_scandir(const char *restrict dirp,
                struct dirent ***restrict namelist,
@@ -81,6 +84,7 @@ __wrap_scandir(const char *restrict dirp,
                    __attribute__((unused)))
 {
         int ret;
+        int i;
 
         check_expected(dirp);
 
@@ -91,6 +95,15 @@ __wrap_scandir(const char *restrict dirp,
                 *namelist = malloc(sizeof(struct dirent *));
                 *namelist[0] = malloc(sizeof(struct dirent) + 5);
                 strncpy((*namelist)[0]->d_name, "test", 5);
+        } else if (ret > 1) {
+                *namelist = malloc(ret * sizeof(struct dirent *));
+                assert_non_null(*namelist);
+                for (i = 0; i < ret; i++) {
+                        (*namelist)[i] = calloc(1, sizeof(struct dirent));
+                        assert_non_null((*namelist)[i]);
+                        strncpy((*namelist)[i]->d_name, listed[i],
+                                sizeof((*namelist)[i]->d_name) - 1);
+                }
         }
 
         return ret;
@@ -113,12 +126,22 @@ FILE *__real_pqos_fopen(const char *name, const char *mode);
 /* files a case serves, each a path and then its text, up to a NULL path */
 static const char *const *served;
 
+/* a file a case cannot open, and the errno its open fails with */
+static const char *unopened;
+static int unopened_errno;
+
 FILE *
 __wrap_pqos_fopen(const char *name, const char *mode)
 {
-        FILE *fd = tmpfile();
+        FILE *fd;
         unsigned i;
 
+        if (unopened != NULL && strcmp(name, unopened) == 0) {
+                errno = unopened_errno;
+                return NULL;
+        }
+
+        fd = tmpfile();
         assert_non_null(fd);
 
         for (i = 0; served != NULL && served[i] != NULL; i += 2)
@@ -2277,6 +2300,107 @@ test_resctrl_mon_assoc_get_pid_small_buffer(void **state
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+static int
+get_pid_case_end(void **state __attribute__((unused)))
+{
+        listed = NULL;
+        unopened = NULL;
+
+        return 0;
+}
+
+/* the class's one group, removed since the listing by another writer to
+ * resctrl, holds no task: the task is in no group, which is said quietly
+ */
+static void
+test_resctrl_mon_assoc_get_pid_group_gone(void **state __attribute__((unused)))
+{
+        int ret;
+        char name[128] = "untouched";
+        struct pqos_cap cap;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 2);
+        expect_value(__wrap_resctrl_alloc_assoc_get_pid, task, 3);
+        will_return(__wrap_resctrl_alloc_assoc_get_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_assoc_get_pid, 1);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/COS1/mon_groups/");
+        will_return(__wrap_scandir, 1);
+        unopened = "/sys/fs/resctrl/COS1/mon_groups/test/tasks";
+        unopened_errno = ENOENT;
+
+        test_log_count_start();
+        ret = resctrl_mon_assoc_get_pid(3, name, sizeof(name));
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+        assert_string_equal(name, "untouched");
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* a group removed since the listing is passed over, and the task is found in
+ * the next one
+ */
+static void
+test_resctrl_mon_assoc_get_pid_found_past_a_gone_group(void **state
+                                                       __attribute__((unused)))
+{
+        int ret;
+        char name[128] = "untouched";
+        struct pqos_cap cap;
+        static const char *const groups[] = {"gone", "test"};
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/mon_groups/");
+        will_return(__wrap_scandir, 2);
+        listed = groups;
+        unopened = "/sys/fs/resctrl/mon_groups/gone/tasks";
+        unopened_errno = ENOENT;
+
+        test_log_count_start();
+        ret = resctrl_mon_assoc_get_pid(1, name, sizeof(name));
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_string_equal(name, "test");
+        assert_int_equal(test_log_count_stop(), 0);
+}
+
+/* a tasks file that is there but cannot be opened leaves it unknown whether
+ * its group holds the task: the lookup fails, naming the group, though a
+ * later group holds the task
+ */
+static void
+test_resctrl_mon_assoc_get_pid_tasks_unopened(void **state
+                                              __attribute__((unused)))
+{
+        int ret;
+        char name[128] = "untouched";
+        struct pqos_cap cap;
+        static const char *const groups[] = {"unread", "test"};
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        will_return(resctrl_mon_is_supported, 1);
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+        expect_string(__wrap_scandir, dirp, "/sys/fs/resctrl/mon_groups/");
+        will_return(__wrap_scandir, 2);
+        listed = groups;
+        unopened = "/sys/fs/resctrl/mon_groups/unread/tasks";
+        unopened_errno = EACCES;
+
+        test_log_keep_start();
+        ret = resctrl_mon_assoc_get_pid(1, name, sizeof(name));
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_string_equal(name, "untouched");
+        assert_int_equal(test_log_count_stop(), 1);
+        assert_non_null(strstr(test_log_said(), "group unread for CLOS 0"));
+}
+
 /* ======== resctrl_mon_assoc_set_pid ======== */
 
 static void
@@ -2475,6 +2599,14 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_unassigned),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_alloc_default),
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_small_buffer),
+            cmocka_unit_test_teardown(test_resctrl_mon_assoc_get_pid_group_gone,
+                                      get_pid_case_end),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_assoc_get_pid_found_past_a_gone_group,
+                get_pid_case_end),
+            cmocka_unit_test_teardown(
+                test_resctrl_mon_assoc_get_pid_tasks_unopened,
+                get_pid_case_end),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_busy),

@@ -2448,7 +2448,7 @@ os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
         int ret;
         unsigned max_clos = 0;
         int ret_mon;
-        char mon_group[RESCTRL_MON_GROUP_NAME_SIZE];
+        char mon_group[RESCTRL_MON_GROUP_NAME_SIZE] = "";
         const struct pqos_cap *cap = _pqos_get_cap();
 
         /* Get number of CLOS */

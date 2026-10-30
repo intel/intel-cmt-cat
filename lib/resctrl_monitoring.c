@@ -1372,8 +1372,18 @@ resctrl_mon_assoc_get_pid(const pid_t task,
                         goto resctrl_mon_assoc_get_pid_exit;
 
                 fd = pqos_fopen(path, "r");
-                if (fd == NULL)
+                if (fd == NULL) {
+                        /* a group another writer to resctrl removed since
+                         * the listing holds no task: look on in the others
+                         */
+                        if (errno == ENOENT)
+                                continue;
+                        LOG_ERROR("Failed to open tasks file of monitoring "
+                                  "group %s for CLOS %u\n",
+                                  d_name, class_id);
+                        ret = PQOS_RETVAL_ERROR;
                         goto resctrl_mon_assoc_get_pid_exit;
+                }
 
                 while (fgets(buf, sizeof(buf), fd) != NULL) {
                         char *endptr = NULL;
