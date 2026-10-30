@@ -1914,6 +1914,62 @@ test_common_attempts_a_mapping_it_can_address(void **state
         assert_int_equal(dev_mem_opens, 1);
 }
 
+/* a pipe holding the n bytes of data, its write end closed: a file that
+ * ends after them
+ */
+static int
+read_end_of(const char *data, const size_t n)
+{
+        int fds[2];
+
+        assert_int_equal(pipe(fds), 0);
+        assert_int_equal(write(fds[1], data, n), (ssize_t)n);
+        close(fds[1]);
+
+        return fds[0];
+}
+
+/* a file that ends before the count asked for gives the bytes it held, as
+ * the reads of an ACPI table check: a table shorter than its header says is
+ * refused, rather than read as if whole
+ */
+static void
+test_common_pqos_read_short(void **state __attribute__((unused)))
+{
+        const int fd = read_end_of("0123456789", 10);
+        char buf[36];
+
+        memset(buf, 'x', sizeof(buf));
+        assert_int_equal(pqos_read(fd, buf, sizeof(buf)), 10);
+        assert_memory_equal(buf, "0123456789", 10);
+        assert_int_equal(buf[10], 'x');
+        close(fd);
+}
+
+/* one that holds the count gives the count */
+static void
+test_common_pqos_read_whole(void **state __attribute__((unused)))
+{
+        const char data[] = "abcdefghijklmnopqrstuvwxyz0123456789";
+        const int fd = read_end_of(data, sizeof(data) - 1);
+        char buf[sizeof(data) - 1];
+
+        assert_int_equal(pqos_read(fd, buf, sizeof(buf)), sizeof(buf));
+        assert_memory_equal(buf, data, sizeof(buf));
+        close(fd);
+}
+
+/* and an empty one gives none */
+static void
+test_common_pqos_read_empty(void **state __attribute__((unused)))
+{
+        const int fd = read_end_of("", 0);
+        char buf[36];
+
+        assert_int_equal(pqos_read(fd, buf, sizeof(buf)), 0);
+        close(fd);
+}
+
 int
 main(void)
 {
@@ -1921,6 +1977,9 @@ main(void)
 
         const struct CMUnitTest tests_common[] = {
             cmocka_unit_test(test_common_pqos_strcat),
+            cmocka_unit_test(test_common_pqos_read_short),
+            cmocka_unit_test(test_common_pqos_read_whole),
+            cmocka_unit_test(test_common_pqos_read_empty),
             cmocka_unit_test(test_common_pqos_file_exists),
             cmocka_unit_test(test_common_pqos_dir_exists),
             cmocka_unit_test(test_common_pqos_fgets),

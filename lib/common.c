@@ -999,7 +999,8 @@ pqos_read(int fd, void *buf, size_t count)
                 byte_ptr += ret;
         }
 
-        return count;
+        /* what was read: fewer than asked for where the file ends first */
+        return (ssize_t)(count - len);
 }
 
 int

@@ -170,8 +170,9 @@ PQOS_LOCAL void pqos_munmap(void *mem, const uint64_t size);
  * @param [in] count number of bytes to read
  *
  * @return Number of bytes read
- * @retval Number of bytes read equal 'count' param
- * @retval -1 if it couldn't read 'count' bytes
+ * @retval count when that many were read
+ * @retval fewer than count when the file ends first
+ * @retval -1 when a read fails, with errno set
  */
 PQOS_LOCAL ssize_t pqos_read(int fd, void *buf, size_t count);
 
