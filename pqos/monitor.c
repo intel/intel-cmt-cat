@@ -2337,6 +2337,23 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                                "resctrl groups may exist. "
                                                "(status %d)\n",
                                                grp->desc, ret);
+                                /* on the OS interface, chiefly a group's
+                                 * mkdir that found no RMID left, which the
+                                 * library has said: more groups than the
+                                 * RMIDs that its classes and other groups
+                                 * leave
+                                 */
+                                else if (ret == PQOS_RETVAL_RESOURCE &&
+                                         (interface == PQOS_INTER_OS ||
+                                          interface ==
+                                              PQOS_INTER_OS_RESCTRL_MON))
+                                        printf("PID %s monitoring start error: "
+                                               "%s (status %d). Too many "
+                                               "monitoring groups may be "
+                                               "selected, or other resctrl "
+                                               "groups may hold the RMIDs.\n",
+                                               grp->desc,
+                                               pqos_retval_to_string(ret), ret);
                                 else
                                         printf("PID %s monitoring start error: "
                                                "%s (status %d)\n",

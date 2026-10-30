@@ -443,6 +443,20 @@ $(BIN_DIR)/test_monitor_signals: ./test_monitor_signals.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_monitor_start_errors: ./test_monitor_start_errors.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_mon_start_pids2 \
+		-Wl,--wrap=pqos_mon_stop \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/monitor.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+
 # monitor.c is included by the test rather than linked, as for
 # test_monitor_signals, and compiled there with PQOS_RMID_CUSTOM, which the test
 # defines: --rmid-channels and its handler exist only in that build, which no
