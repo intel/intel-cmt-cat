@@ -1342,6 +1342,7 @@ $(BIN_DIR)/test_os_cpuinfo: ./test_os_cpuinfo.c $(LIB_OBJS)
 $(BIN_DIR)/test_os_monitoring: ./test_os_monitoring.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=free \
 		-Wl,--wrap=nanosleep \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \

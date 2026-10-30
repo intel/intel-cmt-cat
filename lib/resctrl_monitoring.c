@@ -913,8 +913,10 @@ resctrl_mon_empty(const unsigned class_id,
  * max_threshold_occupancy, and while every free RMID is there the mkdir fails
  * with EBUSY. That is not tried again here, under the resctrl lock: what the
  * caller found before the mkdir would not hold after a wait.
- * os_mon_start_cores() tries the whole start again instead, and says the
- * failure if it persists, as the other callers of a start do
+ * os_mon_start_cores() tries the whole start again instead. The BUSY is said,
+ * with RESCTRL_MON_LIMBO, by the caller that gives up on it: a start, the
+ * poll's restore of a purged directory, or an allocation that moves a core or
+ * a task whose monitoring is started to another class
  *
  * @param [in] class_id CLOS id
  * @param[in] name mon group name
@@ -1106,8 +1108,8 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
                 return ret;
 
         ret = mon_assoc_add(class_id, lcore, name, 1);
-        /* BUSY, every free RMID in limbo, is for the start's caller to say,
-         * which may try the start again
+        /* BUSY, every free RMID in limbo, is for the caller to say, which
+         * may be a start that tries again
          */
         if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_BUSY)
                 LOG_ERROR("Could not assign core %u to resctrl monitoring "
@@ -1315,9 +1317,7 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name, int *purged)
 
         if (ret == PQOS_RETVAL_BUSY)
                 LOG_ERROR("Could not assign core %u to resctrl monitoring "
-                          "group: every free RMID is in the kernel's limbo; a "
-                          "higher max_threshold_occupancy in " RESCTRL_PATH
-                          "/info/L3_MON frees them sooner\n",
+                          "group: " RESCTRL_MON_LIMBO "\n",
                           lcore);
         else
                 LOG_ERROR("Could not assign core %u to resctrl monitoring "
@@ -1422,7 +1422,7 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
                 return ret;
         if (name != NULL) {
                 ret = resctrl_mon_mkdir(class_id, name);
-                /* BUSY is the start's caller's to say */
+                /* BUSY is the caller's to say, as for a core */
                 if (ret != PQOS_RETVAL_OK) {
                         if (ret != PQOS_RETVAL_BUSY)
                                 LOG_ERROR("Failed to create resctrl "

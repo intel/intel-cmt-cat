@@ -38,6 +38,7 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -119,6 +120,43 @@ test_log_count_stop(void)
         test_log_init_silent();
 
         return *test_log_count();
+}
+
+/* Keeps what the library logs at the verbosity a run has by default
+ *
+ * As test_log_count_start() counts it, with the messages kept one after
+ * another in test_log_said(), as much of them as fits: for a case that means
+ * a message of its own, which a count would find met by another one in its
+ * place. test_log_count_stop() ends it.
+ */
+#define TEST_LOG_SAID_SIZE 1024
+
+static inline char *
+test_log_said(void)
+{
+        static char said[TEST_LOG_SAID_SIZE];
+
+        return said;
+}
+
+static inline void
+test_log_keep_message(void *context, const size_t size, const char *message)
+{
+        char *said = test_log_said();
+        const size_t used = strlen(said);
+
+        (void)context;
+        (void)snprintf(said + used, TEST_LOG_SAID_SIZE - used, "%.*s",
+                       (int)size, message);
+        (*test_log_count())++;
+}
+
+static inline void
+test_log_keep_start(void)
+{
+        test_log_said()[0] = '\0';
+        *test_log_count() = 0;
+        (void)log_init(-1, test_log_keep_message, NULL, LOG_VER_DEFAULT);
 }
 
 #ifndef TEST_NO_LOG_CONSTRUCTOR

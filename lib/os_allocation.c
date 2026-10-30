@@ -333,7 +333,11 @@ os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
         /* Core monitoring was started assign it back to monitoring group */
         if (ret_mon == PQOS_RETVAL_OK) {
                 ret_mon = resctrl_mon_assoc_set(lcore, mon_group);
-                if (ret_mon != PQOS_RETVAL_OK)
+                if (ret_mon == PQOS_RETVAL_BUSY)
+                        LOG_WARN("Could not assign core %d back to monitoring "
+                                 "group: " RESCTRL_MON_LIMBO "\n",
+                                 lcore);
+                else if (ret_mon != PQOS_RETVAL_OK)
                         LOG_WARN("Could not assign core %d back to monitoring "
                                  "group\n",
                                  lcore);
@@ -2498,6 +2502,10 @@ os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
                 ret = resctrl_mon_assoc_set_pid(task, mon_group);
                 if (ret == PQOS_RETVAL_PARAM)
                         ret = PQOS_RETVAL_OK;
+                else if (ret == PQOS_RETVAL_BUSY)
+                        LOG_ERROR("Could not assign task %d back to "
+                                  "monitoring group: " RESCTRL_MON_LIMBO "\n",
+                                  task);
                 else if (ret != PQOS_RETVAL_OK)
                         LOG_ERROR("Could not assign task %d back to "
                                   "monitoring group\n",

@@ -49,6 +49,17 @@ extern "C" {
 #define RESCTRL_MON_GROUP_NAME_SIZE 256
 
 /**
+ * Why a monitoring group's directory could not be made, for the message of a
+ * caller that has a BUSY from it: the mkdir takes an RMID, and the kernel
+ * keeps the RMID of a removed group in limbo until the occupancy counted
+ * against it falls under max_threshold_occupancy
+ */
+#define RESCTRL_MON_LIMBO                                                      \
+        "every free RMID is in the kernel's limbo; a higher "                  \
+        "max_threshold_occupancy in " RESCTRL_PATH "/info/L3_MON frees them "  \
+        "sooner"
+
+/**
  * @brief Initializes resctrl structures used for OS monitoring interface
  *
  * @param cpu cpu topology structure
@@ -170,6 +181,9 @@ PQOS_LOCAL int resctrl_mon_assoc_get(const unsigned lcore,
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_RESOURCE if the core is in no class, as an offline one
  *         is, or resctrl monitoring is not supported
+ * @retval PQOS_RETVAL_BUSY if the group's directory could not be made, every
+ *         free RMID being in the kernel's limbo: not logged here, for the
+ *         caller to say with RESCTRL_MON_LIMBO
  */
 PQOS_LOCAL int resctrl_mon_assoc_set(const unsigned lcore, const char *name);
 
@@ -199,6 +213,7 @@ PQOS_LOCAL int resctrl_mon_assoc_get_pid(const pid_t task,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_PARAM when \a task no longer exists
+ * @retval PQOS_RETVAL_BUSY as for resctrl_mon_assoc_set()
  */
 PQOS_LOCAL int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
 

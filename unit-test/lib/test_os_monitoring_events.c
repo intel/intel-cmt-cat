@@ -37,7 +37,6 @@
 #include "test.h"
 
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 /* ======== mock ======== */
@@ -197,25 +196,10 @@ test_os_mon_start_events_resctrl(void **state)
         }
 }
 
-/* what a start logged at the verbosity a run has by default, the messages one
- * after another
- */
-static char start_said[256];
-
-static void
-start_say(void *context, const size_t size, const char *message)
-{
-        const size_t said = strlen(start_said);
-
-        (void)context;
-        (void)snprintf(start_said + said, sizeof(start_said) - said, "%.*s",
-                       (int)size, message);
-}
-
 /* the resctrl start of a core group, in a class whose free RMIDs are all
  * in the kernel's limbo, failing with BUSY, and its rollback stop with
- * stop_ret; returns what os_mon_start_events() returns, and puts what it
- * logged in start_said
+ * stop_ret; returns what os_mon_start_events() returns, with what it logged
+ * in test_log_said()
  */
 static int
 start_busy(struct test_data *data, const int stop_ret)
@@ -250,10 +234,9 @@ start_busy(struct test_data *data, const int stop_ret)
         will_return(__wrap_resctrl_mon_stop, stop_ret);
         will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
 
-        start_said[0] = '\0';
-        (void)log_init(-1, start_say, NULL, LOG_VER_DEFAULT);
+        test_log_keep_start();
         ret = os_mon_start_events(&group);
-        test_log_init_silent();
+        (void)test_log_count_stop();
 
         return ret;
 }
@@ -266,7 +249,7 @@ test_os_mon_start_events_busy(void **state)
 {
         assert_int_equal(start_busy((struct test_data *)*state, PQOS_RETVAL_OK),
                          PQOS_RETVAL_BUSY);
-        assert_string_equal(start_said, "");
+        assert_string_equal(test_log_said(), "");
 }
 
 /* one whose rollback fails has left something of itself behind: not to be
@@ -278,9 +261,10 @@ test_os_mon_start_events_busy_rollback_fails(void **state)
         assert_int_equal(
             start_busy((struct test_data *)*state, PQOS_RETVAL_ERROR),
             PQOS_RETVAL_ERROR);
-        assert_non_null(strstr(start_said, "Failed to stop resctrl events\n"));
-        assert_non_null(strstr(start_said, "Failed to start all selected "
-                                           "OS monitoring events\n"));
+        assert_non_null(
+            strstr(test_log_said(), "Failed to stop resctrl events\n"));
+        assert_non_null(strstr(test_log_said(), "Failed to start all selected "
+                                                "OS monitoring events\n"));
 }
 
 static void

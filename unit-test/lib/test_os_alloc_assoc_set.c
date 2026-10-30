@@ -37,6 +37,8 @@
 #include "os_allocation.h"
 #include "test.h"
 
+#include <string.h>
+
 /* ======== os_alloc_assoc_set ======== */
 
 static void
@@ -91,6 +93,54 @@ test_os_alloc_assoc_set_active_mon(void **state)
 
         ret = os_alloc_assoc_set(lcore, class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* moves core 2, whose monitoring is started, to class 1, the group's restore
+ * there failing with mon_ret; returns what was logged
+ */
+static const char *
+assoc_set_mon_fails(const int mon_ret)
+{
+        const unsigned class_id = 1;
+        const unsigned lcore = 2;
+
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_get, lcore, lcore);
+        will_return(__wrap_resctrl_mon_assoc_get, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_alloc_assoc_set, lcore, lcore);
+        expect_value(__wrap_resctrl_alloc_assoc_set, class_id, class_id);
+        will_return(__wrap_resctrl_alloc_assoc_set, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_set, lcore, lcore);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set, mon_ret);
+
+        test_log_keep_start();
+        assert_int_equal(os_alloc_assoc_set(lcore, class_id), PQOS_RETVAL_OK);
+        (void)test_log_count_stop();
+
+        return test_log_said();
+}
+
+/* a restore that finds every free RMID in the kernel's limbo says so, which
+ * the association leaves to its caller; another failure is said as before
+ */
+static void
+test_os_alloc_assoc_set_mon_restore_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        assert_string_equal(assoc_set_mon_fails(PQOS_RETVAL_BUSY),
+                            "WARN: Could not assign core 2 back to monitoring "
+                            "group: " RESCTRL_MON_LIMBO "\n");
+        assert_string_equal(
+            assoc_set_mon_fails(PQOS_RETVAL_ERROR),
+            "WARN: Could not assign core 2 back to monitoring group\n");
 }
 
 static void
@@ -258,6 +308,55 @@ test_os_alloc_assoc_set_pid_mon_restore_task_ended(void **state)
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* moves task 2, whose monitoring is started, to class 1, the group's restore
+ * there failing with mon_ret, which the call then fails with as the move has
+ * taken the task out of its monitoring; returns what was logged
+ */
+static const char *
+assoc_set_pid_mon_fails(const int mon_ret)
+{
+        const unsigned class_id = 1;
+        const pid_t task = 2;
+
+        will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_get_pid, task, task);
+        will_return(__wrap_resctrl_mon_assoc_get_pid, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, task, task);
+        expect_value(__wrap_resctrl_alloc_assoc_set_pid, class_id, class_id);
+        will_return(__wrap_resctrl_alloc_assoc_set_pid, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, task);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, mon_ret);
+
+        test_log_keep_start();
+        assert_int_equal(os_alloc_assoc_set_pid(task, class_id), mon_ret);
+        (void)test_log_count_stop();
+
+        return test_log_said();
+}
+
+/* a task's restore that fails is an error, which names the kernel's limbo
+ * when every free RMID is in it
+ */
+static void
+test_os_alloc_assoc_set_pid_mon_restore_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        assert_string_equal(assoc_set_pid_mon_fails(PQOS_RETVAL_BUSY),
+                            "ERROR: Could not assign task 2 back to "
+                            "monitoring group: " RESCTRL_MON_LIMBO "\n");
+        assert_string_equal(
+            assoc_set_pid_mon_fails(PQOS_RETVAL_ERROR),
+            "ERROR: Could not assign task 2 back to monitoring group\n");
+}
+
 static void
 test_os_alloc_assoc_set_pid_param(void **state)
 {
@@ -287,13 +386,15 @@ main(void)
             cmocka_unit_test(test_os_alloc_assoc_set),
             cmocka_unit_test(test_os_alloc_assoc_set_param),
             cmocka_unit_test(test_os_alloc_assoc_set_active_mon),
+            cmocka_unit_test(test_os_alloc_assoc_set_mon_restore_fails),
             cmocka_unit_test(test_os_alloc_assoc_set_pid),
             cmocka_unit_test(test_os_alloc_assoc_set_pid_param),
             cmocka_unit_test(test_os_alloc_assoc_set_pid_active_mon),
             cmocka_unit_test(test_os_alloc_assoc_set_pid_mon_lookup_error),
             cmocka_unit_test(test_os_alloc_assoc_set_pid_mon_restore_error),
             cmocka_unit_test(
-                test_os_alloc_assoc_set_pid_mon_restore_task_ended)};
+                test_os_alloc_assoc_set_pid_mon_restore_task_ended),
+            cmocka_unit_test(test_os_alloc_assoc_set_pid_mon_restore_fails)};
 
         const struct CMUnitTest tests_unsupported[] = {};
 

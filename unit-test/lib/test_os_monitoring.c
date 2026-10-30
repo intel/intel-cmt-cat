@@ -36,30 +36,44 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 #include <time.h>
+#include <unistd.h>
+
+void __real_free(void *ptr);
 
 /* ======== mock ======== */
 
-/* the points at which a real start's file accesses, or a real wait, would act
- * on a pending cancellation: how many were reached, and how many of them with
- * the thread's cancellation on
+/* A core group's start made in a child process and cancelled there - the
+ * child's one thread has cmocka's state, which is each thread's own - and what
+ * the child shows its parent, in a page both share. NULL outside those cases.
  */
-static unsigned cancel_points;
-static unsigned cancel_points_on;
+struct cancelled_start {
+        struct pqos_mon_data *group; /**< the group, as the child made it */
+        unsigned *cores;             /**< its cores, as the start made them */
+        int cancel_in_wait;          /**< a wait has the thread cancelled */
+        unsigned group_freed;
+        unsigned cores_freed;
+        int said;     /**< the thread was cancelled in a message */
+        int returned; /**< the start returned */
+};
 
-static void
-cancel_point(void)
+static struct cancelled_start *cancelled;
+
+void
+__wrap_free(void *ptr)
 {
-        int found;
-        int set;
-
-        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found),
-                         0);
-        assert_int_equal(pthread_setcancelstate(found, &set), 0);
-        cancel_points++;
-        if (found == PTHREAD_CANCEL_ENABLE)
-                cancel_points_on++;
+        if (cancelled != NULL && ptr != NULL) {
+                if (ptr == cancelled->group)
+                        cancelled->group_freed++;
+                else if (ptr == cancelled->cores)
+                        cancelled->cores_freed++;
+        }
+        __real_free(ptr);
 }
 
 int
@@ -81,9 +95,10 @@ os_mon_start_events(struct pqos_mon_data *group)
         unsigned num_ctrs = 0;
         int ret;
 
-        cancel_point();
         assert_non_null(group);
         check_expected_ptr(group);
+        if (cancelled != NULL)
+                cancelled->cores = group->cores;
 
         if (group->num_cores > 0)
                 num_ctrs = group->num_cores;
@@ -114,7 +129,6 @@ static unsigned waits_cut_short;
 int
 __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
 {
-        cancel_point();
         assert_non_null(req);
         assert_int_equal(req->tv_sec, 0);
         if (waits < DIM(wait_ns))
@@ -126,6 +140,13 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
                 rem->tv_nsec = req->tv_nsec / 2;
                 errno = EINTR;
                 return -1;
+        }
+        if (cancelled != NULL && cancelled->cancel_in_wait) {
+                /* as another thread would: nanosleep() is a cancellation
+                 * point
+                 */
+                (void)pthread_cancel(pthread_self());
+                pthread_testcancel();
         }
 
         return 0;
@@ -465,25 +486,27 @@ test_os_mon_start_cores(void **state)
         assert_null(group.cores);
 }
 
-/* a core group's start whose tries find every free RMID in limbo: each try
- * finds the cores free again, and its BUSY, which leaves nothing of it, has
- * the start made again after a wait, tries times in all, ending with last
+/* the cores of the starts tried below */
+static const unsigned tried_cores[] = {1};
+
+/* sets up a core group's start whose tries find every free RMID in limbo:
+ * each try finds the cores free again, and its BUSY, which leaves nothing of
+ * it, has the start made again after a wait, tries times in all, ending with
+ * last
  */
-static int
-start_cores_tried(struct test_data *data,
-                  struct pqos_mon_data *group,
-                  const unsigned tries,
-                  const int last,
-                  unsigned *logged)
+static void
+start_cores_set_up(struct test_data *data,
+                   struct pqos_mon_data *group,
+                   const unsigned tries,
+                   const int last)
 {
-        unsigned cores[] = {1};
         unsigned i;
-        int ret;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         for (i = 0; i < tries; i++) {
-                expect_value(__wrap_resctrl_mon_assoc_get, lcore, cores[0]);
+                expect_value(__wrap_resctrl_mon_assoc_get, lcore,
+                             tried_cores[0]);
                 will_return(__wrap_resctrl_mon_assoc_get, PQOS_RETVAL_RESOURCE);
                 expect_value(os_mon_start_events, group, group);
                 will_return(os_mon_start_events,
@@ -491,9 +514,23 @@ start_cores_tried(struct test_data *data,
         }
 
         waits = 0;
+}
+
+/* makes that start; says how many messages it logged */
+static int
+start_cores_tried(struct test_data *data,
+                  struct pqos_mon_data *group,
+                  const unsigned tries,
+                  const int last,
+                  unsigned *logged)
+{
+        int ret;
+
+        start_cores_set_up(data, group, tries, last);
         test_log_count_start();
-        ret = os_mon_start_cores(DIM(cores), cores, PQOS_MON_EVENT_L3_OCCUP,
-                                 NULL, NULL, group, NULL);
+        ret = os_mon_start_cores(DIM(tried_cores), tried_cores,
+                                 PQOS_MON_EVENT_L3_OCCUP, NULL, NULL, group,
+                                 NULL);
         *logged = test_log_count_stop();
 
         return ret;
@@ -624,66 +661,139 @@ test_os_mon_start_cores_wait_after_a_signal(void **state)
         assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
 }
 
-/* a thread cancelled during a start is cancelled once the start has
- * returned: no try, and no wait, finds the thread's cancellation on, where one
- * acted on would lose the group; and it is on again after the start
+/* a log whose message has the thread cancelled, as another thread would one
+ * blocked in a write() to a reader that has stopped
  */
 static void
-test_os_mon_start_cores_not_cancelled_midway(void **state)
+cancel_in_the_message(void *context, const size_t size, const char *message)
 {
-        struct pqos_mon_data group;
-        struct pqos_mon_data_internal intl;
-        unsigned logged;
-        int after;
-        int ret;
-
-        memset(&group, 0, sizeof(group));
-        memset(&intl, 0, sizeof(intl));
-        group.intl = &intl;
-        cancel_points = 0;
-        cancel_points_on = 0;
-
-        ret = start_cores_tried((struct test_data *)*state, &group, 3,
-                                PQOS_RETVAL_OK, &logged);
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-        /* three tries, and two waits */
-        assert_int_equal(cancel_points, 5);
-        assert_int_equal(cancel_points_on, 0);
-        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &after),
-                         0);
-        assert_int_equal(after, PTHREAD_CANCEL_ENABLE);
-
-        expect_value(os_mon_stop_events, group, &group);
-        will_return(os_mon_stop_events, PQOS_RETVAL_OK);
-        assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
+        (void)context;
+        (void)size;
+        (void)message;
+        cancelled->said = 1;
+        (void)pthread_cancel(pthread_self());
+        pthread_testcancel();
 }
 
-/* and a start made with cancellation off leaves it off */
-static void
-test_os_mon_start_cores_cancellation_left_off(void **state)
+/* makes, in a child process, the start start_cores_set_up() sets up, on a
+ * group made as pqos_mon_start_cores_ext() makes one, or as a caller of its
+ * own does, with the thread cancelled in a wait or in a message; returns the
+ * child's status, with what it showed in seen
+ */
+static int
+start_cancelled(struct test_data *data,
+                const unsigned tries,
+                const int last,
+                const int library_made,
+                const int cancel_in_wait,
+                struct cancelled_start *seen)
 {
-        struct pqos_mon_data group;
-        struct pqos_mon_data_internal intl;
-        unsigned logged;
-        int found;
-        int left;
-        int ret;
+        struct cancelled_start *shared;
+        int status = -1;
+        pid_t pid;
 
-        memset(&group, 0, sizeof(group));
-        memset(&intl, 0, sizeof(intl));
-        group.intl = &intl;
+        shared = mmap(NULL, sizeof(*shared), PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        assert_true(shared != MAP_FAILED);
+        memset(shared, 0, sizeof(*shared));
+        shared->cancel_in_wait = cancel_in_wait;
+        fflush(stdout);
+        fflush(stderr);
 
-        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found),
-                         0);
-        ret = start_cores_tried((struct test_data *)*state, &group, 2,
-                                PQOS_RETVAL_OK, &logged);
-        assert_int_equal(pthread_setcancelstate(found, &left), 0);
-        assert_int_equal(left, PTHREAD_CANCEL_DISABLE);
-        assert_int_equal(ret, PQOS_RETVAL_OK);
+        pid = fork();
+        assert_true(pid >= 0);
+        if (pid == 0) {
+                struct pqos_mon_data *group;
+                const int null = open("/dev/null", O_WRONLY);
 
-        expect_value(os_mon_stop_events, group, &group);
-        will_return(os_mon_stop_events, PQOS_RETVAL_OK);
-        assert_int_equal(os_mon_stop(&group), PQOS_RETVAL_OK);
+                /* a failure would have cmocka go on with the cases left in
+                 * this process too: they print nowhere, and its status says
+                 * it
+                 */
+                if (null >= 0) {
+                        (void)dup2(null, STDOUT_FILENO);
+                        (void)dup2(null, STDERR_FILENO);
+                }
+                group = calloc(1, sizeof(*group) +
+                                      sizeof(struct pqos_mon_data_internal));
+                if (group == NULL)
+                        _exit(4);
+                group->intl = (struct pqos_mon_data_internal *)&group[1];
+                group->intl->manage_memory = library_made;
+                shared->group = group;
+                cancelled = shared;
+                start_cores_set_up(data, group, tries, last);
+                if (!cancel_in_wait)
+                        (void)log_init(-1, cancel_in_the_message, NULL,
+                                       LOG_VER_DEFAULT);
+                (void)os_mon_start_cores(DIM(tried_cores), tried_cores,
+                                         PQOS_MON_EVENT_L3_OCCUP, NULL, NULL,
+                                         group, NULL);
+                shared->returned = 1;
+                _exit(3);
+        }
+
+        assert_int_equal(waitpid(pid, &status, 0), pid);
+        *seen = *shared;
+        assert_int_equal(munmap(shared, sizeof(*shared)), 0);
+
+        return status;
+}
+
+/* a thread cancelled in a wait between two tries gives the group back, as a
+ * failed start does: the try before it has left nothing else. A cancelled
+ * thread that is a process's only one ends the process with status 0
+ */
+static void
+test_os_mon_start_cores_cancelled_in_a_wait(void **state)
+{
+        struct cancelled_start seen;
+        int status;
+
+        status = start_cancelled((struct test_data *)*state, 2, PQOS_RETVAL_OK,
+                                 1, 1, &seen);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+        assert_false(seen.returned);
+        assert_int_equal(seen.cores_freed, 1);
+        assert_int_equal(seen.group_freed, 1);
+}
+
+/* a group of the caller's own, as pqos_mon_start() starts, is the caller's to
+ * free: only its cores are given back
+ */
+static void
+test_os_mon_start_cores_cancelled_in_a_wait_own_group(void **state)
+{
+        struct cancelled_start seen;
+        int status;
+
+        status = start_cancelled((struct test_data *)*state, 2, PQOS_RETVAL_OK,
+                                 0, 1, &seen);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+        assert_false(seen.returned);
+        assert_int_equal(seen.cores_freed, 1);
+        assert_int_equal(seen.group_freed, 0);
+}
+
+/* and one cancelled in the message that gives the start up, a write() that
+ * another thread can cancel as it can any write the library makes
+ */
+static void
+test_os_mon_start_cores_cancelled_saying_it_gave_up(void **state)
+{
+        struct cancelled_start seen;
+        int status;
+
+        status = start_cancelled((struct test_data *)*state, 30,
+                                 PQOS_RETVAL_BUSY, 1, 0, &seen);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+        assert_true(seen.said);
+        assert_false(seen.returned);
+        assert_int_equal(seen.cores_freed, 1);
+        assert_int_equal(seen.group_freed, 1);
 }
 
 /* ======== os_mon_start_pids ======== */
@@ -1041,8 +1151,11 @@ main(void)
             cmocka_unit_test(test_os_mon_start_cores_error_not_tried_again),
             cmocka_unit_test(test_os_mon_start_cores_core_taken_during_a_wait),
             cmocka_unit_test(test_os_mon_start_cores_wait_after_a_signal),
-            cmocka_unit_test(test_os_mon_start_cores_not_cancelled_midway),
-            cmocka_unit_test(test_os_mon_start_cores_cancellation_left_off),
+            cmocka_unit_test(test_os_mon_start_cores_cancelled_in_a_wait),
+            cmocka_unit_test(
+                test_os_mon_start_cores_cancelled_in_a_wait_own_group),
+            cmocka_unit_test(
+                test_os_mon_start_cores_cancelled_saying_it_gave_up),
             cmocka_unit_test(test_os_mon_start_pids_param),
             cmocka_unit_test(test_os_mon_start_pids),
             cmocka_unit_test(test_os_mon_start_pids_busy_not_tried_again),
