@@ -402,15 +402,207 @@ selfn_dump_length(const char *arg)
         sel_dump.length = strtouint64(arg);
 }
 
+/**
+ * @brief Finds the socket of a CPU domain, and how many cores it has there
+ *
+ * A CPU agent sits on one socket, so the cores the core to domain mapping
+ * gives it are all on that socket.
+ *
+ * @param [in] sys system configuration
+ * @param [in] domain_id CPU domain to place
+ * @param [out] socket socket of the domain's cores, when it has one
+ * @param [out] other another socket one of its cores is on
+ * @param [out] num_cores number of topology cores the mapping gives the domain
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK when the domain's cores, if any, are on one socket
+ * @retval PQOS_RETVAL_ERROR when its cores are on more than one socket
+ */
+static int
+get_cpu_domain_socket(const struct pqos_sysconfig *sys,
+                      const uint16_t domain_id,
+                      unsigned *socket,
+                      unsigned *other,
+                      unsigned *num_cores)
+{
+        const struct pqos_cores_domains *cores_domains = sys->cores_domains;
+
+        *num_cores = 0;
+
+        for (unsigned i = 0; i < sys->cpu->num_cores; i++) {
+                const struct pqos_coreinfo *core = &sys->cpu->cores[i];
+
+                if (core->lcore >= cores_domains->num_cores ||
+                    cores_domains->domains[core->lcore] != domain_id)
+                        continue;
+
+                if (*num_cores == 0) {
+                        *socket = core->socket;
+                } else if (core->socket != *socket) {
+                        *other = core->socket;
+                        return PQOS_RETVAL_ERROR;
+                }
+                (*num_cores)++;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Finds an enumeration ID that two CACDs both list
+ *
+ * The core to domain mapping gives a core that two CACDs list to the domain
+ * written last, so where CACDs overlap the mapping no longer says which cores
+ * a domain's CACD enumerates.
+ *
+ * @param [in] erdt ERDT information
+ * @param [out] first domain of the first CACD that lists the ID
+ * @param [out] second domain of the second CACD that lists it
+ * @param [out] id the enumeration ID both list
+ *
+ * @return 1 if two CACDs list the same enumeration ID, 0 otherwise
+ */
+static int
+find_shared_enumeration_id(const struct pqos_erdt_info *erdt,
+                           uint16_t *first,
+                           uint16_t *second,
+                           uint32_t *id)
+{
+        for (uint32_t a = 0; a < erdt->num_cpu_agents; a++) {
+                const struct pqos_erdt_cacd *cacd_a = &erdt->cpu_agents[a].cacd;
+
+                for (uint32_t b = a + 1; b < erdt->num_cpu_agents; b++) {
+                        const struct pqos_erdt_cacd *cacd_b =
+                            &erdt->cpu_agents[b].cacd;
+
+                        for (uint32_t i = 0; i < cacd_a->enum_ids_length; i++)
+                                for (uint32_t j = 0;
+                                     j < cacd_b->enum_ids_length; j++) {
+                                        if (cacd_a->enumeration_ids[i] !=
+                                            cacd_b->enumeration_ids[j])
+                                                continue;
+
+                                        *first =
+                                            erdt->cpu_agents[a].rmdd.domain_id;
+                                        *second =
+                                            erdt->cpu_agents[b].rmdd.domain_id;
+                                        *id = cacd_a->enumeration_ids[i];
+                                        return 1;
+                                }
+                }
+        }
+
+        return 0;
+}
+
+/**
+ * @brief Checks that the CPU topology lists exactly the CPUs the mapping covers
+ *
+ * The core to domain mapping covers the logical CPUs from 0 to its num_cores
+ * minus 1. A CPU it covers that the topology does not list, as a cpuset can
+ * leave one out, may be one a CACD enumerates, and a core that no CACD lists
+ * can then stand in for it in the count of its domain's cores. A CPU the
+ * topology lists beyond the mapping has no domain to read.
+ *
+ * @param [in] sys system configuration
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK when the topology lists every CPU the mapping covers,
+ *         and no other
+ * @retval PQOS_RETVAL_ERROR when it does not
+ * @retval PQOS_RETVAL_RESOURCE when the memory to check it cannot be had
+ */
+static int
+check_topology_coverage(const struct pqos_sysconfig *sys)
+{
+        const unsigned num_cores = sys->cores_domains->num_cores;
+        unsigned char *listed = calloc(num_cores > 0 ? num_cores : 1, 1);
+        int ret = PQOS_RETVAL_OK;
+
+        if (listed == NULL) {
+                printf("Error with memory allocation for the CPU topology "
+                       "check!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        for (unsigned i = 0; i < sys->cpu->num_cores; i++) {
+                const unsigned lcore = sys->cpu->cores[i].lcore;
+
+                if (lcore >= num_cores) {
+                        printf("CPU %u of the CPU topology is outside the core "
+                               "to domain mapping, so the sockets of the CPU "
+                               "domains are unknown. Use --dump-domain-id\n",
+                               lcore);
+                        ret = PQOS_RETVAL_ERROR;
+                        goto check_topology_coverage_exit;
+                }
+                listed[lcore] = 1;
+        }
+
+        for (unsigned lcore = 0; lcore < num_cores; lcore++)
+                if (!listed[lcore]) {
+                        printf("CPU %u of the core to domain mapping is not in "
+                               "the CPU topology, so the sockets of the CPU "
+                               "domains are unknown. Use --dump-domain-id\n",
+                               lcore);
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                }
+
+check_topology_coverage_exit:
+        free(listed);
+
+        return ret;
+}
+
+/**
+ * @brief Collects the domains of one socket
+ *
+ * A CPU agent belongs to the socket of the cores its CACD enumerates, not to a
+ * position in ERDT: a socket may populate fewer CBBs than
+ * CPU_AGENTS_PER_SOCKET, with domain IDs that neither start at 0 nor follow
+ * one another, two CBBs with domains 1 and 3 for one. A device agent has no
+ * cores to place it by, so device domains are still taken
+ * DEVICE_AGENTS_PER_SOCKET at a time in ERDT order.
+ *
+ * The mapping is zero-filled, and a core no CACD enumerates reads as domain 0,
+ * so the mapping is taken only where it agrees with ERDT. The topology has to
+ * list exactly the CPUs the mapping covers, so that every core a CACD lists is
+ * in it, and no two CACDs may list the same core, since the mapping keeps only
+ * one of them for it. Then the mapping gives each domain the cores its CACD
+ * lists and, for domain 0, the cores no CACD lists, and a CPU domain is placed
+ * by its cores only when there are as many as its CACD enumerates, all on one
+ * socket. Any other domain refuses the selection, which would otherwise leave
+ * it out of a socket's dump or put it on a socket by a stray core. The counts
+ * are checked before the IDs are compared, so that the IDs left to compare
+ * are no more than the cores.
+ *
+ * @param [in] socket socket whose domains are collected
+ * @param [out] domain_ids table the domains are written to
+ * @param [out] num_domain_ids number of domains written
+ * @param [in] sys system configuration
+ * @param [in] dm_type type of the domains to collect
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM when the socket has no domain of the type
+ * @retval PQOS_RETVAL_RESOURCE when the core to domain mapping is missing
+ * @retval PQOS_RETVAL_ERROR when a CPU domain cannot be placed
+ */
 static int
 get_socket_domain_ids(uint32_t socket,
                       uint16_t *domain_ids,
-                      struct pqos_erdt_info *erdt,
-                      enum pqos_domain_type dm_type,
-                      uint32_t dm_per_socket)
+                      uint32_t *num_domain_ids,
+                      const struct pqos_sysconfig *sys,
+                      enum pqos_domain_type dm_type)
 {
+        const struct pqos_erdt_info *erdt = sys->erdt;
         uint32_t idx = 0;
         uint32_t dm_idx = 0;
+        uint16_t first = 0;
+        uint16_t second = 0;
+        uint32_t shared = 0;
+        int ret;
 
         if (!domain_ids) {
                 printf("domain_ids not available!\n");
@@ -421,19 +613,81 @@ get_socket_domain_ids(uint32_t socket,
                 return PQOS_RETVAL_PARAM;
         }
 
-        dm_idx = socket * dm_per_socket;
+        if (dm_type == DM_TYPE_CPU) {
+                if (sys->cpu == NULL || sys->cores_domains == NULL ||
+                    sys->cores_domains->domains == NULL) {
+                        printf("Core to domain mapping not available!\n");
+                        return PQOS_RETVAL_RESOURCE;
+                }
 
-        if (dm_type == DM_TYPE_CPU &&
-            ((dm_idx + dm_per_socket) > erdt->num_cpu_agents)) {
-                printf("Mismatch between socket and CPU Agents. "
-                       "Available CPU Agents %d. "
-                       "The requested socket %d\n",
-                       erdt->num_cpu_agents, socket);
-                return PQOS_RETVAL_PARAM;
+                ret = check_topology_coverage(sys);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                for (idx = 0; idx < erdt->num_cpu_agents; idx++) {
+                        const struct pqos_cpu_agent_info *agent =
+                            &erdt->cpu_agents[idx];
+                        const uint16_t domain_id = agent->rmdd.domain_id;
+                        const uint32_t listed = agent->cacd.enum_ids_length;
+                        unsigned dm_socket = 0;
+                        unsigned other = 0;
+                        unsigned num_cores = 0;
+
+                        if (listed == 0) {
+                                printf("Domain ID %u has no core in its CACD, "
+                                       "so its socket is unknown. Use "
+                                       "--dump-domain-id\n",
+                                       domain_id);
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        if (get_cpu_domain_socket(sys, domain_id, &dm_socket,
+                                                  &other, &num_cores) !=
+                            PQOS_RETVAL_OK) {
+                                printf("Domain ID %u has cores on sockets %u "
+                                       "and %u, so its socket is unknown. "
+                                       "Use --dump-domain-id\n",
+                                       domain_id, dm_socket, other);
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        if (num_cores != listed) {
+                                printf("Domain ID %u has %u cores in the CPU "
+                                       "topology where its CACD lists %u, so "
+                                       "its socket is unknown. Use "
+                                       "--dump-domain-id\n",
+                                       domain_id, num_cores, listed);
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        if (dm_socket == socket)
+                                domain_ids[dm_idx++] = domain_id;
+                }
+
+                /* every CACD now lists as many IDs as it has cores */
+                if (find_shared_enumeration_id(erdt, &first, &second,
+                                               &shared)) {
+                        printf("Domain IDs %u and %u both list enumeration "
+                               "ID 0x%x in their CACDs, so the socket of their "
+                               "cores is unknown. Use --dump-domain-id\n",
+                               first, second, shared);
+                        return PQOS_RETVAL_ERROR;
+                }
+
+                if (dm_idx == 0) {
+                        printf("Socket %u holds none of the %u CPU Agents\n",
+                               socket, erdt->num_cpu_agents);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                *num_domain_ids = dm_idx;
+
+                return PQOS_RETVAL_OK;
         }
 
-        if (dm_type == DM_TYPE_DEVICE &&
-            ((dm_idx + dm_per_socket) > erdt->num_dev_agents)) {
+        dm_idx = socket * DEVICE_AGENTS_PER_SOCKET;
+
+        if ((dm_idx + DEVICE_AGENTS_PER_SOCKET) > erdt->num_dev_agents) {
                 printf("Mismatch between socket and Device Agents. "
                        "Available Device Agents %d. "
                        "The requested socket %d\n",
@@ -441,14 +695,10 @@ get_socket_domain_ids(uint32_t socket,
                 return PQOS_RETVAL_PARAM;
         }
 
-        for (idx = 0; idx < dm_per_socket; idx++, dm_idx++) {
-                if (dm_type == DM_TYPE_CPU)
-                        domain_ids[idx] =
-                            erdt->cpu_agents[dm_idx].rmdd.domain_id;
-                if (dm_type == DM_TYPE_DEVICE)
-                        domain_ids[idx] =
-                            erdt->dev_agents[dm_idx].rmdd.domain_id;
-        }
+        for (idx = 0; idx < DEVICE_AGENTS_PER_SOCKET; idx++, dm_idx++)
+                domain_ids[idx] = erdt->dev_agents[dm_idx].rmdd.domain_id;
+
+        *num_domain_ids = DEVICE_AGENTS_PER_SOCKET;
 
         return PQOS_RETVAL_OK;
 }
@@ -460,7 +710,6 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
         int ret = PQOS_RETVAL_OK;
         uint32_t idx = 0;
         uint32_t dm_idx = 0;
-        uint32_t dm_per_socket = 0;
         enum pqos_domain_type dm_type = 0;
 
         /* each refusal returns rather than exits: this runs after
@@ -511,16 +760,18 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                         dump.topology.domain_ids[idx] =
                             sel_dump.domain_ids[idx];
         } else if (sel_dump.num_sockets) {
+                uint32_t max_domain_ids = 0;
+
                 /* Check requested MMIO Register space in Domain ID type CPU */
                 if (sel_dump.space == MMIO_DUMP_SPACE_CMRC ||
                     sel_dump.space == MMIO_DUMP_SPACE_MMRC ||
                     sel_dump.space == MMIO_DUMP_SPACE_MARC_OPT ||
                     sel_dump.space == MMIO_DUMP_SPACE_MARC_MIN ||
                     sel_dump.space == MMIO_DUMP_SPACE_MARC_MAX) {
-                        dump.topology.num_domain_ids =
-                            sel_dump.num_sockets * CPU_AGENTS_PER_SOCKET;
+                        /* a socket holds at most every CPU agent */
+                        max_domain_ids =
+                            sel_dump.num_sockets * sys->erdt->num_cpu_agents;
                         dm_type = DM_TYPE_CPU;
-                        dm_per_socket = CPU_AGENTS_PER_SOCKET;
                 }
 
                 /* Check requested MMIO Register space in Domain ID
@@ -528,14 +779,18 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                 if (sel_dump.space == MMIO_DUMP_SPACE_CMRD ||
                     sel_dump.space == MMIO_DUMP_SPACE_IBRD ||
                     sel_dump.space == MMIO_DUMP_SPACE_CARD) {
-                        dump.topology.num_domain_ids =
+                        max_domain_ids =
                             sel_dump.num_sockets * DEVICE_AGENTS_PER_SOCKET;
                         dm_type = DM_TYPE_DEVICE;
-                        dm_per_socket = DEVICE_AGENTS_PER_SOCKET;
                 }
 
-                dump.topology.domain_ids = (uint16_t *)malloc(
-                    sizeof(uint16_t) * dump.topology.num_domain_ids);
+                if (max_domain_ids == 0) {
+                        printf("ERDT lists no CPU Agents\n");
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                dump.topology.domain_ids =
+                    (uint16_t *)malloc(sizeof(uint16_t) * max_domain_ids);
                 if (dump.topology.domain_ids == NULL) {
                         printf("Error with memory allocation for "
                                "domain_ids!\n");
@@ -543,10 +798,12 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                 }
 
                 for (idx = 0, dm_idx = 0; idx < sel_dump.num_sockets; idx++) {
+                        uint32_t num = 0;
+
                         ret = get_socket_domain_ids(
                             sel_dump.sockets[idx],
-                            &dump.topology.domain_ids[dm_idx], sys->erdt,
-                            dm_type, dm_per_socket);
+                            &dump.topology.domain_ids[dm_idx], &num, sys,
+                            dm_type);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Unable to get domain ids for socket "
                                        "%ld\n",
@@ -555,8 +812,10 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
                                 return ret;
                         }
 
-                        dm_idx += dm_per_socket;
+                        dm_idx += num;
                 }
+
+                dump.topology.num_domain_ids = dm_idx;
         }
 
         ret = pqos_dump(&dump);

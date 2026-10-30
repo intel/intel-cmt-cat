@@ -35,10 +35,22 @@
 
 #include <stddef.h>
 
-/* The allocator test_dump.c makes fail on demand, through --wrap, and the
- * real one it hands every other call to.
+/* The allocators test_dump.c makes fail on demand, through --wrap, the free()
+ * it watches a block's release through, and the real ones it hands every
+ * call on to.
  */
 void *__real_malloc(size_t size);
 void *__wrap_malloc(size_t size);
+void *__real_calloc(size_t nmemb, size_t size);
+void *__wrap_calloc(size_t nmemb, size_t size);
+void __real_free(void *ptr);
+void __wrap_free(void *ptr);
+
+struct pqos_mmio_dump;
+
+/* The dump test_dump.c stands in for, to see the domains a selection
+ * resolved to.
+ */
+int __wrap_pqos_dump(const struct pqos_mmio_dump *dump_cfg);
 
 #endif /* TEST_DUMP_H_ */

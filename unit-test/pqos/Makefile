@@ -330,6 +330,9 @@ $(BIN_DIR)/test_dump: ./test_dump.c $(PQOS_OBJS)
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
 		-Wl,--wrap=malloc \
+		-Wl,--wrap=calloc \
+		-Wl,--wrap=free \
+		-Wl,--wrap=pqos_dump \
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
