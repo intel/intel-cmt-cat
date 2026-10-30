@@ -39,27 +39,80 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <signal.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
 #include <sys/mount.h>
+#include <time.h>
 #include <unistd.h>
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 
 /**
- * @brief Handle SIGALRM
+ * How long a lock of the resctrl filesystem waits for another holder to give
+ * it up, and how long it sleeps between two tries in that while
  */
-static void
-resctrl_lock_signalhandler(int signal)
+#define RESCTRL_LOCK_TIMEOUT_NS 100000000L
+#define RESCTRL_LOCK_RETRY_NS   1000000L
+
+/**
+ * @brief Tries to take the resctrl lock until it is had, or until the timeout
+ *        has passed
+ *
+ * flock() is asked not to block, and asked again after a sleep while the
+ * timeout has not passed: a thread that slept, or was not run, past it does
+ * not try again, so the lock is not taken later than the timeout. A blocking
+ * flock() timed out by SIGALRM, as the lock was before, put in a handler of
+ * the library's in place of the application's, and replaced, then cancelled,
+ * any alarm the application had pending: they share the process's one
+ * ITIMER_REAL. The thread's cancellation is off for the tries, which are 100
+ * ms at most, so that one acted on in a sleep does not leave the descriptor
+ * open with nothing to close it.
+ *
+ * @param [in] fd descriptor of the resctrl filesystem
+ * @param [in] type lock type
+ *
+ * @return 0 when the lock is had, ETIMEDOUT when the timeout has passed, or
+ *         the errno of a try that failed otherwise
+ */
+static int
+resctrl_lock_try(const int fd, const int type)
 {
-        UNUSED_PARAM(signal);
-        /* File lock timeout */
+        const struct timespec retry = {0, RESCTRL_LOCK_RETRY_NS};
+        struct timespec start;
+        struct timespec now;
+        int state;
+        int err;
+
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
+        (void)clock_gettime(CLOCK_MONOTONIC, &start);
+        for (;;) {
+                if (flock(fd, type | LOCK_NB) == 0) {
+                        err = 0;
+                        break;
+                }
+                err = errno;
+                if (err != EWOULDBLOCK && err != EINTR)
+                        break;
+                (void)nanosleep(&retry, NULL);
+                (void)clock_gettime(CLOCK_MONOTONIC, &now);
+                if ((now.tv_sec - start.tv_sec) * 1000000000LL +
+                        (now.tv_nsec - start.tv_nsec) >=
+                    RESCTRL_LOCK_TIMEOUT_NS) {
+                        err = ETIMEDOUT;
+                        break;
+                }
+        }
+        (void)pthread_setcancelstate(state, &state);
+
+        return err;
 }
 
 /**
  * @brief Obtain lock on resctrl filesystem
+ *
+ * Waits up to 100 ms for another holder to give it up.
  *
  * @param[in] type lock type
  *
@@ -69,8 +122,7 @@ resctrl_lock_signalhandler(int signal)
 static int
 resctrl_lock(const int type)
 {
-        struct sigaction sa;
-        int ret = PQOS_RETVAL_ERROR;
+        int err;
 
         ASSERT(type == LOCK_SH || type == LOCK_EX);
 
@@ -81,36 +133,22 @@ resctrl_lock(const int type)
                 return PQOS_RETVAL_ERROR;
         }
 
-        /* Handle SIGALRM */
-        sigaction(SIGALRM, NULL, &sa);
-        sa.sa_handler = resctrl_lock_signalhandler;
-        sa.sa_flags = 0;
-        sigaction(SIGALRM, &sa, NULL);
+        err = resctrl_lock_try(resctrl_lock_fd, type);
+        if (err == 0)
+                return PQOS_RETVAL_OK;
 
-        /* Set alarm when 100ms timeout occurs */
-        ualarm(100000, 0);
-
-        if (flock(resctrl_lock_fd, type) == 0) {
-                ret = PQOS_RETVAL_OK;
-                goto resctrl_lock_exit;
-        }
-
-        if (errno == EINTR)
+        if (err == ETIMEDOUT)
                 LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
                           "timeout occurred\n");
         else
                 LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
-                          "%m\n");
+                          "%s\n",
+                          strerror(err));
 
         close(resctrl_lock_fd);
         resctrl_lock_fd = -1;
 
-resctrl_lock_exit:
-        /* disable alarm */
-        ualarm(0, 0);
-        sa.sa_handler = SIG_DFL;
-
-        return ret;
+        return PQOS_RETVAL_ERROR;
 }
 
 int

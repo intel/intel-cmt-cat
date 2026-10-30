@@ -30,10 +30,77 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "test_resctrl.h"
+
 #include "resctrl.h"
 #include "test.h"
 
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <sys/file.h>
+#include <time.h>
+#include <unistd.h>
+
 /* ======== mock ======== */
+
+/* the directory the resctrl lock opens in place of RESCTRL_PATH, which the
+ * lock's cases make; NULL outside them
+ */
+static char *lock_dir;
+
+int
+__wrap_open(const char *path, int flags, ...)
+{
+        int mode = 0;
+
+        if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
+                va_list ap;
+
+                va_start(ap, flags);
+                mode = va_arg(ap, int);
+                va_end(ap);
+        }
+        if (lock_dir != NULL && strcmp(path, RESCTRL_PATH) == 0)
+                path = lock_dir;
+
+        return __real_open(path, flags, mode);
+}
+
+/* the sleeps of the lock's waits, and how many of them found the thread's
+ * cancellation on, counted with the atomic builtins: a case's other thread
+ * reads them. A case can have the first sleep give a holder's lock up and last
+ * longer than the lock's timeout, as for a thread that is not run for a while
+ */
+static unsigned lock_sleeps;
+static unsigned lock_sleeps_cancellable;
+static int lock_overslept_holder = -1;
+
+int
+__wrap_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+        int found;
+        int set;
+
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found);
+        (void)pthread_setcancelstate(found, &set);
+        __atomic_add_fetch(&lock_sleeps, 1, __ATOMIC_SEQ_CST);
+        if (found == PTHREAD_CANCEL_ENABLE)
+                __atomic_add_fetch(&lock_sleeps_cancellable, 1,
+                                   __ATOMIC_SEQ_CST);
+        if (lock_overslept_holder != -1) {
+                const struct timespec past = {0, 150000000L};
+
+                (void)flock(lock_overslept_holder, LOCK_UN);
+                lock_overslept_holder = -1;
+                return __real_nanosleep(&past, rem);
+        }
+
+        return __real_nanosleep(req, rem);
+}
 
 int
 __wrap_mount(const char *source,
@@ -388,6 +455,364 @@ test_resctrl_cpumask_write_zero(void **state __attribute__((unused)))
         fclose(fd);
 }
 
+/* ======== resctrl_lock ======== */
+
+static int
+lock_setup(void **state __attribute__((unused)))
+{
+        static char dir[] = "/tmp/test_resctrl_lock.XXXXXX";
+
+        memcpy(dir + sizeof(dir) - 7, "XXXXXX", 6);
+        lock_dir = mkdtemp(dir);
+        lock_sleeps = 0;
+        lock_sleeps_cancellable = 0;
+        lock_overslept_holder = -1;
+
+        return lock_dir == NULL ? -1 : 0;
+}
+
+static int
+lock_teardown(void **state __attribute__((unused)))
+{
+        int ret = rmdir(lock_dir);
+
+        lock_dir = NULL;
+
+        return ret;
+}
+
+/* another holder of the lock, as another process would be one */
+static int
+lock_hold(const int type)
+{
+        int fd = open(lock_dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+
+        assert_true(fd >= 0);
+        assert_int_equal(flock(fd, type), 0);
+
+        return fd;
+}
+
+static long
+lock_ms_since(const struct timespec *start)
+{
+        struct timespec now;
+
+        (void)clock_gettime(CLOCK_MONOTONIC, &now);
+
+        return (now.tv_sec - start->tv_sec) * 1000L +
+               (now.tv_nsec - start->tv_nsec) / 1000000L;
+}
+
+/* A watchdog over a case that expects the lock to time out on a holder: it
+ * gives the holder's lock up after 2 s, so that a lock that waits without end,
+ * as a blocking flock() would, fails the case rather than hanging the binary
+ */
+struct lock_watchdog {
+        pthread_t thread;
+        pthread_mutex_t mutex;
+        pthread_cond_t cond;
+        int holder;
+        int stop;
+        int fired;
+};
+
+static void *
+lock_watchdog_run(void *arg)
+{
+        struct lock_watchdog *watchdog = arg;
+        struct timespec until;
+
+        (void)clock_gettime(CLOCK_REALTIME, &until);
+        until.tv_sec += 2;
+        (void)pthread_mutex_lock(&watchdog->mutex);
+        while (!watchdog->stop)
+                if (pthread_cond_timedwait(&watchdog->cond, &watchdog->mutex,
+                                           &until) == ETIMEDOUT) {
+                        watchdog->fired = 1;
+                        (void)flock(watchdog->holder, LOCK_UN);
+                        break;
+                }
+        (void)pthread_mutex_unlock(&watchdog->mutex);
+
+        return NULL;
+}
+
+static void
+lock_watchdog_start(struct lock_watchdog *watchdog, const int holder)
+{
+        memset(watchdog, 0, sizeof(*watchdog));
+        watchdog->holder = holder;
+        assert_int_equal(pthread_mutex_init(&watchdog->mutex, NULL), 0);
+        assert_int_equal(pthread_cond_init(&watchdog->cond, NULL), 0);
+        assert_int_equal(pthread_create(&watchdog->thread, NULL,
+                                        lock_watchdog_run, watchdog),
+                         0);
+}
+
+/* @return 1 where the watchdog gave the holder's lock up */
+static int
+lock_watchdog_stop(struct lock_watchdog *watchdog)
+{
+        (void)pthread_mutex_lock(&watchdog->mutex);
+        watchdog->stop = 1;
+        (void)pthread_cond_signal(&watchdog->cond);
+        (void)pthread_mutex_unlock(&watchdog->mutex);
+        (void)pthread_join(watchdog->thread, NULL);
+        (void)pthread_cond_destroy(&watchdog->cond);
+        (void)pthread_mutex_destroy(&watchdog->mutex);
+
+        return watchdog->fired;
+}
+
+/* the descriptors the process has open */
+static unsigned
+lock_open_fds(void)
+{
+        DIR *dir = opendir("/proc/self/fd");
+        struct dirent *entry;
+        unsigned count = 0;
+
+        assert_non_null(dir);
+        while ((entry = readdir(dir)) != NULL)
+                if (entry->d_name[0] != '.')
+                        count++;
+        closedir(dir);
+
+        return count;
+}
+
+static void
+lock_alarm_handler(int signo __attribute__((unused)))
+{
+}
+
+/* a lock and its release take nothing of the application's: its SIGALRM
+ * handler, with its flags, and the alarm it has pending are as they were
+ */
+static void
+test_resctrl_lock_keeps_the_callers_alarm(void **state __attribute__((unused)))
+{
+        struct sigaction sa;
+        struct sigaction found;
+        struct sigaction after;
+        unsigned left;
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = lock_alarm_handler;
+        sa.sa_flags = SA_RESTART;
+        sigemptyset(&sa.sa_mask);
+        assert_int_equal(sigaction(SIGALRM, &sa, &found), 0);
+        (void)alarm(30);
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+
+        /* the alarm ended before the handler goes: a SIGALRM after it would
+         * end the process
+         */
+        left = alarm(0);
+        assert_int_equal(sigaction(SIGALRM, &found, &after), 0);
+        assert_ptr_equal(after.sa_handler, lock_alarm_handler);
+        assert_true(after.sa_flags & SA_RESTART);
+        assert_in_range(left, 29, 30);
+}
+
+/* a lock another holder keeps is given up on after 100 ms, saying so, with
+ * the thread's cancellation off in each sleep of the wait and on after it;
+ * and the descriptor is closed: the lock is taken once the holder has gone
+ */
+static void
+test_resctrl_lock_times_out(void **state __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_EX);
+        const unsigned fds = lock_open_fds();
+        struct lock_watchdog watchdog;
+        struct timespec start;
+        unsigned fds_after;
+        long took;
+        int fired;
+        int after;
+        int set;
+        int ret;
+
+        lock_watchdog_start(&watchdog, holder);
+        test_log_keep_start();
+        (void)clock_gettime(CLOCK_MONOTONIC, &start);
+        ret = resctrl_lock_exclusive();
+        took = lock_ms_since(&start);
+        (void)test_log_count_stop();
+        fired = lock_watchdog_stop(&watchdog);
+        fds_after = lock_open_fds();
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &after);
+        (void)pthread_setcancelstate(after, &set);
+        close(holder);
+        if (ret == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        assert_false(fired);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_in_range(took, 100, 2000);
+        assert_non_null(strstr(test_log_said(),
+                               "Failed to acquire lock on resctrl filesystem "
+                               "- timeout occurred"));
+        assert_true(lock_sleeps > 0);
+        assert_int_equal(lock_sleeps_cancellable, 0);
+        assert_int_equal(after, PTHREAD_CANCEL_ENABLE);
+        assert_int_equal(fds_after, fds);
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* 1 where the holder's lock was given up after 2 s with the lock not yet
+ * slept in its wait, which a case fails on
+ */
+static int lock_given_up_unslept;
+
+static void *
+lock_give_up_after_a_sleep(void *arg)
+{
+        const struct timespec poll = {0, 1000000L};
+        unsigned waited = 0;
+
+        /* clock_nanosleep(), not the nanosleep() the lock's sleeps are
+         * counted by
+         */
+        while (__atomic_load_n(&lock_sleeps, __ATOMIC_SEQ_CST) == 0) {
+                if (++waited == 2000) {
+                        lock_given_up_unslept = 1;
+                        break;
+                }
+                (void)clock_nanosleep(CLOCK_MONOTONIC, 0, &poll, NULL);
+        }
+        (void)flock(*(const int *)arg, LOCK_UN);
+
+        return NULL;
+}
+
+/* a lock whose holder gives it up during the wait, once the lock has tried
+ * and slept, is taken at a try after the sleep
+ */
+static void
+test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
+{
+        int holder = lock_hold(LOCK_EX);
+        pthread_t thread;
+        int ret;
+
+        lock_given_up_unslept = 0;
+        assert_int_equal(
+            pthread_create(&thread, NULL, lock_give_up_after_a_sleep, &holder),
+            0);
+        ret = resctrl_lock_exclusive();
+        assert_int_equal(pthread_join(thread, NULL), 0);
+        close(holder);
+
+        assert_false(lock_given_up_unslept);
+        assert_true(lock_sleeps >= 1);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* a thread that sleeps past the timeout in its wait, as one that is not run
+ * for a while does, does not take the lock after it, though the holder gave it
+ * up in the meantime
+ */
+static void
+test_resctrl_lock_not_taken_past_the_timeout(void **state
+                                             __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_EX);
+        struct lock_watchdog watchdog;
+        int fired;
+        int ret;
+
+        lock_overslept_holder = holder;
+        lock_watchdog_start(&watchdog, holder);
+        test_log_count_start();
+        ret = resctrl_lock_exclusive();
+        (void)test_log_count_stop();
+        fired = lock_watchdog_stop(&watchdog);
+        lock_overslept_holder = -1;
+        close(holder);
+        if (ret == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        assert_false(fired);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(lock_sleeps, 1);
+}
+
+/* a caller whose cancellation is off finds it off after the lock, whether the
+ * lock was taken or timed out
+ */
+static void
+test_resctrl_lock_keeps_cancellation_off(void **state __attribute__((unused)))
+{
+        struct lock_watchdog watchdog;
+        int after_taken;
+        int after_timeout;
+        int holder;
+        int found;
+        int fired;
+        int taken;
+        int timed_out;
+
+        assert_int_equal(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found),
+                         0);
+        taken = resctrl_lock_exclusive();
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &after_taken);
+        if (taken == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        holder = lock_hold(LOCK_EX);
+        lock_watchdog_start(&watchdog, holder);
+        test_log_count_start();
+        timed_out = resctrl_lock_exclusive();
+        (void)test_log_count_stop();
+        fired = lock_watchdog_stop(&watchdog);
+        (void)pthread_setcancelstate(found, &after_timeout);
+        close(holder);
+        if (timed_out == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        assert_int_equal(taken, PQOS_RETVAL_OK);
+        assert_int_equal(after_taken, PTHREAD_CANCEL_DISABLE);
+        assert_false(fired);
+        assert_int_equal(timed_out, PQOS_RETVAL_ERROR);
+        assert_int_equal(after_timeout, PTHREAD_CANCEL_DISABLE);
+}
+
+/* a shared lock is taken beside another shared one, and an exclusive one is
+ * not
+ */
+static void
+test_resctrl_lock_shared_beside_shared(void **state __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_SH);
+        struct lock_watchdog watchdog;
+        int fired;
+        int ret;
+
+        assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+
+        lock_watchdog_start(&watchdog, holder);
+        test_log_count_start();
+        ret = resctrl_lock_exclusive();
+        (void)test_log_count_stop();
+        fired = lock_watchdog_stop(&watchdog);
+        close(holder);
+        if (ret == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        assert_false(fired);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
 int
 main(void)
 {
@@ -408,6 +833,23 @@ main(void)
             cmocka_unit_test(test_resctrl_cpumask_core_past_the_mask),
             cmocka_unit_test(test_resctrl_cpumask_write),
             cmocka_unit_test(test_resctrl_cpumask_write_zero),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_keeps_the_callers_alarm, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(test_resctrl_lock_times_out,
+                                            lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_taken_once_given_up, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_not_taken_past_the_timeout, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_keeps_cancellation_off, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_shared_beside_shared, lock_setup,
+                lock_teardown),
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);
