@@ -1000,6 +1000,12 @@ $(BIN_DIR)/test_mmio_dump_rmids: test_mmio_dump_rmids.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_get_erdt \
+		-Wl,--wrap=log_printf \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=_pqos_get_mrrm \
+		-Wl,--wrap=pqos_mmap_read \
+		-Wl,--wrap=pqos_munmap \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

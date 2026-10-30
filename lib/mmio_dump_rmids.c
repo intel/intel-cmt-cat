@@ -303,6 +303,45 @@ mmio_dump_rmids_iol3_miss(const struct pqos_mmio_dump_rmids *dump_cfg,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Checks that every domain of a dump holds the RMIDs it reads
+ *
+ * The L3 CMT and MBM RMIDs are in the CPU domains and the I/O ones in the
+ * device domains. Every domain is looked up before any is dumped, so that one
+ * the platform lacks is named, rather than the dump stopping after the domains
+ * before it with nothing said.
+ *
+ * @param [in] dump_cfg dump configuration
+ * @param [in] erdt ERDT information
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK when every domain holds the RMIDs the dump reads
+ * @retval PQOS_RETVAL_ERROR otherwise
+ */
+static int
+mmio_dump_rmids_check_domains(const struct pqos_mmio_dump_rmids *dump_cfg,
+                              const struct pqos_erdt_info *erdt)
+{
+        const int cpu = dump_cfg->rmid_type == MMIO_DUMP_RMID_TYPE_CMT ||
+                        dump_cfg->rmid_type == MMIO_DUMP_RMID_TYPE_MBM;
+
+        for (uint32_t i = 0; i < dump_cfg->num_domain_ids; i++) {
+                const uint16_t domain_id = dump_cfg->domain_ids[i];
+                const int idx =
+                    cpu ? get_cpu_agent_idx_by_domain_id(erdt, domain_id)
+                        : get_dev_agent_idx_by_domain_id(erdt, domain_id);
+
+                if (idx < 0) {
+                        LOG_ERROR("Domain ID %u is not a %s domain. Use "
+                                  "--print-topology to list them\n",
+                                  domain_id, cpu ? "CPU" : "device");
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 mmio_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg)
 {
@@ -344,6 +383,10 @@ mmio_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg)
                         }
                 }
         }
+
+        ret = mmio_dump_rmids_check_domains(dump_cfg, erdt);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         switch (dump_cfg->rmid_type) {
         case MMIO_DUMP_RMID_TYPE_CMT:
