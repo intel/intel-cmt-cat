@@ -113,21 +113,9 @@ output_has_text(const char *format_string, ...)
         return ret;
 }
 
-/**
- * @brief Appends captured output to the buffer, and never past the end of it
- *
- * Every wrapper below goes through this, because they share one cursor: a
- * single unbounded write leaves chars_in_buffer past the end of the buffer, and
- * then the next write of any of them is to a pointer outside the buffer with a
- * negative remaining length - which strncpy() and snprintf() take as a size_t
- * and read as gigabytes of room. What each wrapper still returns is what the
- * function it stands in for would have returned, which is the formatted length
- * whether the capture kept it or not.
- *
- * @param [in] text what was formatted
- * @param [in] len its length, as the formatting reported it
+/* as much of a write to stderr as stderr_buffer has room for: __wrap_fprintf()
+ * keeps one there as well as in the shared buffer
  */
-/* as much of a write to stderr as stderr_buffer has room for */
 static void
 append_to_stderr_buffer(const char *text, int len)
 {
@@ -165,6 +153,20 @@ output_stderr_has_text(const char *format_string, ...)
         return ret;
 }
 
+/**
+ * @brief Appends captured output to the buffer, and never past the end of it
+ *
+ * Every wrapper below goes through this, because they share one cursor: a
+ * single unbounded write leaves chars_in_buffer past the end of the buffer, and
+ * then the next write of any of them is to a pointer outside the buffer with a
+ * negative remaining length - which strncpy() and snprintf() take as a size_t
+ * and read as gigabytes of room. What each wrapper still returns is what the
+ * function it stands in for would have returned, which is the formatted length
+ * whether the capture kept it or not.
+ *
+ * @param [in] text what was formatted
+ * @param [in] len its length, as the formatting reported it
+ */
 static void
 append_to_buffer(const char *text, int len)
 {
