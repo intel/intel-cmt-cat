@@ -540,7 +540,8 @@ os_mon_busy_say(const unsigned tries)
  * As a start that fails: its cores, and the group itself where the library
  * made it, which pqos_mon_start_cores_ext() would free on the failure - the
  * caller is never given it. A group of the caller's own, as pqos_mon_start()
- * starts, has only its cores freed.
+ * starts, is the caller's, but its internal data is the library's, made apart
+ * from it, which pqos_mon_start() would free on the failure.
  *
  * @param [in] arg the group
  */
@@ -553,6 +554,10 @@ os_mon_start_cancelled(void *arg)
         group->cores = NULL;
         if (group->intl->manage_memory)
                 free(group);
+        else {
+                free(group->intl);
+                group->intl = NULL;
+        }
 }
 
 /**

@@ -54,9 +54,12 @@ void __real_free(void *ptr);
  */
 struct cancelled_start {
         struct pqos_mon_data *group; /**< the group, as the child made it */
-        unsigned *cores;             /**< its cores, as the start made them */
-        int cancel_in_wait;          /**< a wait has the thread cancelled */
+        /** its internal data, where it is made apart from the group */
+        struct pqos_mon_data_internal *intl;
+        unsigned *cores;    /**< its cores, as the start made them */
+        int cancel_in_wait; /**< a wait has the thread cancelled */
         unsigned group_freed;
+        unsigned intl_freed;
         unsigned cores_freed;
         int said;     /**< the thread was cancelled in a message */
         int returned; /**< the start returned */
@@ -70,6 +73,8 @@ __wrap_free(void *ptr)
         if (cancelled != NULL && ptr != NULL) {
                 if (ptr == cancelled->group)
                         cancelled->group_freed++;
+                else if (ptr == cancelled->intl)
+                        cancelled->intl_freed++;
                 else if (ptr == cancelled->cores)
                         cancelled->cores_freed++;
         }
@@ -676,8 +681,9 @@ cancel_in_the_message(void *context, const size_t size, const char *message)
 }
 
 /* makes, in a child process, the start start_cores_set_up() sets up, on a
- * group made as pqos_mon_start_cores_ext() makes one, or as a caller of its
- * own does, with the thread cancelled in a wait or in a message; returns the
+ * group made as pqos_mon_start_cores_ext() makes one, with its internal data
+ * in it, or as pqos_mon_start() has a caller's own, with its internal data
+ * made apart; the thread is cancelled in a wait or in a message. Returns the
  * child's status, with what it showed in seen
  */
 static int
@@ -714,12 +720,23 @@ start_cancelled(struct test_data *data,
                         (void)dup2(null, STDOUT_FILENO);
                         (void)dup2(null, STDERR_FILENO);
                 }
-                group = calloc(1, sizeof(*group) +
-                                      sizeof(struct pqos_mon_data_internal));
-                if (group == NULL)
-                        _exit(4);
-                group->intl = (struct pqos_mon_data_internal *)&group[1];
-                group->intl->manage_memory = library_made;
+                if (library_made) {
+                        group =
+                            calloc(1, sizeof(*group) + sizeof(*group->intl));
+                        if (group == NULL)
+                                _exit(4);
+                        group->intl =
+                            (struct pqos_mon_data_internal *)&group[1];
+                        group->intl->manage_memory = 1;
+                } else {
+                        group = calloc(1, sizeof(*group));
+                        if (group == NULL)
+                                _exit(4);
+                        group->intl = calloc(1, sizeof(*group->intl));
+                        if (group->intl == NULL)
+                                _exit(4);
+                        shared->intl = group->intl;
+                }
                 shared->group = group;
                 cancelled = shared;
                 start_cores_set_up(data, group, tries, last);
@@ -760,7 +777,8 @@ test_os_mon_start_cores_cancelled_in_a_wait(void **state)
 }
 
 /* a group of the caller's own, as pqos_mon_start() starts, is the caller's to
- * free: only its cores are given back
+ * free; its cores, and the internal data the library made for it apart, are
+ * given back
  */
 static void
 test_os_mon_start_cores_cancelled_in_a_wait_own_group(void **state)
@@ -774,6 +792,7 @@ test_os_mon_start_cores_cancelled_in_a_wait_own_group(void **state)
         assert_int_equal(WEXITSTATUS(status), 0);
         assert_false(seen.returned);
         assert_int_equal(seen.cores_freed, 1);
+        assert_int_equal(seen.intl_freed, 1);
         assert_int_equal(seen.group_freed, 0);
 }
 

@@ -506,6 +506,46 @@ test_resctrl_mon_assoc_set(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* a group whose directory cannot be made with every free RMID in the kernel's
+ * limbo is BUSY, and nothing is said here at the default verbosity: the
+ * caller says it, once it gives up - a start may try again. Another failure
+ * is said here
+ */
+static void
+test_resctrl_mon_assoc_set_busy(void **state __attribute__((unused)))
+{
+        const struct {
+                int ret;
+                unsigned logged;
+        } fails[] = {{PQOS_RETVAL_BUSY, 0}, {PQOS_RETVAL_ERROR, 1}};
+        unsigned lcore = 1;
+        char name[] = "test";
+        struct pqos_cap cap;
+        unsigned i;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        for (i = 0; i < DIM(fails); i++) {
+                will_return(resctrl_mon_is_supported, 1);
+                will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+                /* no class but the default group, which holds the core */
+                expect_value(__wrap_resctrl_alloc_cpumask_read, class_id, 0);
+                will_return(__wrap_resctrl_alloc_cpumask_read, PQOS_RETVAL_OK);
+                expect_value(__wrap_resctrl_cpumask_get, lcore, lcore);
+                will_return(__wrap_resctrl_cpumask_get, 1);
+
+                expect_value(__wrap_resctrl_mon_mkdir, class_id, 0);
+                expect_string(__wrap_resctrl_mon_mkdir, name, name);
+                will_return(__wrap_resctrl_mon_mkdir, fails[i].ret);
+
+                test_log_count_start();
+                assert_int_equal(resctrl_mon_assoc_set(lcore, name),
+                                 fails[i].ret);
+                assert_int_equal(test_log_count_stop(), fails[i].logged);
+        }
+}
+
 static void
 test_resctrl_mon_assoc_set_error(void **state __attribute__((unused)))
 {
@@ -2274,6 +2314,37 @@ test_resctrl_mon_assoc_set_pid(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* and so is a task's */
+static void
+test_resctrl_mon_assoc_set_pid_busy(void **state __attribute__((unused)))
+{
+        const struct {
+                int ret;
+                unsigned logged;
+        } fails[] = {{PQOS_RETVAL_BUSY, 0}, {PQOS_RETVAL_ERROR, 1}};
+        pid_t pid = 1;
+        char name[] = "test";
+        struct pqos_cap cap;
+        unsigned i;
+
+        will_return_maybe(__wrap__pqos_get_cap, &cap);
+
+        for (i = 0; i < DIM(fails); i++) {
+                will_return(resctrl_mon_is_supported, 1);
+                will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_OK);
+                will_return(__wrap_resctrl_alloc_get_grps_num, 0);
+
+                expect_value(__wrap_resctrl_mon_mkdir, class_id, 0);
+                expect_string(__wrap_resctrl_mon_mkdir, name, name);
+                will_return(__wrap_resctrl_mon_mkdir, fails[i].ret);
+
+                test_log_count_start();
+                assert_int_equal(resctrl_mon_assoc_set_pid(pid, name),
+                                 fails[i].ret);
+                assert_int_equal(test_log_count_stop(), fails[i].logged);
+        }
+}
+
 static void
 test_resctrl_mon_assoc_set_pid_error(void **state __attribute__((unused)))
 {
@@ -2344,6 +2415,7 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_get_core_in_no_class),
             cmocka_unit_test(test_resctrl_mon_assoc_set_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_set),
+            cmocka_unit_test(test_resctrl_mon_assoc_set_busy),
             cmocka_unit_test(test_resctrl_mon_assoc_set_error),
             cmocka_unit_test(test_resctrl_mon_assoc_set_core_in_no_class),
             cmocka_unit_test(test_resctrl_mon_assoc_restore_core_in_its_group),
@@ -2405,6 +2477,7 @@ main(void)
             cmocka_unit_test(test_resctrl_mon_assoc_get_pid_small_buffer),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_unsupported),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid),
+            cmocka_unit_test(test_resctrl_mon_assoc_set_pid_busy),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_error),
             cmocka_unit_test(test_resctrl_mon_assoc_set_pid_write),
         };
