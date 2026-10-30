@@ -653,6 +653,7 @@ $(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=open \
 		-Wl,--wrap=nanosleep \
+		-Wl,--wrap=clock_gettime \
 		-Wl,--wrap=mount \
 		-Wl,--wrap=umount2 \
 		-Wl,--start-group \

@@ -62,19 +62,19 @@ static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
  *
  * flock() is asked not to block, and asked again after a sleep while the
  * timeout has not passed: a thread that slept, or was not run, past it does
- * not try again, so the lock is not taken later than the timeout. A blocking
- * flock() timed out by SIGALRM, as the lock was before, put in a handler of
- * the library's in place of the application's, and replaced, then cancelled,
- * any alarm the application had pending: they share the process's one
- * ITIMER_REAL. The thread's cancellation is off for the tries, which are 100
- * ms at most, so that one acted on in a sleep does not leave the descriptor
- * open with nothing to close it.
+ * not try again, so the lock is not taken at a try after the timeout. A
+ * blocking flock() timed out by SIGALRM, as the lock was before, put in a
+ * handler of the library's in place of the application's, and replaced, then
+ * cancelled, any alarm the application had pending: they share the process's
+ * one ITIMER_REAL. The timeout is when the tries stop, at the first look at
+ * the clock after a sleep, not a bound on how long they take: a sleep can end
+ * late.
  *
  * @param [in] fd descriptor of the resctrl filesystem
  * @param [in] type lock type
  *
  * @return 0 when the lock is had, ETIMEDOUT when the timeout has passed, or
- *         the errno of a try that failed otherwise
+ *         the errno of a try, or of a look at the clock, that failed
  */
 static int
 resctrl_lock_try(const int fd, const int type)
@@ -82,21 +82,21 @@ resctrl_lock_try(const int fd, const int type)
         const struct timespec retry = {0, RESCTRL_LOCK_RETRY_NS};
         struct timespec start;
         struct timespec now;
-        int state;
         int err;
 
-        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
-        (void)clock_gettime(CLOCK_MONOTONIC, &start);
+        if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+                return errno;
         for (;;) {
-                if (flock(fd, type | LOCK_NB) == 0) {
-                        err = 0;
-                        break;
-                }
+                if (flock(fd, type | LOCK_NB) == 0)
+                        return 0;
                 err = errno;
                 if (err != EWOULDBLOCK && err != EINTR)
                         break;
                 (void)nanosleep(&retry, NULL);
-                (void)clock_gettime(CLOCK_MONOTONIC, &now);
+                if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+                        err = errno;
+                        break;
+                }
                 if ((now.tv_sec - start.tv_sec) * 1000000000LL +
                         (now.tv_nsec - start.tv_nsec) >=
                     RESCTRL_LOCK_TIMEOUT_NS) {
@@ -104,7 +104,6 @@ resctrl_lock_try(const int fd, const int type)
                         break;
                 }
         }
-        (void)pthread_setcancelstate(state, &state);
 
         return err;
 }
@@ -112,7 +111,12 @@ resctrl_lock_try(const int fd, const int type)
 /**
  * @brief Obtain lock on resctrl filesystem
  *
- * Waits up to 100 ms for another holder to give it up.
+ * Gives another holder 100 ms to give the lock up, as resctrl_lock_try()
+ * counts them. The thread's cancellation is off from the open of the
+ * descriptor until it holds the lock or is closed: one acted on in a sleep of
+ * the wait, or in the log or the close of a wait that failed, would leave the
+ * descriptor open with nothing to close it. A cancellation asked for in the
+ * meantime is acted on at the caller's next cancellation point.
  *
  * @param[in] type lock type
  *
@@ -122,20 +126,26 @@ resctrl_lock_try(const int fd, const int type)
 static int
 resctrl_lock(const int type)
 {
+        int ret = PQOS_RETVAL_ERROR;
+        int state;
         int err;
 
         ASSERT(type == LOCK_SH || type == LOCK_EX);
+
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
 
         /* O_CLOEXEC: held for as long as the resctrl lock is */
         resctrl_lock_fd = open(RESCTRL_PATH, O_DIRECTORY | O_CLOEXEC);
         if (resctrl_lock_fd < 0) {
                 LOG_ERROR("Could not open %s directory\n", RESCTRL_PATH);
-                return PQOS_RETVAL_ERROR;
+                goto resctrl_lock_exit;
         }
 
         err = resctrl_lock_try(resctrl_lock_fd, type);
-        if (err == 0)
-                return PQOS_RETVAL_OK;
+        if (err == 0) {
+                ret = PQOS_RETVAL_OK;
+                goto resctrl_lock_exit;
+        }
 
         if (err == ETIMEDOUT)
                 LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
@@ -148,7 +158,10 @@ resctrl_lock(const int type)
         close(resctrl_lock_fd);
         resctrl_lock_fd = -1;
 
-        return PQOS_RETVAL_ERROR;
+resctrl_lock_exit:
+        (void)pthread_setcancelstate(state, &state);
+
+        return ret;
 }
 
 int

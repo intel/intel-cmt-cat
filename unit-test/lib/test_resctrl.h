@@ -40,5 +40,7 @@ int __wrap_open(const char *path, int flags, ...);
 int __real_open(const char *path, int flags, ...);
 int __wrap_nanosleep(const struct timespec *req, struct timespec *rem);
 int __real_nanosleep(const struct timespec *req, struct timespec *rem);
+int __wrap_clock_gettime(clockid_t clk, struct timespec *tp);
+int __real_clock_gettime(clockid_t clk, struct timespec *tp);
 
 #endif /* TEST_RESCTRL_H_ */

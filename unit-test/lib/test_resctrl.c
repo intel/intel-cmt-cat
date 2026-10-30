@@ -72,12 +72,17 @@ __wrap_open(const char *path, int flags, ...)
 
 /* the sleeps of the lock's waits, and how many of them found the thread's
  * cancellation on, counted with the atomic builtins: a case's other thread
- * reads them. A case can have the first sleep give a holder's lock up and last
- * longer than the lock's timeout, as for a thread that is not run for a while
+ * reads them. A case can have the first sleep:
+ * - give a holder's lock up, and sleep as asked;
+ * - give a holder's lock up, and last longer than the lock's timeout, as for a
+ *   thread that is not run for a while;
+ * - ask for the sleeping thread's own cancellation, which the wait has off.
  */
 static unsigned lock_sleeps;
 static unsigned lock_sleeps_cancellable;
+static int lock_released_holder = -1;
 static int lock_overslept_holder = -1;
+static int lock_cancel_in_sleep;
 
 int
 __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
@@ -91,6 +96,12 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
         if (found == PTHREAD_CANCEL_ENABLE)
                 __atomic_add_fetch(&lock_sleeps_cancellable, 1,
                                    __ATOMIC_SEQ_CST);
+        if (__atomic_exchange_n(&lock_cancel_in_sleep, 0, __ATOMIC_SEQ_CST))
+                (void)pthread_cancel(pthread_self());
+        if (lock_released_holder != -1) {
+                (void)flock(lock_released_holder, LOCK_UN);
+                lock_released_holder = -1;
+        }
         if (lock_overslept_holder != -1) {
                 const struct timespec past = {0, 150000000L};
 
@@ -100,6 +111,26 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
         }
 
         return __real_nanosleep(req, rem);
+}
+
+/* the lock's looks at the clock: a case can have the next one, or the one
+ * after it, fail with EINVAL, which no clock the library reads ever does.
+ * CLOCK_MONOTONIC's alone are counted: the watchdog reads CLOCK_REALTIME
+ */
+static unsigned lock_clock_fails_in;
+
+int
+__wrap_clock_gettime(clockid_t clk, struct timespec *tp)
+{
+        if (clk == CLOCK_MONOTONIC &&
+            __atomic_load_n(&lock_clock_fails_in, __ATOMIC_SEQ_CST) != 0 &&
+            __atomic_sub_fetch(&lock_clock_fails_in, 1, __ATOMIC_SEQ_CST) ==
+                0) {
+                errno = EINVAL;
+                return -1;
+        }
+
+        return __real_clock_gettime(clk, tp);
 }
 
 int
@@ -466,7 +497,10 @@ lock_setup(void **state __attribute__((unused)))
         lock_dir = mkdtemp(dir);
         lock_sleeps = 0;
         lock_sleeps_cancellable = 0;
+        lock_released_holder = -1;
         lock_overslept_holder = -1;
+        lock_cancel_in_sleep = 0;
+        lock_clock_fails_in = 0;
 
         return lock_dir == NULL ? -1 : 0;
 }
@@ -667,52 +701,26 @@ test_resctrl_lock_times_out(void **state __attribute__((unused)))
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
 }
 
-/* 1 where the holder's lock was given up after 2 s with the lock not yet
- * slept in its wait, which a case fails on
- */
-static int lock_given_up_unslept;
-
-static void *
-lock_give_up_after_a_sleep(void *arg)
-{
-        const struct timespec poll = {0, 1000000L};
-        unsigned waited = 0;
-
-        /* clock_nanosleep(), not the nanosleep() the lock's sleeps are
-         * counted by
-         */
-        while (__atomic_load_n(&lock_sleeps, __ATOMIC_SEQ_CST) == 0) {
-                if (++waited == 2000) {
-                        lock_given_up_unslept = 1;
-                        break;
-                }
-                (void)clock_nanosleep(CLOCK_MONOTONIC, 0, &poll, NULL);
-        }
-        (void)flock(*(const int *)arg, LOCK_UN);
-
-        return NULL;
-}
-
-/* a lock whose holder gives it up during the wait, once the lock has tried
- * and slept, is taken at a try after the sleep
+/* a lock whose holder gives it up during the wait, in the lock's first sleep,
+ * is taken at the try after the sleep
  */
 static void
 test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
 {
-        int holder = lock_hold(LOCK_EX);
-        pthread_t thread;
+        const int holder = lock_hold(LOCK_EX);
+        struct lock_watchdog watchdog;
+        int fired;
         int ret;
 
-        lock_given_up_unslept = 0;
-        assert_int_equal(
-            pthread_create(&thread, NULL, lock_give_up_after_a_sleep, &holder),
-            0);
+        lock_released_holder = holder;
+        lock_watchdog_start(&watchdog, holder);
         ret = resctrl_lock_exclusive();
-        assert_int_equal(pthread_join(thread, NULL), 0);
+        fired = lock_watchdog_stop(&watchdog);
+        lock_released_holder = -1;
         close(holder);
 
-        assert_false(lock_given_up_unslept);
-        assert_true(lock_sleeps >= 1);
+        assert_false(fired);
+        assert_int_equal(lock_sleeps, 1);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
 }
@@ -786,6 +794,107 @@ test_resctrl_lock_keeps_cancellation_off(void **state __attribute__((unused)))
         assert_int_equal(after_timeout, PTHREAD_CANCEL_DISABLE);
 }
 
+/* a look at the clock that fails, the first or the one after a sleep, ends
+ * the wait, saying why, with the descriptor closed and the thread's
+ * cancellation on as it was: the lock is taken once the holder has gone
+ */
+static void
+test_resctrl_lock_clock_failure_ends_the_wait(void **state
+                                              __attribute__((unused)))
+{
+        unsigned which;
+
+        for (which = 1; which <= 2; which++) {
+                const int holder = lock_hold(LOCK_EX);
+                const unsigned fds = lock_open_fds();
+                struct lock_watchdog watchdog;
+                unsigned fds_after;
+                int fired;
+                int after;
+                int set;
+                int ret;
+
+                lock_sleeps = 0;
+                __atomic_store_n(&lock_clock_fails_in, which, __ATOMIC_SEQ_CST);
+                lock_watchdog_start(&watchdog, holder);
+                test_log_keep_start();
+                ret = resctrl_lock_exclusive();
+                (void)test_log_count_stop();
+                fired = lock_watchdog_stop(&watchdog);
+                __atomic_store_n(&lock_clock_fails_in, 0, __ATOMIC_SEQ_CST);
+                fds_after = lock_open_fds();
+                (void)pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &after);
+                (void)pthread_setcancelstate(after, &set);
+                close(holder);
+                if (ret == PQOS_RETVAL_OK)
+                        (void)resctrl_lock_release();
+
+                assert_false(fired);
+                assert_int_equal(ret, PQOS_RETVAL_ERROR);
+                assert_non_null(strstr(test_log_said(),
+                                       "Failed to acquire lock on resctrl "
+                                       "filesystem - Invalid argument"));
+                assert_int_equal(lock_sleeps, which - 1);
+                assert_int_equal(fds_after, fds);
+                assert_int_equal(after, PTHREAD_CANCEL_ENABLE);
+        }
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* the status the lock gave the worker of the cancellation case, written
+ * before the cancellation point after it
+ */
+static int lock_cancelled_ret;
+
+static void *
+lock_cancelled_worker(void *arg __attribute__((unused)))
+{
+        lock_cancelled_ret = resctrl_lock_exclusive();
+        pthread_testcancel();
+
+        return NULL;
+}
+
+/* a cancellation asked for in the wait, here by the waiting thread itself in
+ * its first sleep, is acted on at the caller's next cancellation point, after
+ * the lock has timed out and closed its descriptor: no descriptor is left
+ * open, and the lock is taken once the holder has gone
+ */
+static void
+test_resctrl_lock_cancelled_in_the_wait(void **state __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_EX);
+        const unsigned fds = lock_open_fds();
+        struct lock_watchdog watchdog;
+        pthread_t worker;
+        void *result = NULL;
+        unsigned fds_after;
+        int fired;
+
+        lock_cancelled_ret = -1;
+        __atomic_store_n(&lock_cancel_in_sleep, 1, __ATOMIC_SEQ_CST);
+        lock_watchdog_start(&watchdog, holder);
+        test_log_count_start();
+        assert_int_equal(
+            pthread_create(&worker, NULL, lock_cancelled_worker, NULL), 0);
+        assert_int_equal(pthread_join(worker, &result), 0);
+        (void)test_log_count_stop();
+        fired = lock_watchdog_stop(&watchdog);
+        fds_after = lock_open_fds();
+        close(holder);
+
+        assert_false(fired);
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_cancelled_ret, PQOS_RETVAL_ERROR);
+        assert_true(lock_sleeps > 0);
+        assert_int_equal(fds_after, fds);
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
 /* a shared lock is taken beside another shared one, and an exclusive one is
  * not
  */
@@ -843,6 +952,12 @@ main(void)
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_not_taken_past_the_timeout, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_clock_failure_ends_the_wait, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_in_the_wait, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_keeps_cancellation_off, lock_setup,
