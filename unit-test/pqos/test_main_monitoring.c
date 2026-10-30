@@ -46,6 +46,12 @@
  * library initialised, so the stop has to come between the loop and the
  * finalising; and a flush that a reader which stopped reading blocks must
  * come after both, holding nothing.
+ *
+ * main() has SIGPIPE ignored by the time it initialises the library, so that a
+ * reader of stdout that has gone fails the writes there with EPIPE instead of
+ * ending the process with the library's lock held. Where no monitoring ran,
+ * main() then says a write to stdout that failed, and makes it an
+ * EXIT_FAILURE; a monitoring run's output is monitor_flush()'s to check.
  */
 
 #include "test_main_monitoring.h"
@@ -56,19 +62,22 @@
 
 #include "output.h"
 
+#include <errno.h>
 #include <getopt.h>
 #include <setjmp.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
 
-/** the system main() is given: three cores, with monitoring the one
+/** the system main() is given: four cores, with monitoring the one
  * capability
  */
 static struct pqos_cap m_cap;
@@ -77,11 +86,21 @@ static struct pqos_capability m_cap_mon;
 static struct pqos_sysconfig m_sys;
 
 /** what the loop and the flush return, and what main() called from the loop
- * on, in order: "loop", "stop", "fini" and "flush", each followed by a space
+ * on, in order: "loop", "stop", "fini" and "flush", and "stdout" for a flush
+ * of stdout, each followed by a space
  */
 static int m_loop_result;
 static int m_flush_result;
 static char m_calls[64];
+
+/** 1 where SIGPIPE was ignored when main() initialised the library */
+static int m_sigpipe_ignored_at_init;
+
+/** the process's stdout, and a stream that a case puts in its place: the
+ * write end of a pipe whose reader has gone
+ */
+static FILE *m_stdout;
+static FILE *m_reader_gone;
 
 static void
 called(const char *what)
@@ -96,7 +115,11 @@ called(const char *what)
 int
 __wrap_pqos_init(const struct pqos_config *config)
 {
+        struct sigaction sa;
+
         UNUSED_ARG(config);
+        m_sigpipe_ignored_at_init =
+            sigaction(SIGPIPE, NULL, &sa) == 0 && sa.sa_handler == SIG_IGN;
         return PQOS_RETVAL_OK;
 }
 
@@ -105,6 +128,14 @@ __wrap_pqos_fini(void)
 {
         called("fini");
         return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_fflush(FILE *stream)
+{
+        if (stream == stdout)
+                called("stdout");
+        return __real_fflush(stream);
 }
 
 int
@@ -217,6 +248,97 @@ run_monitoring(const char *groups,
         return ret;
 }
 
+/**
+ * @brief Runs "pqos --version", which initialises the library and monitors
+ *        nothing
+ *
+ * @return what appmain() returned
+ */
+static int
+run_version(void)
+{
+        char *argv[] = {strdup("pqos"), strdup("--version"), NULL};
+        const int argc = (int)DIM(argv) - 1;
+        int ret = -1;
+        int i;
+
+        for (i = 0; i < argc; i++)
+                assert_non_null(argv[i]);
+
+        m_flush_result = 0;
+        m_calls[0] = '\0';
+        optind = 1;
+        opterr = 0;
+        run_function(appmain, ret, argc, argv);
+        /* the parser keeps what it selected, for the next case to start
+         * from
+         */
+        sel_print_version = 0;
+
+        for (i = 0; i < argc; i++)
+                free(argv[i]);
+        return ret;
+}
+
+/** where SIGPIPE is not ignored, a case has it handled here rather than
+ * ending the process
+ */
+static void
+sigpipe_handled(int signo)
+{
+        UNUSED_ARG(signo);
+}
+
+/**
+ * @brief Has SIGPIPE handled, not ignored, and gives a case a stdout whose
+ *        reader has gone, for it to put in place of the process's
+ */
+static int
+case_start(void **state)
+{
+        struct sigaction sa;
+        int fds[2];
+
+        UNUSED_ARG(state);
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = sigpipe_handled;
+        sigemptyset(&sa.sa_mask);
+        assert_int_equal(sigaction(SIGPIPE, &sa, NULL), 0);
+        m_sigpipe_ignored_at_init = 0;
+        m_stdout = stdout;
+        assert_int_equal(pipe(fds), 0);
+        close(fds[0]);
+        m_reader_gone = fdopen(fds[1], "w");
+        if (m_reader_gone == NULL)
+                close(fds[1]);
+        assert_non_null(m_reader_gone);
+
+        return 0;
+}
+
+/**
+ * @brief Puts the process's stdout back, closes the pipe's stream, whose last
+ *        write fails as SIGPIPE is still handled or ignored, and gives
+ *        SIGPIPE its default action back
+ */
+static int
+case_end(void **state)
+{
+        struct sigaction sa;
+
+        UNUSED_ARG(state);
+        stdout = m_stdout;
+        if (m_reader_gone != NULL)
+                (void)fclose(m_reader_gone);
+        m_reader_gone = NULL;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = SIG_DFL;
+        sigemptyset(&sa.sa_mask);
+        (void)sigaction(SIGPIPE, &sa, NULL);
+
+        return 0;
+}
+
 static void
 test_a_monitoring_loop_that_fails_makes_pqos_exit_1(void **state)
 {
@@ -251,25 +373,148 @@ test_an_output_whose_end_fails_makes_pqos_exit_1(void **state)
         assert_string_equal(m_calls, "loop stop fini flush ");
 }
 
+/**
+ * @brief The library is initialised with SIGPIPE ignored
+ *
+ * pqos_init() writes the library's log, on stdout by default. At its default
+ * action, SIGPIPE ended the process at the first such write to a pipe whose
+ * reader had gone, before its clean-up, with the lock file left behind.
+ */
+static void
+test_the_library_is_initialised_with_sigpipe_ignored(void **state)
+{
+        UNUSED_ARG(state);
+
+        assert_int_equal(run_version(), EXIT_SUCCESS);
+        assert_true(m_sigpipe_ignored_at_init);
+}
+
+/**
+ * @brief A write to stdout that failed, where no monitoring ran, is said
+ *
+ * What the tool prints is captured here, so the stream put in place of stdout
+ * holds a line of the tool's for main()'s check to write; the write to the
+ * pipe fails with EPIPE. The process's stdout is put back as soon as main()
+ * returns.
+ */
+static void
+test_a_failed_write_to_stdout_makes_pqos_exit_1(void **state)
+{
+        int ret;
+
+        UNUSED_ARG(state);
+        (void)fputs("PQoS Library version: 26.6.0\n", m_reader_gone);
+        stdout = m_reader_gone;
+        ret = run_version();
+        stdout = m_stdout;
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_true(output_stderr_has_text(
+            "Failed to write standard output: %s\n", strerror(EPIPE)));
+        /* stdout flushed last, with the library finalised and the lock let
+         * go: a reader that has stopped reading can hold the process there,
+         * but nothing else
+         */
+        assert_string_equal(m_calls, "fini flush stdout ");
+}
+
+/**
+ * @brief And so is one that failed before, whose line the stream dropped
+ *
+ * A stream drops what a write that failed was given, and keeps the failure in
+ * its error indicator, which is then all there is to look at: the flush at
+ * the end has nothing to write. What the write failed with is not known then.
+ */
+static void
+test_an_earlier_failed_write_to_stdout_makes_pqos_exit_1(void **state)
+{
+        int ret;
+
+        UNUSED_ARG(state);
+        (void)fputs("PQoS Library version: 26.6.0\n", m_reader_gone);
+        assert_int_not_equal(fflush(m_reader_gone), 0);
+        stdout = m_reader_gone;
+        ret = run_version();
+        stdout = m_stdout;
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(
+            output_stderr_has_text("Failed to write standard output\n"));
+        assert_string_equal(m_calls, "fini flush stdout ");
+}
+
+/**
+ * @brief And one that wrote is not
+ */
+static void
+test_a_command_that_wrote_its_output_exits_0(void **state)
+{
+        UNUSED_ARG(state);
+
+        assert_int_equal(run_version(), EXIT_SUCCESS);
+        assert_false(output_has_text("Failed to write"));
+        assert_string_equal(m_calls, "fini flush stdout ");
+}
+
+/**
+ * @brief Where monitoring ran, stdout is left to monitor_flush()
+ *
+ * It checks the monitoring's output, which stdout is unless -o named a file,
+ * and stdout where it is not, and says what failed: main() saying the failure
+ * too would say it twice. monitor_flush() is wrapped here, and says nothing.
+ */
+static void
+test_a_monitoring_run_leaves_stdout_to_its_flush(void **state)
+{
+        int ret;
+
+        UNUSED_ARG(state);
+        (void)fputs("TIME 2026-10-30 16:00:00\n", m_reader_gone);
+        stdout = m_reader_gone;
+        ret = run_monitoring("all:3", 0, 0);
+        stdout = m_stdout;
+
+        assert_int_equal(ret, EXIT_SUCCESS);
+        assert_false(output_has_text("Failed to write"));
+        assert_string_equal(m_calls, "loop stop fini flush ");
+}
+
 int
 main(void)
 {
         const struct CMUnitTest tests[] = {
+            cmocka_unit_test_setup_teardown(
+                test_the_library_is_initialised_with_sigpipe_ignored,
+                case_start, case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_failed_write_to_stdout_makes_pqos_exit_1, case_start,
+                case_end),
+            cmocka_unit_test_setup_teardown(
+                test_an_earlier_failed_write_to_stdout_makes_pqos_exit_1,
+                case_start, case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_command_that_wrote_its_output_exits_0, case_start,
+                case_end),
             cmocka_unit_test(
                 test_a_monitoring_loop_that_fails_makes_pqos_exit_1),
             cmocka_unit_test(
                 test_a_monitoring_loop_that_ends_well_makes_pqos_exit_0),
-            cmocka_unit_test(test_an_output_whose_end_fails_makes_pqos_exit_1)};
+            cmocka_unit_test(test_an_output_whose_end_fails_makes_pqos_exit_1),
+            cmocka_unit_test_setup_teardown(
+                test_a_monitoring_run_leaves_stdout_to_its_flush, case_start,
+                case_end)};
         struct pqos_cpuinfo *cpu =
-            calloc(1, sizeof(*cpu) + 3 * sizeof(struct pqos_coreinfo));
+            calloc(1, sizeof(*cpu) + 4 * sizeof(struct pqos_coreinfo));
         int ret;
 
         if (cpu == NULL)
                 return EXIT_FAILURE;
-        cpu->num_cores = 3;
+        cpu->num_cores = 4;
         cpu->cores[0].lcore = 0;
         cpu->cores[1].lcore = 1;
         cpu->cores[2].lcore = 2;
+        cpu->cores[3].lcore = 3;
         m_cap_mon.type = PQOS_CAP_TYPE_MON;
         m_cap_mon.u.mon = &m_mon;
         m_sys.cap = &m_cap;

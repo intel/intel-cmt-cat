@@ -47,12 +47,21 @@ static int buffer_full = 0;
 static int exit_code = 0;
 static int exit_was_called = 0;
 
+/* what the grab's writes to stderr held, alone: the buffer above holds every
+ * stream's, and a case asking which stream a message went to asks this one
+ */
+#define STDERR_BUFFER_LENGTH 65536
+static char stderr_buffer[STDERR_BUFFER_LENGTH + 1];
+static int chars_in_stderr_buffer = 0;
+
 void
 output_start(void)
 {
         memset(buffer, 0, BUFFER_LENGTH + 1);
         chars_in_buffer = 0;
         buffer_full = 0;
+        stderr_buffer[0] = '\0';
+        chars_in_stderr_buffer = 0;
         exit_code = 0;
         exit_was_called = 0;
         grab_in_progress = 1;
@@ -118,6 +127,44 @@ output_has_text(const char *format_string, ...)
  * @param [in] text what was formatted
  * @param [in] len its length, as the formatting reported it
  */
+/* as much of a write to stderr as stderr_buffer has room for */
+static void
+append_to_stderr_buffer(const char *text, int len)
+{
+        const int room = STDERR_BUFFER_LENGTH - chars_in_stderr_buffer;
+
+        if (text == NULL || len <= 0 || room <= 0)
+                return;
+        if (len > room)
+                len = room;
+        memcpy(&stderr_buffer[chars_in_stderr_buffer], text, (size_t)len);
+        chars_in_stderr_buffer += len;
+        stderr_buffer[chars_in_stderr_buffer] = '\0';
+}
+
+int
+output_stderr_has_text(const char *format_string, ...)
+{
+        int ret = 0;
+
+        if (format_string != NULL) {
+                int str_len = 0;
+                char *tmp_buff = NULL;
+                va_list args;
+
+                va_start(args, format_string);
+                str_len = vasprintf(&tmp_buff, format_string, args);
+                va_end(args);
+                if (tmp_buff != NULL) {
+                        if (str_len > 0 &&
+                            strstr(stderr_buffer, tmp_buff) != NULL)
+                                ret = 1;
+                        free(tmp_buff);
+                }
+        }
+        return ret;
+}
+
 static void
 append_to_buffer(const char *text, int len)
 {
@@ -203,6 +250,8 @@ __wrap_fprintf(FILE *stream, const char *format_string, ...)
         str_len = vasprintf(&tmp_buff, format_string, args);
         va_end(args);
         append_to_buffer(tmp_buff, str_len);
+        if (stream == stderr)
+                append_to_stderr_buffer(tmp_buff, str_len);
         if (tmp_buff != NULL)
                 free(tmp_buff);
 

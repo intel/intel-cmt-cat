@@ -62,6 +62,8 @@ const char *output_get(void);
 int output_exit_was_called(void);
 int output_get_exit_status(void);
 int output_has_text(const char *format_string, ...);
+/* the same, of what the grab wrote to stderr alone */
+int output_stderr_has_text(const char *format_string, ...);
 void __wrap_exit(int __status);
 int __wrap_printf(const char *format_string, ...);
 int __wrap_fprintf(FILE *stream, const char *format_string, ...);

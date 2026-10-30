@@ -52,6 +52,7 @@
 #include <fcntl.h>
 #include <getopt.h> /**< getopt_long() */
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1884,6 +1885,64 @@ optarg_is_next_word(char **argv)
         return optarg != NULL && optarg == argv[optind - 1];
 }
 
+/**
+ * @brief Has SIGPIPE ignored from the library's initialisation on
+ *
+ * pqos_init() writes the library's log, on stdout unless -l named a file, and
+ * from then on the process holds the library's lock and what the library has
+ * taken. At its default action, SIGPIPE ended the process at a write to a pipe
+ * whose reader had gone, before its clean-up, with the lock file left behind.
+ * Ignored, it leaves such a write to fail with EPIPE: libpqos says the first
+ * failure of its log on stderr, the monitoring loop records its own output's,
+ * and stdout_check() says the tool's other output's at the end.
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 if SIGPIPE could not be ignored, which is said
+ */
+static int
+ignore_sigpipe(void)
+{
+        struct sigaction sa;
+
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = SIG_IGN;
+        sigemptyset(&sa.sa_mask);
+        if (sigaction(SIGPIPE, &sa, NULL) == 0)
+                return 0;
+        fprintf(stderr, "Failed to ignore SIGPIPE: %s\n", strerror(errno));
+        return -1;
+}
+
+/**
+ * @brief Says a write to stdout that failed, outside monitoring
+ *
+ * With SIGPIPE ignored, a write to a pipe whose reader has gone fails rather
+ * than ending the process, so stdout is flushed and its error indicator looked
+ * at, once, at the end. A monitoring run checks its own output, and stdout
+ * where that is a file, and monitor_flush() says what failed.
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 if a write to stdout failed, which is said on stderr
+ */
+static int
+stdout_check(void)
+{
+        int err = 0;
+
+        if (fflush(stdout) != 0)
+                err = errno;
+        else if (!ferror(stdout))
+                return 0;
+        /* what a write failed with is not known where the stream's error
+         * indicator is all that is left of it
+         */
+        fprintf(stderr, "Failed to write standard output%s%s\n",
+                err != 0 ? ": " : "", err != 0 ? strerror(err) : "");
+        return -1;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1896,6 +1955,7 @@ main(int argc, char **argv)
         const struct pqos_capability *cap_smba = NULL;
         unsigned l3cat_id_count, *l3cat_ids = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
+        int monitored = 0;
         int opt_index = 0;
 
         m_cmd_name = argv[0];
@@ -2292,6 +2352,9 @@ main(int argc, char **argv)
                 return EXIT_SUCCESS;
         }
 
+        if (ignore_sigpipe() != 0)
+                return EXIT_FAILURE;
+
         cfg.verbose = sel_verbose_mode;
         cfg.interface = sel_interface;
         /**
@@ -2525,6 +2588,7 @@ main(int argc, char **argv)
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
+        monitored = 1;
         if (monitor_loop() != 0)
                 exit_val = EXIT_FAILURE;
         monitor_stop();
@@ -2545,6 +2609,10 @@ error_exit_2:
 
 error_exit_1:
         monitor_cleanup();
+
+        /* what monitoring wrote, monitor_flush() has checked */
+        if (!monitored && stdout_check() != 0)
+                exit_val = EXIT_FAILURE;
 
         /**
          * Close file descriptor for message log

@@ -309,6 +309,7 @@ $(BIN_DIR)/test_main_monitoring: ./test_main_monitoring.c $(PQOS_OBJS)
 		-Wl,--wrap=monitor_loop \
 		-Wl,--wrap=monitor_stop \
 		-Wl,--wrap=monitor_flush \
+		-Wl,--wrap=fflush \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/main.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 

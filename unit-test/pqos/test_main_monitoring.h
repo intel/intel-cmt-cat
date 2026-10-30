@@ -41,7 +41,7 @@
 int appmain(int argc, char **argv);
 
 /* What main() asks of the library on its way to the monitoring, answered here
- * through --wrap: a system of two cores whose one capability is monitoring
+ * through --wrap: a system of four cores whose one capability is monitoring
  */
 int __wrap_pqos_init(const struct pqos_config *config);
 int __wrap_pqos_fini(void);
@@ -66,5 +66,9 @@ int __wrap_monitor_setup(const struct pqos_cpuinfo *cpu_info,
 int __wrap_monitor_loop(void);
 void __wrap_monitor_stop(void);
 int __wrap_monitor_flush(void);
+
+/* and the flushes, to record where main() flushes stdout */
+int __wrap_fflush(FILE *stream);
+int __real_fflush(FILE *stream);
 
 #endif /* TEST_MAIN_MONITORING_H_ */
