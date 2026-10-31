@@ -48,9 +48,11 @@
 /* ======== mock ======== */
 
 /* the directory the resctrl lock opens in place of RESCTRL_PATH, which the
- * lock's cases make; NULL outside them
+ * lock's cases make; NULL outside them. A case can have that open fail with
+ * lock_open_errno instead
  */
 static char *lock_dir;
+static int lock_open_errno;
 
 int
 __wrap_open(const char *path, int flags, ...)
@@ -64,8 +66,13 @@ __wrap_open(const char *path, int flags, ...)
                 mode = va_arg(ap, int);
                 va_end(ap);
         }
-        if (lock_dir != NULL && strcmp(path, RESCTRL_PATH) == 0)
+        if (lock_dir != NULL && strcmp(path, RESCTRL_PATH) == 0) {
+                if (lock_open_errno != 0) {
+                        errno = lock_open_errno;
+                        return -1;
+                }
                 path = lock_dir;
+        }
 
         return __real_open(path, flags, mode);
 }
@@ -114,10 +121,13 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
 }
 
 /* the lock's looks at the clock: a case can have the next one, or the one
- * after it, fail with EINVAL, which no clock the library reads ever does.
- * CLOCK_MONOTONIC's alone are counted: the watchdog reads CLOCK_REALTIME
+ * after it, fail with EINVAL, which no clock the library reads ever does; or
+ * freeze the clock, so that the wait cannot time out however late its thread
+ * runs. CLOCK_MONOTONIC's alone are counted: the watchdog reads
+ * CLOCK_REALTIME
  */
 static unsigned lock_clock_fails_in;
+static int lock_clock_frozen;
 
 int
 __wrap_clock_gettime(clockid_t clk, struct timespec *tp)
@@ -128,6 +138,12 @@ __wrap_clock_gettime(clockid_t clk, struct timespec *tp)
                 0) {
                 errno = EINVAL;
                 return -1;
+        }
+        if (clk == CLOCK_MONOTONIC &&
+            __atomic_load_n(&lock_clock_frozen, __ATOMIC_SEQ_CST)) {
+                tp->tv_sec = 1000;
+                tp->tv_nsec = 0;
+                return 0;
         }
 
         return __real_clock_gettime(clk, tp);
@@ -501,6 +517,8 @@ lock_setup(void **state __attribute__((unused)))
         lock_overslept_holder = -1;
         lock_cancel_in_sleep = 0;
         lock_clock_fails_in = 0;
+        lock_clock_frozen = 0;
+        lock_open_errno = 0;
 
         return lock_dir == NULL ? -1 : 0;
 }
@@ -702,7 +720,8 @@ test_resctrl_lock_times_out(void **state __attribute__((unused)))
 }
 
 /* a lock whose holder gives it up during the wait, in the lock's first sleep,
- * is taken at the try after the sleep
+ * is taken at the try after the sleep, however late its thread runs: the
+ * clock is frozen for the case
  */
 static void
 test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
@@ -713,9 +732,11 @@ test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
         int ret;
 
         lock_released_holder = holder;
+        __atomic_store_n(&lock_clock_frozen, 1, __ATOMIC_SEQ_CST);
         lock_watchdog_start(&watchdog, holder);
         ret = resctrl_lock_exclusive();
         fired = lock_watchdog_stop(&watchdog);
+        __atomic_store_n(&lock_clock_frozen, 0, __ATOMIC_SEQ_CST);
         lock_released_holder = -1;
         close(holder);
 
@@ -895,6 +916,150 @@ test_resctrl_lock_cancelled_in_the_wait(void **state __attribute__((unused)))
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
 }
 
+/* a log callback with a cancellation point in it, as a write() to a full pipe
+ * is one: for the lock's failure, it records whether the thread's
+ * cancellation was on, and acts on a cancellation asked for
+ */
+static int lock_log_found_cancellable;
+
+static void
+lock_log_cancellation_point(void *context __attribute__((unused)),
+                            const size_t size __attribute__((unused)),
+                            const char *message)
+{
+        int found;
+        int set;
+
+        if (strstr(message, "Failed to acquire lock") == NULL)
+                return;
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found);
+        (void)pthread_setcancelstate(found, &set);
+        lock_log_found_cancellable = found == PTHREAD_CANCEL_ENABLE;
+        pthread_testcancel();
+}
+
+/* a wait that fails is logged with the thread's cancellation on, so that a log
+ * that blocks can be cancelled: a cancellation asked for in the wait is acted
+ * on in that log, with the descriptor closed already
+ */
+static void
+test_resctrl_lock_failure_logged_cancellable(void **state
+                                             __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_EX);
+        const unsigned fds = lock_open_fds();
+        struct lock_watchdog watchdog;
+        pthread_t worker;
+        void *result = NULL;
+        unsigned fds_after;
+        int fired;
+
+        lock_cancelled_ret = -1;
+        lock_log_found_cancellable = -1;
+        __atomic_store_n(&lock_cancel_in_sleep, 1, __ATOMIC_SEQ_CST);
+        lock_watchdog_start(&watchdog, holder);
+        (void)log_init(-1, lock_log_cancellation_point, NULL, LOG_VER_DEFAULT);
+        assert_int_equal(
+            pthread_create(&worker, NULL, lock_cancelled_worker, NULL), 0);
+        assert_int_equal(pthread_join(worker, &result), 0);
+        test_log_init_silent();
+        fired = lock_watchdog_stop(&watchdog);
+        fds_after = lock_open_fds();
+        close(holder);
+
+        assert_false(fired);
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_log_found_cancellable, 1);
+        assert_int_equal(lock_cancelled_ret, -1);
+        assert_int_equal(fds_after, fds);
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+static void *
+lock_cancelled_before_worker(void *arg __attribute__((unused)))
+{
+        (void)pthread_cancel(pthread_self());
+        lock_cancelled_ret = resctrl_lock_exclusive();
+
+        return NULL;
+}
+
+/* 1 where another descriptor can take the lock exclusively at once */
+static int
+lock_free_now(void)
+{
+        const int fd = open(lock_dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        int free_now;
+
+        assert_true(fd >= 0);
+        free_now = flock(fd, LOCK_EX | LOCK_NB) == 0;
+        close(fd);
+
+        return free_now;
+}
+
+/* a cancellation asked for before the lock is acted on at its start, before
+ * anything is opened: the cancelled thread leaves no descriptor open and no
+ * lock held
+ */
+static void
+test_resctrl_lock_cancelled_before_the_call(void **state
+                                            __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        pthread_t worker;
+        void *result = NULL;
+
+        lock_cancelled_ret = -1;
+        assert_int_equal(
+            pthread_create(&worker, NULL, lock_cancelled_before_worker, NULL),
+            0);
+        assert_int_equal(pthread_join(worker, &result), 0);
+
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_cancelled_ret, -1);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_true(lock_free_now());
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* a lock whose descriptor cannot be opened fails, saying so, and leaves the
+ * thread's cancellation as the caller had it, on or off
+ */
+static void
+test_resctrl_lock_open_failure(void **state __attribute__((unused)))
+{
+        const int states[] = {PTHREAD_CANCEL_ENABLE, PTHREAD_CANCEL_DISABLE};
+        unsigned i;
+
+        for (i = 0; i < 2; i++) {
+                int found;
+                int after;
+                int ret;
+
+                (void)pthread_setcancelstate(states[i], &found);
+                lock_open_errno = EACCES;
+                test_log_keep_start();
+                ret = resctrl_lock_exclusive();
+                (void)test_log_count_stop();
+                lock_open_errno = 0;
+                (void)pthread_setcancelstate(found, &after);
+
+                assert_int_equal(ret, PQOS_RETVAL_ERROR);
+                assert_non_null(strstr(test_log_said(),
+                                       "Could not open " RESCTRL_PATH
+                                       " directory"));
+                assert_int_equal(after, states[i]);
+        }
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
 /* a shared lock is taken beside another shared one, and an exclusive one is
  * not
  */
@@ -959,6 +1124,14 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_cancelled_in_the_wait, lock_setup,
                 lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_failure_logged_cancellable, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_before_the_call, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(test_resctrl_lock_open_failure,
+                                            lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_keeps_cancellation_off, lock_setup,
                 lock_teardown),

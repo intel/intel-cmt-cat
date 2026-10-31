@@ -112,11 +112,15 @@ resctrl_lock_try(const int fd, const int type)
  * @brief Obtain lock on resctrl filesystem
  *
  * Gives another holder 100 ms to give the lock up, as resctrl_lock_try()
- * counts them. The thread's cancellation is off from the open of the
- * descriptor until it holds the lock or is closed: one acted on in a sleep of
- * the wait, or in the log or the close of a wait that failed, would leave the
- * descriptor open with nothing to close it. A cancellation asked for in the
- * meantime is acted on at the caller's next cancellation point.
+ * counts them. A cancellation asked for before the call is acted on at its
+ * start, before anything is opened. The thread's cancellation is then off
+ * from the open of the descriptor until the lock is held, or the descriptor
+ * closed: one acted on in a sleep of the wait would leave the descriptor open
+ * with nothing to close it. It is put back before a failure is logged, since
+ * a log written to a pipe, or a callback, can block, and a thread that cannot
+ * be cancelled there would keep the API lock. A cancellation asked for during
+ * the wait is acted on at the next cancellation point after it: in that log,
+ * or in the caller.
  *
  * @param[in] type lock type
  *
@@ -126,26 +130,30 @@ resctrl_lock_try(const int fd, const int type)
 static int
 resctrl_lock(const int type)
 {
-        int ret = PQOS_RETVAL_ERROR;
         int state;
         int err;
 
         ASSERT(type == LOCK_SH || type == LOCK_EX);
 
+        pthread_testcancel();
         (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
 
         /* O_CLOEXEC: held for as long as the resctrl lock is */
         resctrl_lock_fd = open(RESCTRL_PATH, O_DIRECTORY | O_CLOEXEC);
         if (resctrl_lock_fd < 0) {
+                (void)pthread_setcancelstate(state, &state);
                 LOG_ERROR("Could not open %s directory\n", RESCTRL_PATH);
-                goto resctrl_lock_exit;
+                return PQOS_RETVAL_ERROR;
         }
 
         err = resctrl_lock_try(resctrl_lock_fd, type);
-        if (err == 0) {
-                ret = PQOS_RETVAL_OK;
-                goto resctrl_lock_exit;
+        if (err != 0) {
+                close(resctrl_lock_fd);
+                resctrl_lock_fd = -1;
         }
+        (void)pthread_setcancelstate(state, &state);
+        if (err == 0)
+                return PQOS_RETVAL_OK;
 
         if (err == ETIMEDOUT)
                 LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
@@ -155,13 +163,7 @@ resctrl_lock(const int type)
                           "%s\n",
                           strerror(err));
 
-        close(resctrl_lock_fd);
-        resctrl_lock_fd = -1;
-
-resctrl_lock_exit:
-        (void)pthread_setcancelstate(state, &state);
-
-        return ret;
+        return PQOS_RETVAL_ERROR;
 }
 
 int
