@@ -1068,53 +1068,30 @@ is_mba40_supported(unsigned core, unsigned *supported)
         return PQOS_RETVAL_OK;
 }
 
-static int
+static void
 detect_mba40(const struct pqos_cpuinfo *cpu, unsigned *supported)
 {
-        int ret = PQOS_RETVAL_OK;
-        unsigned *mba_ids;
-        unsigned mba_id_num;
         unsigned i;
 
         *supported = 0;
 
-        /* MBA IDs */
-        mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
-        if (mba_ids == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
         /*
          * Detect MBA 4.0 extensions support
-         * Checking all cores to log a debug message
+         * Checking all cores to log a debug message. They are taken from the
+         * topology: an MBA domain is an L3 cluster, whose id need not be the
+         * id of a socket.
          */
-        for (i = 0; i < mba_id_num; i++) {
+        for (i = 0; i < cpu->num_cores; i++) {
+                const unsigned lcore = cpu->cores[i].lcore;
                 unsigned core_supported = 0;
-                unsigned num_cores = 0;
-                unsigned *cores = NULL;
-                unsigned j;
+                int ret;
 
-                cores = pqos_cpu_get_cores(cpu, mba_ids[i], &num_cores);
-                if (cores == NULL) {
-                        *supported = 0;
-                        ret = PQOS_RETVAL_ERROR;
-                        break;
+                ret = is_mba40_supported(lcore, &core_supported);
+                if (ret == PQOS_RETVAL_OK && core_supported) {
+                        *supported = 1;
+                        LOG_DEBUG("MBA 4.0 available for core %u\n", lcore);
                 }
-
-                for (j = 0; j < num_cores; j++) {
-                        ret = is_mba40_supported(cores[j], &core_supported);
-                        if (ret == PQOS_RETVAL_OK && core_supported) {
-                                *supported = 1;
-                                LOG_DEBUG("MBA 4.0 available for core %u\n",
-                                          cores[j]);
-                        }
-                }
-
-                free(cores);
         }
-
-        free(mba_ids);
-
-        return ret;
 }
 
 /**
