@@ -151,6 +151,7 @@ $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
 		--globalize-symbol=hw_alloc_reset_assoc --weaken-symbol=hw_alloc_reset_assoc \
 		--globalize-symbol=hw_alloc_reset_assoc_cores --weaken-symbol=hw_alloc_reset_assoc_cores \
 		--globalize-symbol=hw_alloc_reset_assoc_channels --weaken-symbol=hw_alloc_reset_assoc_channels \
+		--globalize-symbol=hw_alloc_reset_mba40 --weaken-symbol=hw_alloc_reset_mba40 \
 		--globalize-symbol=hw_alloc_assoc_unused --weaken-symbol=hw_alloc_assoc_unused \
 		--globalize-symbol=hw_l3ca_set --weaken-symbol=hw_l3ca_set \
 		--globalize-symbol=hw_l3ca_set --weaken-symbol=hw_l3ca_set \
@@ -389,6 +390,8 @@ $(BIN_DIR)/test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
 		-Wl,--wrap=cpuinfo_get_config \
 		-Wl,--wrap=_pqos_cap_l3cdp_change \
 		-Wl,--wrap=_pqos_cap_l2cdp_change \
+		-Wl,--wrap=_pqos_cap_mba40_change \
+		-Wl,--wrap=_pqos_cap_mba40_refresh \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -1088,6 +1091,7 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=os_cap_l2ca_discover \
 		-Wl,--wrap=hw_cap_mba_discover \
 		-Wl,--wrap=os_cap_mba_discover \
+		-Wl,--wrap=hw_cap_mba40_on \
 		-Wl,--wrap=pqos_mon_init \
 		-Wl,--wrap=pqos_mon_fini \
 		-Wl,--wrap=pqos_alloc_init \

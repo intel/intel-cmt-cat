@@ -1083,6 +1083,44 @@ test_hw_cap_mba_discover_mba40_no_core_reports_it(void **state)
         assert_int_equal(cap_mba.mba40_on, 0);
 }
 
+/* MBA 4.0 on in the last MBA domain only reads as on in some only */
+static void
+test_hw_cap_mba_discover_mba40_mixed(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        const int probe[] = {MACHINE_RETVAL_OK, MACHINE_RETVAL_OK, -1};
+        unsigned *mba_ids;
+        unsigned mba_id_num;
+        unsigned i;
+        int ret;
+
+        _mba40_probe_queue(data->cpu, probe);
+
+        mba_ids = pqos_cpu_get_mba_ids(data->cpu, &mba_id_num);
+        assert_non_null(mba_ids);
+        assert_int_equal(mba_id_num, 2);
+        for (i = 0; i < mba_id_num; i++) {
+                unsigned core = 0;
+
+                assert_int_equal(
+                    pqos_cpu_get_one_by_mba_id(data->cpu, mba_ids[i], &core),
+                    PQOS_RETVAL_OK);
+                expect_value(__wrap_msr_read, lcore, core);
+                expect_value(__wrap_msr_read, reg, PQOS_MSR_MBA_CFG);
+                will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+                will_return(__wrap_msr_read, i == mba_id_num - 1
+                                                 ? PQOS_MSR_MBA_CFG_MBA40_EN
+                                                 : 0);
+        }
+        free(mba_ids);
+
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_mba.mba40, 1);
+        assert_int_equal(cap_mba.mba40_on, -1);
+}
+
 /*
  * MBA_CFG cannot be read for another reason than the core refusing it, the
  * core gone offline say, which tells nothing about the register: discovery
@@ -1100,6 +1138,82 @@ test_hw_cap_mba_discover_mba40_core_unreadable(void **state)
 
         ret = hw_cap_mba_discover(&cap_mba, data->cpu);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+/*
+ * MBA_CFG of the first core of each MBA domain read as \a regs gives, where
+ * \a fails is the domain whose read fails, or -1
+ */
+static void
+_mba40_on_queue(const struct pqos_cpuinfo *cpu,
+                const uint64_t *regs,
+                const int fails)
+{
+        unsigned *mba_ids;
+        unsigned mba_id_num;
+        unsigned i;
+
+        mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+        assert_non_null(mba_ids);
+        assert_int_equal(mba_id_num, 2);
+        for (i = 0; i < mba_id_num; i++) {
+                unsigned core = 0;
+
+                assert_int_equal(
+                    pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core),
+                    PQOS_RETVAL_OK);
+                expect_value(__wrap_msr_read, lcore, core);
+                expect_value(__wrap_msr_read, reg, PQOS_MSR_MBA_CFG);
+                if ((int)i == fails) {
+                        will_return(__wrap_msr_read, MACHINE_RETVAL_ERROR);
+                        break;
+                }
+                will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+                will_return(__wrap_msr_read, regs[i]);
+        }
+        free(mba_ids);
+}
+
+/* the state read back is every domain's, as discovery reads it */
+static void
+test_hw_cap_mba40_on(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const uint64_t on[] = {PQOS_MSR_MBA_CFG_MBA40_EN,
+                               PQOS_MSR_MBA_CFG_MBA40_EN};
+        const uint64_t off[] = {0, 0};
+        const uint64_t mixed[] = {PQOS_MSR_MBA_CFG_MBA40_EN, 0};
+        int enabled = 2;
+
+        _mba40_on_queue(data->cpu, on, -1);
+        assert_int_equal(hw_cap_mba40_on(data->cpu, &enabled), PQOS_RETVAL_OK);
+        assert_int_equal(enabled, 1);
+
+        _mba40_on_queue(data->cpu, off, -1);
+        assert_int_equal(hw_cap_mba40_on(data->cpu, &enabled), PQOS_RETVAL_OK);
+        assert_int_equal(enabled, 0);
+
+        _mba40_on_queue(data->cpu, mixed, -1);
+        assert_int_equal(hw_cap_mba40_on(data->cpu, &enabled), PQOS_RETVAL_OK);
+        assert_int_equal(enabled, -1);
+}
+
+/* a domain that cannot be read fails the read-back, the state untouched */
+static void
+test_hw_cap_mba40_on_read_fails(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        const uint64_t on[] = {PQOS_MSR_MBA_CFG_MBA40_EN,
+                               PQOS_MSR_MBA_CFG_MBA40_EN};
+        int enabled = 2;
+
+        _mba40_on_queue(data->cpu, on, 1);
+        assert_int_equal(hw_cap_mba40_on(data->cpu, &enabled),
+                         PQOS_RETVAL_ERROR);
+        assert_int_equal(enabled, 2);
+
+        assert_int_equal(hw_cap_mba40_on(NULL, &enabled), PQOS_RETVAL_PARAM);
+        assert_int_equal(hw_cap_mba40_on(data->cpu, NULL), PQOS_RETVAL_PARAM);
 }
 
 static void
@@ -1179,6 +1293,9 @@ main(void)
                 test_hw_cap_mba_discover_mba40_no_core_reports_it, _init),
             cmocka_unit_test_setup(
                 test_hw_cap_mba_discover_mba40_core_unreadable, _init),
+            cmocka_unit_test_setup(test_hw_cap_mba_discover_mba40_mixed, _init),
+            cmocka_unit_test_setup(test_hw_cap_mba40_on, _init),
+            cmocka_unit_test_setup(test_hw_cap_mba40_on_read_fails, _init),
             cmocka_unit_test_setup(test_hw_cap_mba_discover_mba40_unsupported,
                                    _init),
         };

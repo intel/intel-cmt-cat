@@ -413,10 +413,12 @@ cap_print_features_mba(const unsigned indent,
                       mba->is_linear ? "linear" : "nonlinear");
 
         if (mba->mba40) {
-                if (mba->mba40_on)
+                if (mba->mba40_on == 1)
                         mba40_status = "enabled";
-                else
+                else if (mba->mba40_on == 0)
                         mba40_status = "disabled";
+                else
+                        mba40_status = "enabled in some MBA domains only";
         }
 
         printf_indent(indent + 4, "MBA 4.0 extensions: %s\n", mba40_status);

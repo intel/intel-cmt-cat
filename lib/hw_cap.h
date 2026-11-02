@@ -148,6 +148,18 @@ PQOS_LOCAL int hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
                                     const struct pqos_cpuinfo *cpu);
 
 /**
+ * @brief Reads the MBA 4.0 state of every MBA domain from its MBA_CFG
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store the state: 1 where every MBA domain has MBA
+ *        4.0 on, 0 where none has, -1 where only some have
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_cap_mba40_on(const struct pqos_cpuinfo *cpu, int *enabled);
+
+/**
  * @brief Discovers HW support of MBA
  *
  * @param cap place to store MBA capabilities

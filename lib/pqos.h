@@ -576,7 +576,9 @@ struct pqos_cap_mba {
         int ctrl;               /**< MBA controller support */
         int ctrl_on;            /**< MBA controller enabled */
         int mba40;              /**< MBA 4.0 extensions support */
-        int mba40_on;           /**< MBA 4.0 extensions enabled */
+        int mba40_on;           /**< MBA 4.0 extensions enabled: 1 in
+                                     every MBA domain, 0 in none, -1 in
+                                     some only */
 };
 
 /**

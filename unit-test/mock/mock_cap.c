@@ -90,6 +90,18 @@ __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
         check_expected(cfg);
 }
 
+void
+__wrap__pqos_cap_mba40_change(const enum pqos_feature_cfg cfg)
+{
+        check_expected(cfg);
+}
+
+void
+__wrap__pqos_cap_mba40_refresh(void)
+{
+        function_called();
+}
+
 int
 __wrap_pqos_sysconfig_get(const struct pqos_sysconfig **sysconf)
 {

@@ -533,26 +533,33 @@ alloc_reset(const struct pqos_alloc_config *cfg)
         }
 
         /**
-         * Enable/disable MBA 4.0 extensions as requested
+         * Enable/disable MBA 4.0 extensions as requested, in every MBA
+         * domain whatever mba40_on says: the domains can differ, and the
+         * flag does not say which ones are which
          */
-        if (mba_cap != NULL) {
-                if (mba40_cfg == PQOS_FEATURE_ON && !mba_cap->mba40_on) {
+        if (mba_cap != NULL && mba_cap->mba40) {
+                if (mba40_cfg == PQOS_FEATURE_ON) {
                         LOG_INFO("Enabling MBA 4.0 extensions...\n");
                         ret = hw_alloc_reset_mba40(mba_id_num, mba_ids, 1);
                         if (ret != PQOS_RETVAL_OK) {
                                 LOG_ERROR("MBA 4.0 enable error!\n");
+                                /* some domains may have been written */
+                                _pqos_cap_mba40_refresh();
                                 goto pqos_alloc_reset_exit;
                         }
                 }
 
-                if (mba40_cfg == PQOS_FEATURE_OFF && mba_cap->mba40_on) {
+                if (mba40_cfg == PQOS_FEATURE_OFF) {
                         LOG_INFO("Disabling MBA 4.0 extensions...\n");
                         ret = hw_alloc_reset_mba40(mba_id_num, mba_ids, 0);
                         if (ret != PQOS_RETVAL_OK) {
                                 LOG_ERROR("MBA 4.0 disable error!\n");
+                                _pqos_cap_mba40_refresh();
                                 goto pqos_alloc_reset_exit;
                         }
                 }
+                /* every domain is now as asked, a mixed state included */
+                _pqos_cap_mba40_change(mba40_cfg);
         }
 
 pqos_alloc_reset_exit:

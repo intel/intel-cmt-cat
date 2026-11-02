@@ -138,6 +138,18 @@ hw_alloc_reset_assoc(void)
         return mock_type(int);
 }
 
+int
+hw_alloc_reset_mba40(const unsigned mba_ids_num,
+                     const unsigned *mba_ids,
+                     const int enable)
+{
+        check_expected(mba_ids_num);
+        check_expected(mba_ids);
+        check_expected(enable);
+
+        return mock_type(int);
+}
+
 /* ======== hw_l3ca_set ======== */
 
 static void
@@ -1750,6 +1762,148 @@ test_hw_alloc_reset_mba(void **state)
                 free(mba_ids);
 }
 
+/*
+ * A reset with \a mba40 asked of a platform with MBA 4.0 (\a supported) whose
+ * flag says \a on; \a applied is the enable the extensions are set with, or
+ * -1 where they are not to be touched
+ */
+static void
+_test_hw_alloc_reset_mba40(void **state,
+                           const unsigned supported,
+                           const int on,
+                           const enum pqos_feature_cfg mba40,
+                           const int applied,
+                           const int written)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned *mba_ids = NULL;
+        unsigned mba_id_num = 0;
+        unsigned i;
+        struct pqos_alloc_config cfg;
+
+        data->cap_mba.ctrl = 0;
+        data->cap_mba.mba40 = supported;
+        data->cap_mba.mba40_on = on;
+        mba_ids = pqos_cpu_get_mba_ids(data->cpu, &mba_id_num);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
+
+        for (i = 0; i < mba_id_num; ++i) {
+                unsigned coreid;
+
+                ret =
+                    pqos_cpu_get_one_by_mba_id(data->cpu, mba_ids[i], &coreid);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+
+                expect_value(hw_alloc_reset_clos, msr_start,
+                             data->config.mba_msr_reg);
+                expect_value(hw_alloc_reset_clos, msr_num,
+                             data->cap_mba.num_classes);
+                expect_value(hw_alloc_reset_clos, coreid, coreid);
+                expect_value(hw_alloc_reset_clos, msr_val,
+                             data->config.mba_default_val);
+                will_return(hw_alloc_reset_clos, PQOS_RETVAL_OK);
+        }
+
+        will_return(hw_alloc_reset_assoc, PQOS_RETVAL_OK);
+
+        /* every MBA domain, in the order the topology gives them */
+        if (applied != -1) {
+                expect_value(hw_alloc_reset_mba40, mba_ids_num, mba_id_num);
+                expect_memory(hw_alloc_reset_mba40, mba_ids, mba_ids,
+                              mba_id_num * sizeof(mba_ids[0]));
+                expect_value(hw_alloc_reset_mba40, enable, applied);
+                will_return(hw_alloc_reset_mba40, written);
+        }
+        /*
+         * and the state published as written, wherever MBA 4.0 is there, or
+         * read back where the write failed
+         */
+        if (written != PQOS_RETVAL_OK)
+                expect_function_call(__wrap__pqos_cap_mba40_refresh);
+        else if (supported)
+                expect_value(__wrap__pqos_cap_mba40_change, cfg, mba40);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.mba = PQOS_MBA_ANY;
+        cfg.mba40 = mba40;
+
+        ret = hw_alloc_reset(&cfg);
+        assert_int_equal(ret, written);
+
+        data->cap_mba.mba40 = 0;
+        data->cap_mba.mba40_on = 0;
+        free(mba_ids);
+}
+
+/* every domain is on already: a request to enable is applied all the same */
+static void
+test_hw_alloc_reset_mba40_on_applied_when_on(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, 1, PQOS_FEATURE_ON, 1,
+                                   PQOS_RETVAL_OK);
+}
+
+/* every domain is off already: a request to disable is applied all the same */
+static void
+test_hw_alloc_reset_mba40_off_applied_when_off(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, 0, PQOS_FEATURE_OFF, 0,
+                                   PQOS_RETVAL_OK);
+}
+
+/* some domains on and some off: a request either way is applied to all */
+static void
+test_hw_alloc_reset_mba40_on_applied_when_mixed(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, -1, PQOS_FEATURE_ON, 1,
+                                   PQOS_RETVAL_OK);
+}
+
+static void
+test_hw_alloc_reset_mba40_off_applied_when_mixed(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, -1, PQOS_FEATURE_OFF, 0,
+                                   PQOS_RETVAL_OK);
+}
+
+/*
+ * a write that fails after some domains, or none, have been written: the
+ * state is read back rather than published as asked
+ */
+static void
+test_hw_alloc_reset_mba40_on_fails_reads_back(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, 0, PQOS_FEATURE_ON, 1,
+                                   PQOS_RETVAL_ERROR);
+}
+
+static void
+test_hw_alloc_reset_mba40_off_fails_reads_back(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, 1, PQOS_FEATURE_OFF, 0,
+                                   PQOS_RETVAL_ERROR);
+}
+
+/* without MBA 4.0 a request to disable it leaves MBA_CFG alone */
+static void
+test_hw_alloc_reset_mba40_off_unsupported(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 0, 0, PQOS_FEATURE_OFF, -1,
+                                   PQOS_RETVAL_OK);
+}
+
+/* no request, no change */
+static void
+test_hw_alloc_reset_mba40_any(void **state)
+{
+        _test_hw_alloc_reset_mba40(state, 1, 1, PQOS_FEATURE_ANY, -1,
+                                   PQOS_RETVAL_OK);
+}
+
 int
 main(void)
 {
@@ -1804,6 +1958,14 @@ main(void)
             cmocka_unit_test(test_hw_alloc_reset_unsupported_l2ca),
             cmocka_unit_test(test_hw_alloc_reset_unsupported_mba_ctrl),
             cmocka_unit_test(test_hw_alloc_reset_mba),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_on_applied_when_on),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_off_applied_when_off),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_on_applied_when_mixed),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_off_applied_when_mixed),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_on_fails_reads_back),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_off_fails_reads_back),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_off_unsupported),
+            cmocka_unit_test(test_hw_alloc_reset_mba40_any),
             cmocka_unit_test(test_hw_mba_set),
             cmocka_unit_test(test_hw_mba_set_actual),
             cmocka_unit_test(test_hw_mba_set_non_linear),

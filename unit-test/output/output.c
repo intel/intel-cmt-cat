@@ -224,6 +224,24 @@ __wrap_printf(const char *format_string, ...)
         return str_len;
 }
 
+/**
+ * @brief Captures what the utility prints through a va_list, as printf()
+ */
+int
+__wrap_vprintf(const char *format_string, va_list args)
+{
+        int str_len = 0;
+        char *tmp_buff = NULL;
+
+        if (grab_in_progress) {
+                str_len = vasprintf(&tmp_buff, format_string, args);
+                append_to_buffer(tmp_buff, str_len);
+        }
+        if (tmp_buff != NULL)
+                free(tmp_buff);
+        return str_len;
+}
+
 int __real_fprintf(FILE *stream, const char *format_string, ...);
 
 /**

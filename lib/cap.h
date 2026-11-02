@@ -96,6 +96,27 @@ PQOS_LOCAL void _pqos_cap_smba_change(const enum pqos_mba_config cfg);
 PQOS_LOCAL void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 
 /**
+ * @brief Modifies MBA capability structure upon MBA 4.0 config change
+ *
+ * With ON or OFF, for a reset that wrote every MBA domain as \a cfg asks, so
+ * the state is the same in all of them. With ANY nothing was written, and the
+ * state is left as it is, a mixed one included. It is up to caller to check
+ * for MBA 4.0 support.
+ *
+ * @param [in] cfg MBA 4.0 configuration
+ */
+PQOS_LOCAL void _pqos_cap_mba40_change(const enum pqos_feature_cfg cfg);
+
+/**
+ * @brief Reads the MBA 4.0 state back into the MBA capability structure
+ *
+ * For a reset that failed after writing MBA_CFG in some MBA domains, or in
+ * none: the state is read from every domain. Where it cannot be read, it is
+ * left as it was, and a warning says so.
+ */
+PQOS_LOCAL void _pqos_cap_mba40_refresh(void);
+
+/**
  * @brief Modifies Mon I/O RDT capability structure upon I/O RDT config change
  *
  * Limited error checks done in this function and no errors reported.

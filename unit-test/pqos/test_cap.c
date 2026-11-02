@@ -836,6 +836,70 @@ test_cap_print_region_devices_without_a_capacity(void **state)
         assert_int_equal(output_has_text("RAM 0x"), 0);
 }
 
+/* ======== cap_print_features: MBA 4.0 ======== */
+
+/*
+ * The MBA 4.0 line of a verbose capability report, for MBA 4.0 extensions
+ * supported and on as \a on says: 1 in every MBA domain, 0 in none, -1 in some
+ */
+static void
+_test_cap_print_mba40(const int on, const char *status)
+{
+        struct pqos_cap_mba mba = {.num_classes = 15,
+                                   .throttle_max = 90,
+                                   .throttle_step = 10,
+                                   .is_linear = 1,
+                                   .ctrl = -1,
+                                   .mba40 = 1,
+                                   .mba40_on = on};
+        union {
+                struct pqos_cap cap;
+                char reserved[sizeof(struct pqos_cap) +
+                              sizeof(struct pqos_capability)];
+        } caps;
+        struct pqos_cpuinfo cpu;
+        struct pqos_sysconfig sys = {.cap = &caps.cap, .cpu = &cpu};
+
+        memset(&caps, 0, sizeof(caps));
+        memset(&cpu, 0, sizeof(cpu));
+        caps.cap.num_cap = 1;
+        caps.cap.capabilities[0].type = PQOS_CAP_TYPE_MBA;
+        caps.cap.capabilities[0].u.mba = &mba;
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MSR);
+
+        run_void_function(cap_print_features, &sys, 1);
+
+        assert_int_equal(output_has_text("MBA 4.0 extensions: %s\n", status),
+                         1);
+}
+
+static void
+test_cap_print_mba40_enabled(void **state)
+{
+        UNUSED_ARG(state);
+
+        _test_cap_print_mba40(1, "enabled");
+}
+
+static void
+test_cap_print_mba40_disabled(void **state)
+{
+        UNUSED_ARG(state);
+
+        _test_cap_print_mba40(0, "disabled");
+}
+
+/* the domains differ: neither enabled nor disabled is true of the platform */
+static void
+test_cap_print_mba40_in_some_domains(void **state)
+{
+        UNUSED_ARG(state);
+
+        _test_cap_print_mba40(-1, "enabled in some MBA domains only");
+}
+
 int
 main(void)
 {
@@ -879,8 +943,14 @@ main(void)
                                          test_cap_group_setup, NULL);
         result += cmocka_run_group_tests(tests_print_region_cache,
                                          test_cap_group_setup, NULL);
+        const struct CMUnitTest tests_print_mba40[] = {
+            cmocka_unit_test(test_cap_print_mba40_enabled),
+            cmocka_unit_test(test_cap_print_mba40_disabled),
+            cmocka_unit_test(test_cap_print_mba40_in_some_domains)};
+
         result += cmocka_run_group_tests(tests_print_region_devices,
                                          test_cap_group_setup, NULL);
+        result += cmocka_run_group_tests(tests_print_mba40, NULL, NULL);
 
         return result;
 }

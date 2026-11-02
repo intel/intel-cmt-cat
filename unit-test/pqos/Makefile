@@ -236,6 +236,7 @@ $(BIN_DIR)/test_cap: ./test_cap.c $(PQOS_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=puts \
 		-Wl,--wrap=printf \
+		-Wl,--wrap=vprintf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
 		-Wl,--wrap=pqos_inter_get \

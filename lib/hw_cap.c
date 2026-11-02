@@ -1175,6 +1175,55 @@ detect_mba40(const struct pqos_cpuinfo *cpu, unsigned *supported)
 }
 
 int
+hw_cap_mba40_on(const struct pqos_cpuinfo *cpu, int *enabled)
+{
+        unsigned *mba_ids = NULL;
+        unsigned mba_id_num = 0;
+        unsigned on_num = 0;
+        unsigned i;
+        int ret = PQOS_RETVAL_OK;
+
+        if (enabled == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+        if (mba_ids == NULL || mba_id_num == 0) {
+                free(mba_ids);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        for (i = 0; i < mba_id_num; i++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        break;
+
+                if (msr_read(core, PQOS_MSR_MBA_CFG, &reg) !=
+                    MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                }
+
+                if (reg & PQOS_MSR_MBA_CFG_MBA40_EN)
+                        on_num++;
+        }
+
+        if (ret == PQOS_RETVAL_OK) {
+                if (on_num == mba_id_num)
+                        *enabled = 1;
+                else if (on_num == 0)
+                        *enabled = 0;
+                else
+                        *enabled = -1;
+        }
+
+        free(mba_ids);
+        return ret;
+}
+
+int
 hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
@@ -1261,6 +1310,7 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         if ((version == 2) || (version == 4)) {
                 unsigned *mba_ids;
                 unsigned mba_id_num;
+                unsigned mba40_on_num = 0;
                 unsigned i;
 
                 /* mba ids */
@@ -1290,21 +1340,40 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
                                     mba_ids[i]);
 
                         if (version >= 4) {
-                                if (reg & PQOS_MSR_MBA_CFG_MBA40_EN)
-                                        cap->mba40_on = 1;
-                                else
-                                        cap->mba40_on = 0;
+                                const int on =
+                                    (reg & PQOS_MSR_MBA_CFG_MBA40_EN) != 0;
 
-                                LOG_INFO(
-                                    "MBA 4.0 extensions %s for socket %u\n",
-                                    cap->mba40_on ? "enabled" : "disabled",
-                                    mba_ids[i]);
+                                if (on)
+                                        mba40_on_num++;
+
+                                LOG_INFO("MBA 4.0 extensions %s for MBA "
+                                         "domain %u\n",
+                                         on ? "enabled" : "disabled",
+                                         mba_ids[i]);
                         }
 
                         if (!mba_thread_ctrl)
                                 LOG_INFO("%s MBA delay enabled on socket %u\n",
                                          (reg & 0x1) ? "Min" : "Max",
                                          mba_ids[i]);
+                }
+
+                /*
+                 * MBA 4.0 is on where every MBA domain has it on, off where
+                 * none has, and -1 where some have, as a reset that failed
+                 * half-way leaves them
+                 */
+                if (ret == PQOS_RETVAL_OK && version >= 4) {
+                        if (mba40_on_num == mba_id_num)
+                                cap->mba40_on = 1;
+                        else if (mba40_on_num == 0)
+                                cap->mba40_on = 0;
+                        else {
+                                cap->mba40_on = -1;
+                                LOG_WARN("MBA 4.0 extensions are enabled in "
+                                         "%u of %u MBA domains\n",
+                                         mba40_on_num, mba_id_num);
+                        }
                 }
 
                 free(mba_ids);

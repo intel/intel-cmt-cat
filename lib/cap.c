@@ -1582,6 +1582,58 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 }
 
 void
+_pqos_cap_mba40_change(const enum pqos_feature_cfg cfg)
+{
+        struct pqos_cap_mba *mba_cap = NULL;
+        unsigned i;
+
+        ASSERT(cfg == PQOS_FEATURE_ON || cfg == PQOS_FEATURE_OFF ||
+               cfg == PQOS_FEATURE_ANY);
+        ASSERT(m_sysconf.cap != NULL);
+
+        if (m_sysconf.cap == NULL)
+                return;
+
+        for (i = 0; i < m_sysconf.cap->num_cap && mba_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                        mba_cap = m_sysconf.cap->capabilities[i].u.mba;
+
+        if (mba_cap == NULL)
+                return;
+
+        if (cfg == PQOS_FEATURE_ON)
+                mba_cap->mba40_on = 1;
+        else if (cfg == PQOS_FEATURE_OFF)
+                mba_cap->mba40_on = 0;
+}
+
+void
+_pqos_cap_mba40_refresh(void)
+{
+        struct pqos_cap_mba *mba_cap = NULL;
+        unsigned i;
+        int enabled = 0;
+
+        ASSERT(m_sysconf.cap != NULL);
+
+        if (m_sysconf.cap == NULL)
+                return;
+
+        for (i = 0; i < m_sysconf.cap->num_cap && mba_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                        mba_cap = m_sysconf.cap->capabilities[i].u.mba;
+
+        if (mba_cap == NULL || !mba_cap->mba40)
+                return;
+
+        if (hw_cap_mba40_on(m_sysconf.cpu, &enabled) == PQOS_RETVAL_OK)
+                mba_cap->mba40_on = enabled;
+        else
+                LOG_WARN("MBA 4.0 state cannot be read back: the one "
+                         "reported may not be the platform's\n");
+}
+
+void
 _pqos_cap_mon_iordt_change(const enum pqos_iordt_config iordt)
 {
         struct pqos_cap_mon *mon_cap = NULL;

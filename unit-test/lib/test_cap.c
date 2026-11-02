@@ -725,6 +725,82 @@ test__pqos_cap_mba_change(void **state __attribute__((unused)))
         _pqos_cap_mba_change(PQOS_MBA_CTRL);
 }
 
+/* ======== _pqos_cap_mba40_change ======== */
+
+/* a reset wrote every MBA domain as asked: the state reads the same in all */
+static void
+test__pqos_cap_mba40_change(void **state __attribute__((unused)))
+{
+        const struct pqos_capability *item = NULL;
+        struct pqos_cap_mba *mba;
+
+        assert_int_equal(
+            pqos_cap_get_type(__real__pqos_get_cap(), PQOS_CAP_TYPE_MBA, &item),
+            PQOS_RETVAL_OK);
+        mba = item->u.mba;
+
+        mba->mba40_on = -1;
+        _pqos_cap_mba40_change(PQOS_FEATURE_ON);
+        assert_int_equal(mba->mba40_on, 1);
+
+        mba->mba40_on = -1;
+        _pqos_cap_mba40_change(PQOS_FEATURE_OFF);
+        assert_int_equal(mba->mba40_on, 0);
+
+        mba->mba40_on = -1;
+        _pqos_cap_mba40_change(PQOS_FEATURE_ANY);
+        assert_int_equal(mba->mba40_on, -1);
+
+        mba->mba40_on = 0;
+}
+
+/* ======== _pqos_cap_mba40_refresh ======== */
+
+int
+__wrap_hw_cap_mba40_on(const struct pqos_cpuinfo *cpu __attribute__((unused)),
+                       int *enabled)
+{
+        int ret = mock_type(int);
+
+        if (ret == PQOS_RETVAL_OK)
+                *enabled = mock_type(int);
+        return ret;
+}
+
+/* a reset that failed half way: the state is read back from the domains */
+static void
+test__pqos_cap_mba40_refresh(void **state __attribute__((unused)))
+{
+        const struct pqos_capability *item = NULL;
+        struct pqos_cap_mba *mba;
+
+        assert_int_equal(
+            pqos_cap_get_type(__real__pqos_get_cap(), PQOS_CAP_TYPE_MBA, &item),
+            PQOS_RETVAL_OK);
+        mba = item->u.mba;
+        mba->mba40 = 1;
+
+        mba->mba40_on = 1;
+        will_return(__wrap_hw_cap_mba40_on, PQOS_RETVAL_OK);
+        will_return(__wrap_hw_cap_mba40_on, -1);
+        _pqos_cap_mba40_refresh();
+        assert_int_equal(mba->mba40_on, -1);
+
+        /* where it cannot be read, it is left and a warning says so */
+        will_return(__wrap_hw_cap_mba40_on, PQOS_RETVAL_ERROR);
+        test_log_count_start();
+        _pqos_cap_mba40_refresh();
+        assert_int_equal(test_log_count_stop(), 1);
+        assert_int_equal(mba->mba40_on, -1);
+
+        /* without MBA 4.0 there is nothing to read */
+        mba->mba40 = 0;
+        _pqos_cap_mba40_refresh();
+        assert_int_equal(mba->mba40_on, -1);
+
+        mba->mba40_on = 0;
+}
+
 int
 main(void)
 {
@@ -754,6 +830,8 @@ main(void)
             cmocka_unit_test(test__pqos_cap_l2cdp_change_os_resctrl_mon),
 #endif
             cmocka_unit_test(test__pqos_cap_mba_change),
+            cmocka_unit_test(test__pqos_cap_mba40_change),
+            cmocka_unit_test(test__pqos_cap_mba40_refresh),
             cmocka_unit_test(test_pqos_fini),
         };
 
