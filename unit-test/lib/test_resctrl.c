@@ -48,11 +48,15 @@
 /* ======== mock ======== */
 
 /* the directory the resctrl lock opens in place of RESCTRL_PATH, which the
- * lock's cases make; NULL outside them. A case can have that open fail with
- * lock_open_errno instead
+ * lock's cases make; NULL outside them, and the opens of it, counted. A case
+ * can have that open fail with lock_open_errno instead, or have the opening
+ * thread ask for its own cancellation there, as one asked for once the lock
+ * has started would be
  */
 static char *lock_dir;
+static unsigned lock_opens;
 static int lock_open_errno;
+static int lock_cancel_in_open;
 
 int
 __wrap_open(const char *path, int flags, ...)
@@ -67,10 +71,14 @@ __wrap_open(const char *path, int flags, ...)
                 va_end(ap);
         }
         if (lock_dir != NULL && strcmp(path, RESCTRL_PATH) == 0) {
+                __atomic_add_fetch(&lock_opens, 1, __ATOMIC_SEQ_CST);
                 if (lock_open_errno != 0) {
                         errno = lock_open_errno;
                         return -1;
                 }
+                if (__atomic_exchange_n(&lock_cancel_in_open, 0,
+                                        __ATOMIC_SEQ_CST))
+                        (void)pthread_cancel(pthread_self());
                 path = lock_dir;
         }
 
@@ -123,8 +131,8 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
 /* the lock's looks at the clock: a case can have the next one, or the one
  * after it, fail with EINVAL, which no clock the library reads ever does; or
  * freeze the clock, so that the wait cannot time out however late its thread
- * runs. CLOCK_MONOTONIC's alone are counted: the watchdog reads
- * CLOCK_REALTIME
+ * runs. CLOCK_MONOTONIC's alone are counted, and the watchdog reads the
+ * clock past the wrap, through __real_clock_gettime()
  */
 static unsigned lock_clock_fails_in;
 static int lock_clock_frozen;
@@ -518,7 +526,9 @@ lock_setup(void **state __attribute__((unused)))
         lock_cancel_in_sleep = 0;
         lock_clock_fails_in = 0;
         lock_clock_frozen = 0;
+        lock_opens = 0;
         lock_open_errno = 0;
+        lock_cancel_in_open = 0;
 
         return lock_dir == NULL ? -1 : 0;
 }
@@ -558,7 +568,10 @@ lock_ms_since(const struct timespec *start)
 
 /* A watchdog over a case that expects the lock to time out on a holder: it
  * gives the holder's lock up after 2 s, so that a lock that waits without end,
- * as a blocking flock() would, fails the case rather than hanging the binary
+ * as a blocking flock() would, fails the case rather than hanging the binary.
+ * The 2 s are on CLOCK_MONOTONIC, read past the case's wrap of the clock: a
+ * step of the wall clock neither fires it early nor holds it up, and a clock
+ * a case freezes or fails is not the watchdog's
  */
 struct lock_watchdog {
         pthread_t thread;
@@ -575,7 +588,7 @@ lock_watchdog_run(void *arg)
         struct lock_watchdog *watchdog = arg;
         struct timespec until;
 
-        (void)clock_gettime(CLOCK_REALTIME, &until);
+        (void)__real_clock_gettime(CLOCK_MONOTONIC, &until);
         until.tv_sec += 2;
         (void)pthread_mutex_lock(&watchdog->mutex);
         while (!watchdog->stop)
@@ -593,10 +606,15 @@ lock_watchdog_run(void *arg)
 static void
 lock_watchdog_start(struct lock_watchdog *watchdog, const int holder)
 {
+        pthread_condattr_t attr;
+
         memset(watchdog, 0, sizeof(*watchdog));
         watchdog->holder = holder;
         assert_int_equal(pthread_mutex_init(&watchdog->mutex, NULL), 0);
-        assert_int_equal(pthread_cond_init(&watchdog->cond, NULL), 0);
+        assert_int_equal(pthread_condattr_init(&attr), 0);
+        assert_int_equal(pthread_condattr_setclock(&attr, CLOCK_MONOTONIC), 0);
+        assert_int_equal(pthread_cond_init(&watchdog->cond, &attr), 0);
+        (void)pthread_condattr_destroy(&attr);
         assert_int_equal(pthread_create(&watchdog->thread, NULL,
                                         lock_watchdog_run, watchdog),
                          0);
@@ -615,6 +633,26 @@ lock_watchdog_stop(struct lock_watchdog *watchdog)
         (void)pthread_mutex_destroy(&watchdog->mutex);
 
         return watchdog->fired;
+}
+
+/* runs \a worker in a thread of its own and waits for it to end, giving what it
+ * returned in \a result
+ *
+ * @return pthread_create()'s or pthread_join()'s status, for the case to assert
+ *         on once its watchdog is stopped: a failed assertion leaves the case
+ *         at once, and a watchdog left running would go on using the case's
+ *         stack after it
+ */
+static int
+lock_run_worker(void *(*worker)(void *), void **result)
+{
+        pthread_t thread;
+        int err = pthread_create(&thread, NULL, worker, NULL);
+
+        if (err == 0)
+                err = pthread_join(thread, result);
+
+        return err;
 }
 
 /* the descriptors the process has open */
@@ -889,23 +927,22 @@ test_resctrl_lock_cancelled_in_the_wait(void **state __attribute__((unused)))
         const int holder = lock_hold(LOCK_EX);
         const unsigned fds = lock_open_fds();
         struct lock_watchdog watchdog;
-        pthread_t worker;
         void *result = NULL;
         unsigned fds_after;
         int fired;
+        int ran;
 
         lock_cancelled_ret = -1;
         __atomic_store_n(&lock_cancel_in_sleep, 1, __ATOMIC_SEQ_CST);
         lock_watchdog_start(&watchdog, holder);
         test_log_count_start();
-        assert_int_equal(
-            pthread_create(&worker, NULL, lock_cancelled_worker, NULL), 0);
-        assert_int_equal(pthread_join(worker, &result), 0);
+        ran = lock_run_worker(lock_cancelled_worker, &result);
         (void)test_log_count_stop();
         fired = lock_watchdog_stop(&watchdog);
         fds_after = lock_open_fds();
         close(holder);
 
+        assert_int_equal(ran, 0);
         assert_false(fired);
         assert_ptr_equal(result, PTHREAD_CANCELED);
         assert_int_equal(lock_cancelled_ret, PQOS_RETVAL_ERROR);
@@ -949,24 +986,23 @@ test_resctrl_lock_failure_logged_cancellable(void **state
         const int holder = lock_hold(LOCK_EX);
         const unsigned fds = lock_open_fds();
         struct lock_watchdog watchdog;
-        pthread_t worker;
         void *result = NULL;
         unsigned fds_after;
         int fired;
+        int ran;
 
         lock_cancelled_ret = -1;
         lock_log_found_cancellable = -1;
         __atomic_store_n(&lock_cancel_in_sleep, 1, __ATOMIC_SEQ_CST);
         lock_watchdog_start(&watchdog, holder);
         (void)log_init(-1, lock_log_cancellation_point, NULL, LOG_VER_DEFAULT);
-        assert_int_equal(
-            pthread_create(&worker, NULL, lock_cancelled_worker, NULL), 0);
-        assert_int_equal(pthread_join(worker, &result), 0);
+        ran = lock_run_worker(lock_cancelled_worker, &result);
         test_log_init_silent();
         fired = lock_watchdog_stop(&watchdog);
         fds_after = lock_open_fds();
         close(holder);
 
+        assert_int_equal(ran, 0);
         assert_false(fired);
         assert_ptr_equal(result, PTHREAD_CANCELED);
         assert_int_equal(lock_log_found_cancellable, 1);
@@ -1009,19 +1045,84 @@ test_resctrl_lock_cancelled_before_the_call(void **state
                                             __attribute__((unused)))
 {
         const unsigned fds = lock_open_fds();
-        pthread_t worker;
         void *result = NULL;
 
         lock_cancelled_ret = -1;
-        assert_int_equal(
-            pthread_create(&worker, NULL, lock_cancelled_before_worker, NULL),
-            0);
-        assert_int_equal(pthread_join(worker, &result), 0);
+        assert_int_equal(lock_run_worker(lock_cancelled_before_worker, &result),
+                         0);
 
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_cancelled_ret, -1);
+        assert_int_equal(lock_opens, 0);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_true(lock_free_now());
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* a cancellation asked for once the lock has started, here as its descriptor
+ * is opened, with the lock free, is acted on before the lock is handed over,
+ * with the lock given up: acted on at the caller's next cancellation point, it
+ * would leave the lock held and the descriptor open, with nothing to give
+ * them up, and the next lock waiting out its timeout on them
+ */
+static void
+test_resctrl_lock_cancelled_as_it_is_taken(void **state __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        void *result = NULL;
+        int ran;
+
+        lock_cancelled_ret = -1;
+        __atomic_store_n(&lock_cancel_in_open, 1, __ATOMIC_SEQ_CST);
+        ran = lock_run_worker(lock_cancelled_worker, &result);
+        __atomic_store_n(&lock_cancel_in_open, 0, __ATOMIC_SEQ_CST);
+
+        assert_int_equal(ran, 0);
         assert_ptr_equal(result, PTHREAD_CANCELED);
         assert_int_equal(lock_cancelled_ret, -1);
         assert_int_equal(lock_open_fds(), fds);
         assert_true(lock_free_now());
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* and so is one asked for in the wait, in its first sleep, in which the holder
+ * gives the lock up, so that the try after the sleep takes it
+ */
+static void
+test_resctrl_lock_cancelled_in_the_wait_then_taken(void **state
+                                                   __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_EX);
+        const unsigned fds = lock_open_fds();
+        struct lock_watchdog watchdog;
+        void *result = NULL;
+        unsigned fds_after;
+        int free_after;
+        int fired;
+        int ran;
+
+        lock_cancelled_ret = -1;
+        lock_released_holder = holder;
+        __atomic_store_n(&lock_cancel_in_sleep, 1, __ATOMIC_SEQ_CST);
+        lock_watchdog_start(&watchdog, holder);
+        ran = lock_run_worker(lock_cancelled_worker, &result);
+        fired = lock_watchdog_stop(&watchdog);
+        fds_after = lock_open_fds();
+        free_after = lock_free_now();
+        lock_released_holder = -1;
+        close(holder);
+
+        assert_int_equal(ran, 0);
+        assert_false(fired);
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_cancelled_ret, -1);
+        assert_int_equal(lock_sleeps, 1);
+        assert_int_equal(fds_after, fds);
+        assert_true(free_after);
 
         assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
@@ -1129,6 +1230,12 @@ main(void)
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_cancelled_before_the_call, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_as_it_is_taken, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_in_the_wait_then_taken, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(test_resctrl_lock_open_failure,
                                             lock_setup, lock_teardown),

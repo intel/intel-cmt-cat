@@ -109,6 +109,41 @@ resctrl_lock_try(const int fd, const int type)
 }
 
 /**
+ * @brief Gives the resctrl lock up, for a thread cancelled as
+ *        resctrl_lock() hands it over
+ *
+ * @param [in] arg unused
+ */
+static void
+resctrl_lock_cancelled(void *arg)
+{
+        UNUSED_PARAM(arg);
+
+        (void)flock(resctrl_lock_fd, LOCK_UN);
+        close(resctrl_lock_fd);
+        resctrl_lock_fd = -1;
+}
+
+/**
+ * @brief Acts on a cancellation asked for while the lock was being taken,
+ *        with the lock given up
+ *
+ * The thread's cancellation was off from before the open until the lock was
+ * held, so one asked for meanwhile is pending. Acted on at the caller's next
+ * cancellation point, it would leave the lock held and its descriptor open,
+ * with nothing to give either up: the API lock's destructor gives the API
+ * lock back alone, and the next lock would wait out its timeout on this one.
+ * On its own, so that the handler's scope holds nothing else.
+ */
+static void
+resctrl_lock_handed_over(void)
+{
+        pthread_cleanup_push(resctrl_lock_cancelled, NULL);
+        pthread_testcancel();
+        pthread_cleanup_pop(0);
+}
+
+/**
  * @brief Obtain lock on resctrl filesystem
  *
  * Gives another holder 100 ms to give the lock up, as resctrl_lock_try()
@@ -118,9 +153,10 @@ resctrl_lock_try(const int fd, const int type)
  * closed: one acted on in a sleep of the wait would leave the descriptor open
  * with nothing to close it. It is put back before a failure is logged, since
  * a log written to a pipe, or a callback, can block, and a thread that cannot
- * be cancelled there would keep the API lock. A cancellation asked for during
- * the wait is acted on at the next cancellation point after it: in that log,
- * or in the caller.
+ * be cancelled there would keep the API lock. A cancellation asked for since
+ * the start is acted on as the wait ends: in that log, or, where the lock was
+ * taken, before it is handed over, with the lock given up - see
+ * resctrl_lock_handed_over().
  *
  * @param[in] type lock type
  *
@@ -152,8 +188,10 @@ resctrl_lock(const int type)
                 resctrl_lock_fd = -1;
         }
         (void)pthread_setcancelstate(state, &state);
-        if (err == 0)
+        if (err == 0) {
+                resctrl_lock_handed_over();
                 return PQOS_RETVAL_OK;
+        }
 
         if (err == ETIMEDOUT)
                 LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
