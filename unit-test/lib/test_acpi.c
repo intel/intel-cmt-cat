@@ -36,6 +36,9 @@
 #include "acpi_table.h"
 #include "test.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
+
 /* clang-format off */
 uint8_t __irdt_hal[] = {
     /* acpi_table_irdt instance 1 */
@@ -345,6 +348,153 @@ test_acpi_get_irdt_dev_invalid_len(void **state __attribute__((unused)))
         assert_int_equal(num, 0);
 }
 
+/* A DSS or an RCS whose length is under its fields fails the list, as one
+ * under the entry header does; a DSS of its fields and no CHMS is taken
+ */
+static void
+test_acpi_get_irdt_dev_short_dss_rcs(void **state __attribute__((unused)))
+{
+        uint8_t buf[128];
+        struct acpi_table_irdt_rmud *rmud = (struct acpi_table_irdt_rmud *)buf;
+        struct acpi_table_irdt_device **devs = NULL;
+        struct acpi_table_irdt_device *dev = rmud->device;
+        const uint16_t hdr_len = sizeof(dev->type) + sizeof(dev->length);
+        const uint16_t dss_len = hdr_len + sizeof(dev->dss);
+        const uint16_t rcs_len = hdr_len + sizeof(dev->rcs);
+        size_t num = 0;
+
+        /* a DSS one byte short of its fields */
+        memset(buf, 0, sizeof(buf));
+        rmud->length = sizeof(*rmud) + dss_len - 1;
+        dev->type = ACPI_TABLE_IRDT_TYPE_DSS;
+        dev->length = dss_len - 1;
+
+        expect_function_call(__wrap_free);
+        expect_value(__wrap_free, ptr, NULL);
+
+        devs = acpi_get_irdt_dev(rmud, &num);
+        assert_null(devs);
+        assert_int_equal(num, 0);
+
+        /* a DSS of its fields alone */
+        memset(buf, 0, sizeof(buf));
+        rmud->length = sizeof(*rmud) + dss_len;
+        dev->type = ACPI_TABLE_IRDT_TYPE_DSS;
+        dev->length = dss_len;
+
+        devs = acpi_get_irdt_dev(rmud, &num);
+        assert_non_null(devs);
+        assert_int_equal(num, 1);
+        assert_ptr_equal(devs[0], dev);
+
+        expect_function_call(__wrap_free);
+        expect_value(__wrap_free, ptr, devs);
+        free(devs);
+
+        /* a whole DSS, then an RCS one byte short of its fields */
+        memset(buf, 0, sizeof(buf));
+        rmud->length = sizeof(*rmud) + dss_len + rcs_len - 1;
+        dev->type = ACPI_TABLE_IRDT_TYPE_DSS;
+        dev->length = dss_len;
+        dev = (struct acpi_table_irdt_device *)((uint8_t *)dev + dss_len);
+        dev->type = ACPI_TABLE_IRDT_TYPE_RCS;
+        dev->length = rcs_len - 1;
+
+        expect_function_call(__wrap_free);
+        expect_any(__wrap_free, ptr);
+
+        devs = acpi_get_irdt_dev(rmud, &num);
+        assert_null(devs);
+        assert_int_equal(num, 0);
+}
+
+/* \a len bytes that end where a page with no access allowed to it begins, so
+ * that a read past them faults; the mapping's start is given in \a map
+ */
+static uint8_t *
+guarded(const size_t len, uint8_t **map)
+{
+        const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+        uint8_t *p = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+        assert_true(p != MAP_FAILED);
+        assert_int_equal(mprotect(p + page, page, PROT_NONE), 0);
+        *map = p;
+
+        return p + page - len;
+}
+
+static void
+unguard(uint8_t *map)
+{
+        const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+
+        assert_int_equal(__real_munmap(map, 2 * page), 0);
+}
+
+/* An IRDT too short for its protocol flags, or for the rest of its fixed
+ * fields: only its header is printed, and nothing past it is read
+ */
+static void
+test_acpi_print_short_irdt(void **state __attribute__((unused)))
+{
+        const size_t lens[] = {sizeof(struct acpi_table_header) + 1,
+                               sizeof(struct acpi_table_header) + 3,
+                               sizeof(struct acpi_table_irdt) - 1};
+        size_t i;
+
+        for (i = 0; i < sizeof(lens) / sizeof(lens[0]); i++) {
+                struct acpi_table table;
+                uint8_t *map;
+                struct acpi_table_header *header =
+                    (struct acpi_table_header *)guarded(lens[i], &map);
+
+                memcpy(header->signature, "IRDT", 4);
+                header->length = (uint32_t)lens[i];
+                table.header = header;
+
+                acpi_print(&table);
+
+                unguard(map);
+        }
+}
+
+/* An IRDT whole in its fixed fields, whose RMUD holds an RCS of its header
+ * alone: the RCS is not printed, so nothing past the table is read
+ */
+static void
+test_acpi_print_irdt_short_rcs(void **state __attribute__((unused)))
+{
+        const size_t dev_len = 4;
+        const size_t len = sizeof(struct acpi_table_irdt) +
+                           sizeof(struct acpi_table_irdt_rmud) + dev_len;
+        struct acpi_table table;
+        uint8_t *map;
+        struct acpi_table_irdt *irdt =
+            (struct acpi_table_irdt *)guarded(len, &map);
+        struct acpi_table_irdt_rmud *rmud = irdt->rmud;
+
+        memset(irdt, 0, len);
+        memcpy(irdt->header.signature, "IRDT", 4);
+        irdt->header.length = (uint32_t)len;
+        rmud->type = ACPI_TABLE_IRDT_TYPE_RMUD;
+        rmud->length = sizeof(*rmud) + dev_len;
+        rmud->device[0].type = ACPI_TABLE_IRDT_TYPE_RCS;
+        rmud->device[0].length = dev_len;
+        table.irdt = irdt;
+
+        /* the device list given up, then the RMUD list acpi_print() made */
+        expect_function_call(__wrap_free);
+        expect_value(__wrap_free, ptr, NULL);
+        expect_function_call(__wrap_free);
+        expect_any(__wrap_free, ptr);
+
+        acpi_print(&table);
+
+        unguard(map);
+}
+
 static void
 test_acpi_get_irdt_chms(void **state __attribute__((unused)))
 {
@@ -448,6 +598,9 @@ main(void)
             cmocka_unit_test(test_acpi_get_irdt_rmud_invalid_len),
             cmocka_unit_test(test_acpi_get_irdt_dev),
             cmocka_unit_test(test_acpi_get_irdt_dev_invalid_len),
+            cmocka_unit_test(test_acpi_get_irdt_dev_short_dss_rcs),
+            cmocka_unit_test(test_acpi_print_short_irdt),
+            cmocka_unit_test(test_acpi_print_irdt_short_rcs),
             cmocka_unit_test(test_acpi_get_irdt_chms),
             cmocka_unit_test(
 

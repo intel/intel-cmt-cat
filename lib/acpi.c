@@ -647,6 +647,19 @@ acpi_get_irdt_dev(struct acpi_table_irdt_rmud *rmud, size_t *num)
                         return NULL;
                 }
 
+                /* a DSS or an RCS too short for its fields would be read
+                 * past its end by the printing and the parsing of it alike
+                 */
+                if ((dev->type == ACPI_TABLE_IRDT_TYPE_DSS &&
+                     dev->length < dev_hdr_len + sizeof(dev->dss)) ||
+                    (dev->type == ACPI_TABLE_IRDT_TYPE_RCS &&
+                     dev->length < dev_hdr_len + sizeof(dev->rcs))) {
+                        LOG_ERROR("Invalid DEV len!\n");
+                        free(devs);
+                        *num = 0;
+                        return NULL;
+                }
+
                 (*num)++;
 
                 struct acpi_table_irdt_device **devs_tmp =
@@ -939,7 +952,8 @@ acpi_print(struct acpi_table *table)
                                   (unsigned long long)table->rsdt->entry[i]);
         }
 
-        if (memcmp("IRDT", table->header->signature, 4) == 0) {
+        if (memcmp("IRDT", table->header->signature, 4) == 0 &&
+            table->header->length >= sizeof(struct acpi_table_irdt)) {
                 uint16_t flags = table->irdt->io_protocol_flags;
 
                 LOG_DEBUG("IO Proto Flags:    %#X:%s%s%s\n", flags,

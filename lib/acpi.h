@@ -186,10 +186,13 @@ acpi_get_irdt_rmud(struct acpi_table_irdt *irdt, size_t *num);
 /**
  * @brief Get DEVICEs from RMUD table
  *
+ * A DSS or an RCS shorter than its fields fails the whole list, as an entry
+ * shorter than its header does.
+ *
  * @param rmud RMUD table
  * @param num number of extracted DEVICEs
  *
- * @return array of extracted DEVICEs (DSS and/or RCS)
+ * @return array of extracted DEVICEs (DSS and/or RCS), or NULL
  */
 PQOS_LOCAL struct acpi_table_irdt_device **
 acpi_get_irdt_dev(struct acpi_table_irdt_rmud *rmud, size_t *num);
@@ -209,6 +212,8 @@ PQOS_LOCAL int acpi_get_irdt_chms(struct acpi_table_irdt_device *dev,
                                   size_t *num);
 /**
  * @brief Prints out ACPI table in human readable form
+ *
+ * Of an IRDT shorter than its fixed fields, only the header is printed.
  *
  * @param table ACPI table to be printed out
  */
