@@ -763,7 +763,8 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
                 clos_addr = (uint64_t *)((uint8_t *)mem + card->cat_reg_offset +
                                          (clos_number * BYTES_PER_CLOS_ENTRY) +
                                          (PAGE_SIZE * i));
-                *clos_addr = value << IOL3_CBM_SHIFT;
+                *clos_addr = (*clos_addr & IOL3_CBM_RESET_MASK) |
+                             ((value << IOL3_CBM_SHIFT) & IOL3_CBM_MASK);
         }
 
         pqos_munmap(mem, size);

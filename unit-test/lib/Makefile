@@ -997,6 +997,7 @@ $(BIN_DIR)/test_mmio: test_mmio.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=pqos_mmap_read \
+		-Wl,--wrap=pqos_mmap_write \
 		-Wl,--wrap=pqos_munmap \
 		-Wl,--wrap=_pqos_get_erdt \
 		-Wl,--wrap=log_printf \

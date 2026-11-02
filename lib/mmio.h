@@ -98,8 +98,10 @@ extern "C" {
 #define IO_MISS_BW_RMID_U_MASK     0x8000000000000000ULL
 #define IO_MISS_BW_RMID_O_MASK     0x4000000000000000ULL
 
-/* IOL3_MASK register */
-#define IOL3_CBM_MASK       0x0fffffff00000000ULL
+/* IOL3_MASK register: the CBM in bits 63:32, its length the RMDD's Number of
+ * IO L3 ways, and bits 31:0 RsvdP, which a write keeps as it finds them
+ */
+#define IOL3_CBM_MASK       0xffffffff00000000ULL
 #define IOL3_CBM_RESET_MASK ~IOL3_CBM_MASK
 #define IOL3_CBM_SHIFT      0x20
 /* First CAT Register Block of MMIO registers for CLOS */

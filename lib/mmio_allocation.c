@@ -683,6 +683,10 @@ mmio_l3ca_set(const unsigned l3cat_id,
                         return PQOS_RETVAL_PARAM;
                 }
 
+                /* the CBM's length is the RMDD's Number of IO L3 ways, as
+                 * the ERDT specification gives it: a mask past it, such as the
+                 * 0xfffff firmware leaves on some boards, is not one
+                 */
                 io_l3_ways_mask =
                     (1ULL << get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id)
                                  ->rmdd.num_io_l3_ways) -
@@ -794,7 +798,9 @@ mmio_alloc_reset_cat(void)
                         continue;
 
                 for (unsigned i = 0; i < erdt->max_clos; i++) {
-                        /* Reset I/ORDT L3 CAT */
+                        /* Reset I/ORDT L3 CAT: every way of the CBM, whose
+                         * length is the RMDD's Number of IO L3 ways
+                         */
                         ret = set_iol3_cbm_clos_v1(
                             (const struct pqos_erdt_card *)&erdt
                                 ->dev_agents[domain]

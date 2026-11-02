@@ -66,12 +66,25 @@ __wrap_pqos_mmap_read(uint64_t address, const uint64_t size)
         return mock_ptr_type(uint8_t *);
 }
 
+uint8_t *
+__wrap_pqos_mmap_write(uint64_t address, const uint64_t size)
+{
+        check_expected(address);
+        check_expected(size);
+
+        return mock_ptr_type(uint8_t *);
+}
+
 void
 __wrap_pqos_munmap(void *mem, const uint64_t size)
 {
         check_expected_ptr(mem);
         check_expected(size);
 }
+
+int __real_set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
+                                unsigned int clos_number,
+                                uint64_t value);
 
 const struct pqos_erdt_info *
 __wrap__pqos_get_erdt(void)
@@ -274,6 +287,47 @@ test_io_cmt_range_crosses_page(void **state __attribute__((unused)))
 
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_memory_equal(values, expected, sizeof(expected));
+}
+
+/* The IOL3_MASK register's write: the CBM, bits 63:32, is the one given in
+ * each register block, bits 31:0, RsvdP, are kept as they were found, and
+ * the next CLOS's register is not touched
+ */
+static void
+test_iol3_cbm_set_keeps_reserved_bits(void **state __attribute__((unused)))
+{
+        struct pqos_erdt_card card = {0};
+        uint64_t registers[2 * PAGE_SIZE / sizeof(uint64_t)] = {0};
+        const unsigned clos = 3;
+        const unsigned at =
+            (0x100 + clos * BYTES_PER_CLOS_ENTRY) / sizeof(uint64_t);
+        const unsigned at_next_page = at + PAGE_SIZE / sizeof(uint64_t);
+        int ret;
+
+        card.reg_base_addr = 0x3000;
+        card.reg_block_size = 2;
+        card.cat_reg_offset = 0x100;
+
+        /* as firmware leaves them: a CBM of 0xfffff, with reserved bits set,
+         * and in the next block one with its top bits set too, which are the
+         * CBM's as well, so that the write replaces them
+         */
+        registers[at] = 0x000fffff12345678ULL;
+        registers[at_next_page] = 0xf00fffff9abcdef0ULL;
+        registers[at + 1] = UINT64_MAX;
+
+        expect_value(__wrap_pqos_mmap_write, address, card.reg_base_addr);
+        expect_value(__wrap_pqos_mmap_write, size, 2 * PAGE_SIZE);
+        will_return(__wrap_pqos_mmap_write, registers);
+        expect_value(__wrap_pqos_munmap, mem, registers);
+        expect_value(__wrap_pqos_munmap, size, 2 * PAGE_SIZE);
+
+        ret = __real_set_iol3_cbm_clos_v1(&card, clos, 0xff);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(registers[at], 0x000000ff12345678ULL);
+        assert_int_equal(registers[at_next_page], 0x000000ff9abcdef0ULL);
+        assert_int_equal(registers[at + 1], UINT64_MAX);
 }
 
 static void
@@ -1138,6 +1192,51 @@ test_mmio_l3ca_set_domain_list_says_when_truncated(void **state
         assert_true(strlen(test_log) < 319);
 }
 
+/* A mask is held to the RMDD's Number of IO L3 ways: one way past them is
+ * refused with nothing written, and the full mask of those ways is set
+ */
+static void
+test_mmio_l3ca_set_bounds_mask_by_io_l3_ways(void **state
+                                             __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 2;
+
+        ca.domain_id = 0x10;
+        ca.class_id = 1;
+        ca.u.ways_mask = 0x1f;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "available Cache Ways 0xf."));
+
+        ca.u.ways_mask = 0xf;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, card, &dev_agent.card);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, clos_number, 1);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, value, 0xf);
+        will_return(__wrap_set_iol3_cbm_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 static void
 test_alloc_reset_cat_skips_monitoring_only_domain(void **state
                                                   __attribute__((unused)))
@@ -1184,6 +1283,7 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_cpu_cmt_range_crosses_clump),
             cmocka_unit_test(test_io_cmt_range_crosses_page),
+            cmocka_unit_test(test_iol3_cbm_set_keeps_reserved_bits),
             cmocka_unit_test(test_cmt_range_rejects_invalid_range),
             cmocka_unit_test(test_mbm_range_rejects_invalid_range),
             cmocka_unit_test(test_mba_set_resolves_domain_id),
@@ -1205,6 +1305,7 @@ main(void)
             cmocka_unit_test(test_mmio_l3ca_set_rejects_monitoring_only_domain),
             cmocka_unit_test(
                 test_mmio_l3ca_set_domain_list_says_when_truncated),
+            cmocka_unit_test(test_mmio_l3ca_set_bounds_mask_by_io_l3_ways),
             cmocka_unit_test(
                 test_alloc_reset_cat_skips_monitoring_only_domain)};
 
