@@ -1994,8 +1994,11 @@ log_check(void)
 
         if (err == 0)
                 return 0;
+        /* named as selected: a log file opened with descriptor 1 closed is
+         * given that descriptor, and is not standard output
+         */
         fprintf(stderr, "Failed to write the log to %s%s%s\n",
-                m_log_fd == STDOUT_FILENO ? "standard output" : sel_log_file,
+                sel_log_file == NULL ? "standard output" : sel_log_file,
                 err > 0 ? ": " : "", err > 0 ? strerror(err) : "");
         return -1;
 }

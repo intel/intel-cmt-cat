@@ -103,6 +103,9 @@ static int m_sigpipe_ignored_at_init;
 static const char *m_init_log;
 static int m_log_said_before_fini;
 
+/** 1 where descriptor 1 was open when main() initialised the library */
+static int m_fd1_open_at_init;
+
 /** the write end of a pipe whose reader has gone, which a case puts in place
  * of stdout's descriptor, and that descriptor, kept meanwhile
  */
@@ -130,6 +133,7 @@ __wrap_pqos_init(const struct pqos_config *config)
 
         m_sigpipe_ignored_at_init =
             sigaction(SIGPIPE, NULL, &sa) == 0 && sa.sa_handler == SIG_IGN;
+        m_fd1_open_at_init = fcntl(STDOUT_FILENO, F_GETFD) != -1;
         if (m_init_log != NULL) {
                 const size_t size = strlen(m_init_log);
 
@@ -271,6 +275,38 @@ run_monitoring(const char *groups,
 }
 
 /**
+ * @brief Runs "pqos -l <log> -m <groups>", the library's log going to \a log
+ *        rather than stdout, with the monitoring loop and flush returning 0
+ *
+ * @return what appmain() returned
+ */
+static int
+run_monitoring_logging_to(const char *groups, const char *log)
+{
+        char *argv[] = {strdup("pqos"), strdup("-l"),   strdup(log),
+                        strdup("-m"),   strdup(groups), NULL};
+        const int argc = (int)DIM(argv) - 1;
+        int ret = -1;
+        int i;
+
+        for (i = 0; i < argc; i++)
+                assert_non_null(argv[i]);
+
+        m_loop_result = 0;
+        m_flush_result = 0;
+        m_calls[0] = '\0';
+        optind = 1;
+        opterr = 0;
+        run_function(appmain, ret, argc, argv);
+        /* freed by main(), and kept by the parser for the next case */
+        sel_log_file = NULL;
+
+        for (i = 0; i < argc; i++)
+                free(argv[i]);
+        return ret;
+}
+
+/**
  * @brief Runs "pqos --version", which initialises the library and monitors
  *        nothing
  *
@@ -340,9 +376,9 @@ case_start(void **state)
  *
  * The descriptor is put in place, not the stream: stdout cannot be assigned
  * where the C library declares it const, as musl does. What the stream holds
- * goes where it was going first. \a text has no newline, so that the stream
- * keeps it, line buffered, as on a terminal, or not. The fixture's flushes are
- * not main()'s, and are not recorded.
+ * goes where it was going first. \a text has no newline, so that the stream,
+ * line buffered from the start of the binary - see main() - keeps it. The
+ * fixture's flushes are not main()'s, and are not recorded.
  */
 static void
 stdout_to(const int fd, const char *text)
@@ -589,6 +625,36 @@ test_a_log_that_was_written_exits_0(void **state)
         assert_false(output_has_text("printing to file failed"));
 }
 
+/**
+ * @brief A failed write of a log named with -l names the file
+ *
+ * With descriptor 1 closed as pqos starts, the log file is opened with that
+ * descriptor, and a write of it that fails is the file's, not stdout's: here
+ * /dev/full's, which fails every write with ENOSPC.
+ */
+static void
+test_a_failed_log_file_on_descriptor_1_is_named(void **state)
+{
+        int ret;
+
+        UNUSED_ARG(state);
+        (void)__real_fflush(stdout);
+        m_stdout_saved = dup(STDOUT_FILENO);
+        assert_int_not_equal(m_stdout_saved, -1);
+        close(STDOUT_FILENO);
+        m_init_log = "WARN: resctrl filesystem mounted!\n";
+        ret = run_monitoring_logging_to("all:2", "/dev/full");
+        m_init_log = NULL;
+        stdout_back();
+
+        assert_true(m_fd1_open_at_init);
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_stderr_has_text("Failed to write the log to "
+                                           "/dev/full: %s\n",
+                                           strerror(ENOSPC)));
+        assert_false(output_stderr_has_text("standard output"));
+}
+
 int
 main(void)
 {
@@ -617,11 +683,24 @@ main(void)
                 test_a_failed_write_of_the_log_makes_pqos_exit_1, case_start,
                 case_end),
             cmocka_unit_test_setup_teardown(test_a_log_that_was_written_exits_0,
-                                            case_start, case_end)};
-        struct pqos_cpuinfo *cpu =
-            calloc(1, sizeof(*cpu) + 4 * sizeof(struct pqos_coreinfo));
+                                            case_start, case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_failed_log_file_on_descriptor_1_is_named, case_start,
+                case_end)};
+        struct pqos_cpuinfo *cpu;
         int ret;
 
+        /* the cases leave text in stdout's buffer for main()'s check to
+         * write: line buffered, as on a terminal, whatever the stream was
+         * given, such as no buffer by "stdbuf -o0", which would write the text
+         * at once. A buffer of its own, which glibc keeps no other way once a
+         * stream has none, and before any I/O on it, as setvbuf() requires
+         */
+        static char stdout_buffer[BUFSIZ];
+
+        if (setvbuf(stdout, stdout_buffer, _IOLBF, sizeof(stdout_buffer)) != 0)
+                return EXIT_FAILURE;
+        cpu = calloc(1, sizeof(*cpu) + 4 * sizeof(struct pqos_coreinfo));
         if (cpu == NULL)
                 return EXIT_FAILURE;
         cpu->num_cores = 4;

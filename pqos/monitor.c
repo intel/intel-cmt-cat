@@ -267,9 +267,9 @@ static void (*output_end)(FILE *fp);
  * message, which a stop signal does not cut short, its handler restarting the
  * write, with the groups and the library lock held. monitor_flush() says it,
  * once they are not. The library's log, which goes to stdout unless -l named
- * a file, fails on it as well, inside the poll; libpqos says only the first
- * of those failures on stderr, as a line for each of them would fill such a
- * pipe.
+ * a file, fails on it as well, inside the poll: main()'s log_write() keeps
+ * the first of those failures, saying none, and log_check() says it on stderr
+ * once the library is finalised and its lock let go.
  */
 struct output_failure {
         const char *stream; /**< the stream, as the message names it */
@@ -1761,8 +1761,8 @@ monitoring_ctrlc(int signo)
  * the end's, which monitor_flush() makes once they are; either way
  * monitor_flush() says the failure. The library's log, on stdout unless -l
  * named a file, then fails with EPIPE too, where SIGPIPE ended the process at
- * the first message it wrote; libpqos says only the first of those failures,
- * on stderr.
+ * the first message it wrote; main()'s log_write() keeps the first of those
+ * failures, and log_check() says it on stderr once the library is finalised.
  *
  * SIGXFSZ's default action ends the process, with its groups running, at a
  * write that takes a file past the process's file size limit (RLIMIT_FSIZE):
