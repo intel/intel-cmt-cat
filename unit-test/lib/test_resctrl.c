@@ -1090,7 +1090,9 @@ test_resctrl_lock_cancelled_as_it_is_taken(void **state __attribute__((unused)))
 }
 
 /* and so is one asked for in the wait, in its first sleep, in which the holder
- * gives the lock up, so that the try after the sleep takes it
+ * gives the lock up, so that the try after the sleep takes it, however late
+ * its thread runs: the clock is frozen for the case, which a timeout would
+ * otherwise fail with the lock correctly not taken
  */
 static void
 test_resctrl_lock_cancelled_in_the_wait_then_taken(void **state
@@ -1108,9 +1110,11 @@ test_resctrl_lock_cancelled_in_the_wait_then_taken(void **state
         lock_cancelled_ret = -1;
         lock_released_holder = holder;
         __atomic_store_n(&lock_cancel_in_sleep, 1, __ATOMIC_SEQ_CST);
+        __atomic_store_n(&lock_clock_frozen, 1, __ATOMIC_SEQ_CST);
         lock_watchdog_start(&watchdog, holder);
         ran = lock_run_worker(lock_cancelled_worker, &result);
         fired = lock_watchdog_stop(&watchdog);
+        __atomic_store_n(&lock_clock_frozen, 0, __ATOMIC_SEQ_CST);
         fds_after = lock_open_fds();
         free_after = lock_free_now();
         lock_released_holder = -1;
