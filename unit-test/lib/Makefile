@@ -1041,6 +1041,7 @@ $(BIN_DIR)/test_acpi: test_acpi.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=munmap \
 		-Wl,--wrap=free \
+		-Wl,--wrap=log_printf \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

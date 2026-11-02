@@ -40,5 +40,6 @@ int __wrap_munmap(void *addr, size_t length);
 void __wrap_free(void *ptr);
 void __real_free(void *ptr);
 int __real_munmap(void *addr, size_t length);
+void __wrap_log_printf(int type, const char *str, ...);
 
 #endif /* TEST_ACPI_H_ */

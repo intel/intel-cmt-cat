@@ -36,6 +36,7 @@
 #include "acpi_table.h"
 #include "test.h"
 
+#include <stdarg.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -391,7 +392,9 @@ test_acpi_get_irdt_dev_short_dss_rcs(void **state __attribute__((unused)))
         expect_value(__wrap_free, ptr, devs);
         free(devs);
 
-        /* a whole DSS, then an RCS one byte short of its fields */
+        /* a whole DSS, then an RCS one byte short of its fields: the list
+         * made for the DSS is freed, not left
+         */
         memset(buf, 0, sizeof(buf));
         rmud->length = sizeof(*rmud) + dss_len + rcs_len - 1;
         dev->type = ACPI_TABLE_IRDT_TYPE_DSS;
@@ -401,11 +404,27 @@ test_acpi_get_irdt_dev_short_dss_rcs(void **state __attribute__((unused)))
         dev->length = rcs_len - 1;
 
         expect_function_call(__wrap_free);
-        expect_any(__wrap_free, ptr);
+        expect_not_value(__wrap_free, ptr, NULL);
 
         devs = acpi_get_irdt_dev(rmud, &num);
         assert_null(devs);
         assert_int_equal(num, 0);
+}
+
+/* every line the library logged since a case emptied it, so that a case can
+ * tell which of a table's fields acpi_print() printed
+ */
+static char test_log[4096];
+
+void
+__wrap_log_printf(int type __attribute__((unused)), const char *str, ...)
+{
+        const size_t used = strlen(test_log);
+        va_list ap;
+
+        va_start(ap, str);
+        vsnprintf(test_log + used, sizeof(test_log) - used, str, ap);
+        va_end(ap);
 }
 
 /* \a len bytes that end where a page with no access allowed to it begins, so
@@ -434,17 +453,20 @@ unguard(uint8_t *map)
 }
 
 /* An IRDT too short for its protocol flags, or for the rest of its fixed
- * fields: only its header is printed, and nothing past it is read
+ * fields: only its header is printed, and nothing past it is read. One of
+ * its fixed fields exactly has its protocol flags printed too
  */
 static void
 test_acpi_print_short_irdt(void **state __attribute__((unused)))
 {
         const size_t lens[] = {sizeof(struct acpi_table_header) + 1,
                                sizeof(struct acpi_table_header) + 3,
-                               sizeof(struct acpi_table_irdt) - 1};
+                               sizeof(struct acpi_table_irdt) - 1,
+                               sizeof(struct acpi_table_irdt)};
         size_t i;
 
         for (i = 0; i < sizeof(lens) / sizeof(lens[0]); i++) {
+                const int whole = lens[i] >= sizeof(struct acpi_table_irdt);
                 struct acpi_table table;
                 uint8_t *map;
                 struct acpi_table_header *header =
@@ -453,8 +475,16 @@ test_acpi_print_short_irdt(void **state __attribute__((unused)))
                 memcpy(header->signature, "IRDT", 4);
                 header->length = (uint32_t)lens[i];
                 table.header = header;
+                test_log[0] = '\0';
 
                 acpi_print(&table);
+
+                assert_non_null(strstr(test_log, "Signature:         IRDT"));
+                assert_non_null(strstr(test_log, "Creator Revision:"));
+                assert_int_equal(strstr(test_log, "IO Proto Flags:") != NULL,
+                                 whole);
+                assert_int_equal(strstr(test_log, "Cache Proto Flags:") != NULL,
+                                 whole);
 
                 unguard(map);
         }
@@ -488,7 +518,7 @@ test_acpi_print_irdt_short_rcs(void **state __attribute__((unused)))
         expect_function_call(__wrap_free);
         expect_value(__wrap_free, ptr, NULL);
         expect_function_call(__wrap_free);
-        expect_any(__wrap_free, ptr);
+        expect_not_value(__wrap_free, ptr, NULL);
 
         acpi_print(&table);
 
