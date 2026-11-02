@@ -1068,9 +1068,14 @@ is_mba40_supported(unsigned core, unsigned *supported)
         return PQOS_RETVAL_OK;
 }
 
-static void
+static int
 detect_mba40(const struct pqos_cpuinfo *cpu, unsigned *supported)
 {
+        int ret = PQOS_RETVAL_OK;
+        unsigned *mba_ids;
+        unsigned mba_id_num;
+        unsigned refused_num = 0;
+        unsigned refused_id = 0;
         unsigned i;
 
         *supported = 0;
@@ -1092,34 +1097,81 @@ detect_mba40(const struct pqos_cpuinfo *cpu, unsigned *supported)
                         LOG_DEBUG("MBA 4.0 available for core %u\n", lcore);
                 }
         }
-}
 
-/**
- * @brief Detects presence of MBA 4.0 based on model & family ID.
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- * @retval PQOS_RETVAL_RESOURCE technology not supported
- */
-static int
-hw_cap_mba40_model(void)
-{
-        const int cpu_model = cpuinfo_get_cpu_model();
-        const int cpu_family = cpuinfo_get_cpu_family();
+        if (!*supported)
+                return PQOS_RETVAL_OK;
 
-        const struct {
-                int model;
-                int family;
-        } no_support_cpus[] = {
-            {.family = CPU_FAMILY_4F, .model = CPU_MODEL_01}};
+        /*
+         * MBA 4.0 is turned on and off in the MBA configuration register,
+         * which a part can leave out while its cores report the capability
+         */
+        /* a list that cannot be made fails discovery: RESOURCE would be read
+         * as a part without MBA, and initialization would succeed without it
+         */
+        mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+        if (mba_ids == NULL) {
+                *supported = 0;
+                return PQOS_RETVAL_ERROR;
+        }
 
-        for (unsigned i = 0; i < DIM(no_support_cpus); i++) {
-                if (no_support_cpus[i].model == cpu_model &&
-                    no_support_cpus[i].family == cpu_family)
-                        return PQOS_RETVAL_RESOURCE;
-        };
+        for (i = 0; i < mba_id_num; i++) {
+                unsigned lcore = 0;
+                uint64_t reg = 0;
+                int probe;
 
-        return PQOS_RETVAL_OK;
+                ret = pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &lcore);
+                if (ret != PQOS_RETVAL_OK)
+                        break;
+
+                probe = msr_probe(lcore, PQOS_MSR_MBA_CFG, &reg);
+                if (probe == MACHINE_RETVAL_OK)
+                        continue;
+
+                /*
+                 * The register is missing only where the core refused it: a
+                 * read that failed otherwise, on a core gone offline say,
+                 * tells nothing about the register, and discovery fails as it
+                 * would have
+                 */
+                if (probe != MACHINE_RETVAL_FAULT) {
+                        LOG_ERROR("MBA 4.0 detection: MBA_CFG MSR (0x%X) "
+                                  "cannot be read on core %u of MBA domain "
+                                  "%u\n",
+                                  PQOS_MSR_MBA_CFG, lcore, mba_ids[i]);
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                }
+
+                if (refused_num++ == 0)
+                        refused_id = mba_ids[i];
+        }
+
+        /*
+         * Without the register in every domain MBA 4.0 cannot be had; with
+         * it in some only, a request to turn MBA 4.0 off could not reach the
+         * domains that have it, and discovery fails
+         */
+        if (ret != PQOS_RETVAL_OK)
+                *supported = 0;
+        else if (refused_num == mba_id_num) {
+                *supported = 0;
+                LOG_INFO("MBA 4.0 not supported: CORE_CAPABILITIES reports "
+                         "it, but MBA_CFG MSR (0x%X) cannot be read in any of "
+                         "the %u MBA domains\n",
+                         PQOS_MSR_MBA_CFG, mba_id_num);
+        } else if (refused_num > 0) {
+                *supported = 0;
+                LOG_ERROR("MBA 4.0 detection: MBA_CFG MSR (0x%X) can be read "
+                          "in %u of %u MBA domains, not in %u of them (the "
+                          "first, MBA domain %u)\n",
+                          PQOS_MSR_MBA_CFG, mba_id_num - refused_num,
+                          mba_id_num, refused_num, refused_id);
+                ret = PQOS_RETVAL_ERROR;
+        }
+
+        free(mba_ids);
+
+        return ret;
 }
 
 int
@@ -1184,8 +1236,11 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
          *  - MBA3.0 introduces per-thread MBA controls
          *  - MBA2.0 increases number of MBA CLOS to 15
          */
-        if (!hw_cap_mba40_model() && msr_core_caps_available)
-                detect_mba40(cpu, &mba40_supported);
+        if (msr_core_caps_available) {
+                ret = detect_mba40(cpu, &mba40_supported);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
 
         if (mba40_supported) {
                 version = 4;

@@ -76,13 +76,30 @@ _init(void **state __attribute__((unused)))
 {
         _cpuid_count = 0;
 
-        /* allow cpuinfo_get_cpu_model()/family() paths used by MBA detection */
+        /* cpuinfo_get_cpu_model()/family(), read by L3 CAT detection */
         _lcpuid_add(0x1, 0x0, 0x0, 0x0, 0x0, 0x0);
 
         return 0;
 }
 
 /* ======== mock ======== */
+
+/* set to make the next MBA domain list fail, as a failed allocation does */
+static int _mba_ids_fail;
+
+unsigned *__real_pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu,
+                                      unsigned *count);
+
+unsigned *
+__wrap_pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
+{
+        if (_mba_ids_fail) {
+                _mba_ids_fail = 0;
+                return NULL;
+        }
+
+        return __real_pqos_cpu_get_mba_ids(cpu, count);
+}
 
 void
 __wrap_lcpuid(const unsigned leaf,
@@ -808,6 +825,18 @@ _test_hw_cap_mba_discover_mba40_supported(const struct pqos_cpuinfo *cpu,
                 ret = pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core);
                 assert_int_equal(ret, PQOS_RETVAL_OK);
 
+                expect_value(__wrap_msr_probe, lcore, core);
+                expect_value(__wrap_msr_probe, reg, PQOS_MSR_MBA_CFG);
+                will_return(__wrap_msr_probe, MACHINE_RETVAL_OK);
+                will_return(__wrap_msr_probe, 0);
+        }
+
+        for (i = 0; i < mba_id_num; i++) {
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+
                 expect_value(__wrap_msr_read, lcore, core);
                 expect_value(__wrap_msr_read, reg, PQOS_MSR_MBA_CFG);
                 will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
@@ -864,6 +893,213 @@ test_hw_cap_mba_discover_mba40_domains_not_sockets(void **state)
         _test_hw_cap_mba_discover_mba40_supported(cpu, 1);
 
         free(cpu);
+}
+
+/* what the library logs at the verbose level, kept for a case to read */
+static char _log_text[2048];
+
+static void
+_log_keep(void *context, const size_t size, const char *message)
+{
+        (void)context;
+        (void)size;
+        strncat(_log_text, message, sizeof(_log_text) - strlen(_log_text) - 1);
+}
+
+static void
+_log_keep_start(void)
+{
+        _log_text[0] = '\0';
+        (void)log_init(-1, _log_keep, NULL, LOG_VER_VERBOSE);
+}
+
+/* the id of the i-th MBA domain of the fixture */
+static unsigned
+_mba_id(const struct pqos_cpuinfo *cpu, const unsigned i)
+{
+        unsigned mba_id_num = 0;
+        unsigned *mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+        unsigned id;
+
+        assert_non_null(mba_ids);
+        assert_true(i < mba_id_num);
+        id = mba_ids[i];
+        free(mba_ids);
+        return id;
+}
+
+/*
+ * The cores of a part that reports MBA 4.0, and its MBA configuration register
+ * read on the first core of each domain, which answers as \a probe says:
+ * \a probe[i] is what the read in the i-th domain returns, and -1 ends the
+ * reads expected
+ */
+static void
+_mba40_probe_queue(const struct pqos_cpuinfo *cpu, const int *probe)
+{
+        unsigned *mba_ids;
+        unsigned mba_id_num;
+        unsigned i;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 1U << 30);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x8, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x3, 90 - 1, 0x0, (1 << 2) | 1, 16 - 1);
+
+        for (i = 0; i < cpu->num_cores; i++) {
+                expect_value(__wrap_msr_read, lcore, cpu->cores[i].lcore);
+                expect_value(__wrap_msr_read, reg, PQOS_MSR_CORE_CAPABILITIES);
+                will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+                will_return(__wrap_msr_read,
+                            PQOS_MSR_CORE_CAPABILITIES_MBA40_EN);
+        }
+
+        mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+        assert_non_null(mba_ids);
+        for (i = 0; i < mba_id_num && probe[i] != -1; i++) {
+                unsigned core = 0;
+
+                assert_int_equal(
+                    pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core),
+                    PQOS_RETVAL_OK);
+                expect_value(__wrap_msr_probe, lcore, core);
+                expect_value(__wrap_msr_probe, reg, PQOS_MSR_MBA_CFG);
+                will_return(__wrap_msr_probe, probe[i]);
+                if (probe[i] == MACHINE_RETVAL_OK)
+                        will_return(__wrap_msr_probe, 0);
+        }
+        free(mba_ids);
+}
+
+/*
+ * the cores report MBA 4.0, but the part has no MBA configuration register:
+ * every domain refuses it
+ */
+static void
+test_hw_cap_mba_discover_mba40_without_mba_cfg(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        const int probe[] = {MACHINE_RETVAL_FAULT, MACHINE_RETVAL_FAULT, -1};
+        int ret;
+
+        _mba40_probe_queue(data->cpu, probe);
+
+        _log_keep_start();
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        test_log_init_silent();
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_mba.mba40, 0);
+        assert_int_equal(cap_mba.mba40_on, 0);
+        assert_int_equal(cap_mba.num_classes, 16);
+        /* the reason names no domain of its own: none has the register */
+        assert_non_null(strstr(_log_text, "MBA_CFG MSR (0xC84) cannot be read "
+                                          "in any of the 2 MBA domains\n"));
+}
+
+/* the MBA domain list cannot be made: discovery fails, MBA is not dropped */
+static void
+test_hw_cap_mba_discover_mba40_mba_ids_fail(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        const int probe[] = {-1};
+        int ret;
+
+        _mba40_probe_queue(data->cpu, probe);
+
+        _mba_ids_fail = 1;
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(_mba_ids_fail, 0);
+}
+
+/*
+ * one domain has the register and the other does not, either way round: a
+ * request to turn MBA 4.0 off could not reach the first, and discovery fails
+ */
+static void
+test_hw_cap_mba_discover_mba40_later_domain_without_mba_cfg(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        const int probe[] = {MACHINE_RETVAL_OK, MACHINE_RETVAL_FAULT, -1};
+        char expected[128];
+        int ret;
+
+        _mba40_probe_queue(data->cpu, probe);
+
+        _log_keep_start();
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        test_log_init_silent();
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        /* the error names the domain without the register */
+        snprintf(expected, sizeof(expected),
+                 "can be read in 1 of 2 MBA domains, not in 1 of them (the "
+                 "first, MBA domain %u)\n",
+                 _mba_id(data->cpu, 1));
+        assert_non_null(strstr(_log_text, expected));
+}
+
+static void
+test_hw_cap_mba_discover_mba40_first_domain_without_mba_cfg(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        const int probe[] = {MACHINE_RETVAL_FAULT, MACHINE_RETVAL_OK, -1};
+        int ret;
+
+        _mba40_probe_queue(data->cpu, probe);
+
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+/*
+ * CORE_CAPABILITIES is there but reports no MBA 4.0 on any core: MBA_CFG is
+ * not probed at all, and discovery succeeds without MBA 4.0
+ */
+static void
+test_hw_cap_mba_discover_mba40_no_core_reports_it(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        unsigned i;
+        int ret;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 1U << 30);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x8, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x3, 90 - 1, 0x0, (1 << 2) | 1, 16 - 1);
+
+        for (i = 0; i < data->cpu->num_cores; i++) {
+                expect_value(__wrap_msr_read, lcore, data->cpu->cores[i].lcore);
+                expect_value(__wrap_msr_read, reg, PQOS_MSR_CORE_CAPABILITIES);
+                will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+                will_return(__wrap_msr_read, 0);
+        }
+
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_mba.mba40, 0);
+        assert_int_equal(cap_mba.mba40_on, 0);
+}
+
+/*
+ * MBA_CFG cannot be read for another reason than the core refusing it, the
+ * core gone offline say, which tells nothing about the register: discovery
+ * fails, MBA 4.0 is not dropped in silence
+ */
+static void
+test_hw_cap_mba_discover_mba40_core_unreadable(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        const int probe[] = {MACHINE_RETVAL_ERROR, -1};
+        int ret;
+
+        _mba40_probe_queue(data->cpu, probe);
+
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
 static void
@@ -929,6 +1165,20 @@ main(void)
                 test_hw_cap_mba_discover_mba40_supported_disabled, _init),
             cmocka_unit_test_setup(
                 test_hw_cap_mba_discover_mba40_domains_not_sockets, _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_without_mba_cfg, _init),
+            cmocka_unit_test_setup(test_hw_cap_mba_discover_mba40_mba_ids_fail,
+                                   _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_later_domain_without_mba_cfg,
+                _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_first_domain_without_mba_cfg,
+                _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_no_core_reports_it, _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_core_unreadable, _init),
             cmocka_unit_test_setup(test_hw_cap_mba_discover_mba40_unsupported,
                                    _init),
         };

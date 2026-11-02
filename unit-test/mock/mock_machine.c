@@ -67,6 +67,21 @@ __wrap_msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
 }
 
 int
+__wrap_msr_probe(const unsigned lcore, const uint32_t reg, uint64_t *value)
+{
+        int ret;
+
+        check_expected(lcore);
+        check_expected(reg);
+
+        ret = mock_type(int);
+        if (ret == MACHINE_RETVAL_OK)
+                *value = mock_type(uint64_t);
+
+        return ret;
+}
+
+int
 __wrap_msr_write(const unsigned lcore, const uint32_t reg, const uint64_t value)
 {
         check_expected(lcore);

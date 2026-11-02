@@ -595,11 +595,23 @@ $(BIN_DIR)/test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+# the MSR device is the wrapped open(), pread() and close()
+$(BIN_DIR)/test_machine: test_machine.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=open \
+		-Wl,--wrap=pread \
+		-Wl,--wrap=close \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_hw_cap: test_hw_cap.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=lcpuid \
 		-Wl,--wrap=msr_read \
+		-Wl,--wrap=msr_probe \
+		-Wl,--wrap=pqos_cpu_get_mba_ids \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \

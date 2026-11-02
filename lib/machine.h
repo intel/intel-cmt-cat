@@ -52,6 +52,7 @@ extern "C" {
 #define MACHINE_RETVAL_OK    0 /**< everything OK */
 #define MACHINE_RETVAL_ERROR 1 /**< generic error */
 #define MACHINE_RETVAL_PARAM 2 /**< parameter error */
+#define MACHINE_RETVAL_FAULT 3 /**< the core refused the register */
 
 /* cpuid leaf for cache topology */
 #define CPUID_LEAF_CACHE 4
@@ -109,6 +110,30 @@ lcpuid(const unsigned leaf, const unsigned subleaf, struct cpuid_out *out);
  */
 PQOS_LOCAL int
 msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value);
+
+/**
+ * @brief Executes RDMSR on \a lcore logical core, for a register that the
+ *        platform may not implement
+ *
+ * As msr_read(), except that a read that fails is not logged as an error,
+ * and that a register the core refuses is told from any other failure: the
+ * read of a register the platform does not implement faults, which Linux
+ * reports as EIO and FreeBSD's cpuctl as EFAULT. What it means is the
+ * caller's to say. A core whose MSR device cannot be opened is still warned
+ * about, as msr_read() warns about it.
+ *
+ * @param [in] lcore logical core id
+ * @param [in] reg MSR to read from
+ * @param [out] value place to store MSR value at
+ *
+ * @return Operation status
+ * @retval MACHINE_RETVAL_OK on success
+ * @retval MACHINE_RETVAL_FAULT where the core refused the register
+ * @retval MACHINE_RETVAL_ERROR where the read failed otherwise: the MSR
+ *         device could not be opened, or the core has gone offline say
+ */
+PQOS_LOCAL int
+msr_probe(const unsigned lcore, const uint32_t reg, uint64_t *value);
 
 /**
  * @brief Executes WRMSR on \a lcore logical core

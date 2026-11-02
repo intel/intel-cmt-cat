@@ -43,6 +43,7 @@
 
 #include "log.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -190,12 +191,31 @@ msr_file_open(const unsigned lcore)
         return fd;
 }
 
-int
-msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
+/**
+ * @brief Executes RDMSR on \a lcore logical core
+ *
+ * @param [in] lcore logical core id
+ * @param [in] reg MSR to read from
+ * @param [out] value place to store MSR value at
+ * @param [in] probe whether this is msr_probe(): a failed read is then not
+ *                   logged as an error, and a register the core refused is
+ *                   told from any other failure
+ *
+ * @return Operation status
+ * @retval MACHINE_RETVAL_OK on success
+ * @retval MACHINE_RETVAL_FAULT where \a probe is set and the core refused the
+ *         register
+ */
+static int
+msr_read_core(const unsigned lcore,
+              const uint32_t reg,
+              uint64_t *value,
+              const int probe)
 {
         int ret = MACHINE_RETVAL_OK;
         int fd = -1;
         ssize_t read_ret = 0;
+        int refused = 0;
 #ifdef __FreeBSD__
         cpuctl_msr_args_t io;
 #endif
@@ -218,12 +238,16 @@ msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
 
 #ifdef __linux__
         read_ret = pread(fd, value, sizeof(value[0]), (off_t)reg);
+        /* the msr driver's answer where RDMSR faulted on the core */
+        refused = read_ret < 0 && errno == EIO;
 #endif
 
 #ifdef __FreeBSD__
         io.msr = reg;
         if (ioctl(fd, CPUCTL_RDMSR, &io) != 0) {
                 read_ret = 0;
+                /* cpuctl's, from rdmsr_safe() */
+                refused = errno == EFAULT;
         } else {
                 read_ret = sizeof(value[0]);
                 *value = io.data;
@@ -231,11 +255,25 @@ msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
 #endif
 
         if (read_ret != sizeof(value[0])) {
-                LOG_ERROR("RDMSR failed for reg[0x%x] on lcore %u\n",
-                          (unsigned)reg, lcore);
-                ret = MACHINE_RETVAL_ERROR;
+                if (!probe)
+                        LOG_ERROR("RDMSR failed for reg[0x%x] on lcore %u\n",
+                                  (unsigned)reg, lcore);
+                ret = probe && refused ? MACHINE_RETVAL_FAULT
+                                       : MACHINE_RETVAL_ERROR;
         }
         return ret;
+}
+
+int
+msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
+{
+        return msr_read_core(lcore, reg, value, 0);
+}
+
+int
+msr_probe(const unsigned lcore, const uint32_t reg, uint64_t *value)
+{
+        return msr_read_core(lcore, reg, value, 1);
 }
 
 int
