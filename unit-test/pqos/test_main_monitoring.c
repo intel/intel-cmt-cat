@@ -103,6 +103,20 @@ static int m_sigpipe_ignored_at_init;
 static const char *m_init_log;
 static int m_log_said_before_fini;
 
+/** what the library's initialisation logs after m_init_log, step by step: a
+ * descriptor put in place of stdout's first, or -1 for none, so that the
+ * writes of a log to stdout can fail and work in turn, and the message, of
+ * \a size bytes, or strlen()'s where 0
+ */
+struct log_step {
+        int fd;
+        const char *message;
+        size_t size;
+};
+
+static const struct log_step *m_init_steps;
+static unsigned m_init_step_count;
+
 /** 1 where descriptor 1 was open when main() initialised the library */
 static int m_fd1_open_at_init;
 
@@ -123,26 +137,43 @@ called(const char *what)
 }
 
 /**
- * Logs m_init_log as libpqos would: to the descriptor it was given, a write
+ * Logs \a message as libpqos would: to the descriptor it was given, a write
  * that fails leaving the status alone, and to the callback
+ */
+static void
+log_as_the_library(const struct pqos_config *config,
+                   const char *message,
+                   const size_t size)
+{
+        if (config->fd_log >= 0 && write(config->fd_log, message, size) < 0)
+                fprintf(stderr, "log_emit: printing to file failed\n");
+        if (config->callback_log != NULL)
+                config->callback_log(config->context_log, size, message);
+}
+
+/**
+ * Logs m_init_log, then m_init_steps, as libpqos's initialisation logs its
+ * warnings
  */
 int
 __wrap_pqos_init(const struct pqos_config *config)
 {
         struct sigaction sa;
+        unsigned i;
 
         m_sigpipe_ignored_at_init =
             sigaction(SIGPIPE, NULL, &sa) == 0 && sa.sa_handler == SIG_IGN;
         m_fd1_open_at_init = fcntl(STDOUT_FILENO, F_GETFD) != -1;
-        if (m_init_log != NULL) {
-                const size_t size = strlen(m_init_log);
+        if (m_init_log != NULL)
+                log_as_the_library(config, m_init_log, strlen(m_init_log));
+        for (i = 0; i < m_init_step_count; i++) {
+                const struct log_step *step = &m_init_steps[i];
 
-                if (config->fd_log >= 0 &&
-                    write(config->fd_log, m_init_log, size) < 0)
-                        fprintf(stderr, "log_emit: printing to file failed\n");
-                if (config->callback_log != NULL)
-                        config->callback_log(config->context_log, size,
-                                             m_init_log);
+                if (step->fd != -1)
+                        assert_int_not_equal(dup2(step->fd, STDOUT_FILENO), -1);
+                log_as_the_library(config, step->message,
+                                   step->size != 0 ? step->size
+                                                   : strlen(step->message));
         }
         return PQOS_RETVAL_OK;
 }
@@ -635,9 +666,14 @@ test_a_log_that_was_written_exits_0(void **state)
 static void
 test_a_failed_log_file_on_descriptor_1_is_named(void **state)
 {
+        const int full = open("/dev/full", O_WRONLY);
         int ret;
 
         UNUSED_ARG(state);
+        /* where there is no /dev/full, as on some platforms */
+        if (full == -1)
+                skip();
+        close(full);
         (void)__real_fflush(stdout);
         m_stdout_saved = dup(STDOUT_FILENO);
         assert_int_not_equal(m_stdout_saved, -1);
@@ -653,6 +689,198 @@ test_a_failed_log_file_on_descriptor_1_is_named(void **state)
                                            "/dev/full: %s\n",
                                            strerror(ENOSPC)));
         assert_false(output_stderr_has_text("standard output"));
+}
+
+/**
+ * @brief A log file named with -l gets the library's log, and stdout none of
+ *        it
+ *
+ * stdout is a pipe of the case's here, read once main() returns.
+ */
+static void
+test_a_log_file_gets_the_log_and_stdout_none(void **state)
+{
+        static const char message[] = "WARN: resctrl filesystem mounted!\n";
+        char path[] = "/tmp/test_main_monitoring_log.XXXXXX";
+        char in_file[sizeof(message) + 8];
+        char on_stdout[sizeof(message) + 8];
+        ssize_t file_read;
+        ssize_t stdout_read;
+        int fds[2];
+        int fd;
+        int ret;
+
+        UNUSED_ARG(state);
+        fd = mkstemp(path);
+        assert_int_not_equal(fd, -1);
+        close(fd);
+        if (pipe(fds) != 0) {
+                (void)unlink(path);
+                fail();
+        }
+        stdout_to(fds[1], "");
+        close(fds[1]);
+        m_init_log = message;
+        ret = run_monitoring_logging_to("all:0", path);
+        m_init_log = NULL;
+        stdout_back();
+        /* every write end closed: what stdout had, then the end */
+        stdout_read = read(fds[0], on_stdout, sizeof(on_stdout));
+        close(fds[0]);
+        fd = open(path, O_RDONLY);
+        file_read = fd == -1 ? -1 : read(fd, in_file, sizeof(in_file));
+        if (fd != -1)
+                close(fd);
+        (void)unlink(path);
+
+        assert_int_equal(ret, EXIT_SUCCESS);
+        assert_int_equal(stdout_read, 0);
+        assert_int_equal(file_read, (ssize_t)strlen(message));
+        assert_memory_equal(in_file, message, strlen(message));
+}
+
+/**
+ * @brief A failure of the log is kept through a write of it that works
+ *
+ * The first message goes to stdout as a pipe whose reader has gone, and the
+ * next to /dev/null, put in its place: the session still fails, saying the
+ * first failure.
+ */
+static void
+test_a_log_failure_is_kept_through_a_write_that_works(void **state)
+{
+        struct log_step steps[2];
+        int null;
+        int ret;
+
+        UNUSED_ARG(state);
+        null = open("/dev/null", O_WRONLY);
+        assert_int_not_equal(null, -1);
+        steps[0].fd = -1;
+        steps[0].message = "WARN: first\n";
+        steps[0].size = 0;
+        steps[1].fd = null;
+        steps[1].message = "WARN: second\n";
+        steps[1].size = 0;
+        stdout_to_the_pipe("");
+        m_init_steps = steps;
+        m_init_step_count = DIM(steps);
+        ret = run_monitoring("all:1", 0, 0);
+        m_init_steps = NULL;
+        m_init_step_count = 0;
+        stdout_back();
+        close(null);
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_stderr_has_text(
+            "Failed to write the log to standard output: %s\n",
+            strerror(EPIPE)));
+}
+
+/**
+ * @brief The first failure of the log is the one said
+ *
+ * As above, with /dev/full in place of /dev/null: the second write fails as
+ * well, with ENOSPC, and EPIPE is still what is said.
+ */
+static void
+test_the_first_log_failure_is_the_one_said(void **state)
+{
+        struct log_step steps[2];
+        int full;
+        int ret;
+
+        UNUSED_ARG(state);
+        full = open("/dev/full", O_WRONLY);
+        /* where there is no /dev/full, as on some platforms */
+        if (full == -1)
+                skip();
+        steps[0].fd = -1;
+        steps[0].message = "WARN: first\n";
+        steps[0].size = 0;
+        steps[1].fd = full;
+        steps[1].message = "WARN: second\n";
+        steps[1].size = 0;
+        stdout_to_the_pipe("");
+        m_init_steps = steps;
+        m_init_step_count = DIM(steps);
+        ret = run_monitoring("all:2", 0, 0);
+        m_init_steps = NULL;
+        m_init_step_count = 0;
+        stdout_back();
+        close(full);
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_stderr_has_text(
+            "Failed to write the log to standard output: %s\n",
+            strerror(EPIPE)));
+        assert_false(output_stderr_has_text("%s", strerror(ENOSPC)));
+}
+
+/**
+ * @brief A write of the log that writes less than it was given makes pqos
+ *        exit 1
+ *
+ * stdout is a pipe of the case's, made as small as the system allows and not
+ * waited on, and nothing reads it: a message of twice its size is written in
+ * part, as such a write to a pipe is. What the write failed with is not known
+ * then, and the message says none.
+ */
+/* the Linux fcntl() command that sets a pipe's size, F_LINUX_SPECIFIC_BASE + 7,
+ * which <fcntl.h> declares only with _GNU_SOURCE, and main.c, included above,
+ * is not built with it
+ */
+#if defined(__linux__) && !defined(F_SETPIPE_SZ)
+#define F_SETPIPE_SZ 1031
+#endif
+
+static void
+test_a_short_write_of_the_log_makes_pqos_exit_1(void **state)
+{
+#ifdef F_SETPIPE_SZ
+        struct log_step step;
+        char *message;
+        int room;
+        int fds[2];
+        int ret;
+
+        UNUSED_ARG(state);
+        assert_int_equal(pipe(fds), 0);
+        room = fcntl(fds[1], F_SETPIPE_SZ, 4096);
+        if (room <= 0 || fcntl(fds[1], F_SETFL, O_NONBLOCK) != 0) {
+                close(fds[0]);
+                close(fds[1]);
+                skip();
+        }
+        message = malloc(2 * (size_t)room);
+        if (message == NULL) {
+                close(fds[0]);
+                close(fds[1]);
+                fail();
+        }
+        memset(message, 'x', 2 * (size_t)room - 1);
+        message[2 * (size_t)room - 1] = '\n';
+        step.fd = -1;
+        step.message = message;
+        step.size = 2 * (size_t)room;
+        stdout_to(fds[1], "");
+        close(fds[1]);
+        m_init_steps = &step;
+        m_init_step_count = 1;
+        ret = run_monitoring("all:3", 0, 0);
+        m_init_steps = NULL;
+        m_init_step_count = 0;
+        stdout_back();
+        close(fds[0]);
+        free(message);
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_stderr_has_text(
+            "Failed to write the log to standard output\n"));
+#else
+        UNUSED_ARG(state);
+        skip();
+#endif
 }
 
 int
@@ -686,6 +914,18 @@ main(void)
                                             case_start, case_end),
             cmocka_unit_test_setup_teardown(
                 test_a_failed_log_file_on_descriptor_1_is_named, case_start,
+                case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_log_file_gets_the_log_and_stdout_none, case_start,
+                case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_log_failure_is_kept_through_a_write_that_works,
+                case_start, case_end),
+            cmocka_unit_test_setup_teardown(
+                test_the_first_log_failure_is_the_one_said, case_start,
+                case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_short_write_of_the_log_makes_pqos_exit_1, case_start,
                 case_end)};
         struct pqos_cpuinfo *cpu;
         int ret;
