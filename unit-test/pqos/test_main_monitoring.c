@@ -378,9 +378,13 @@ sigpipe_handled(int signo)
         UNUSED_ARG(signo);
 }
 
+/** SIGPIPE's action as case_start() found it, for case_end() to put back */
+static struct sigaction m_sigpipe_found;
+
 /**
- * @brief Has SIGPIPE handled, not ignored, and gives a case a pipe whose
- *        reader has gone, for it to put in place of stdout
+ * @brief Has SIGPIPE handled, not ignored, keeping the action it had, and
+ *        gives a case a pipe whose reader has gone, for it to put in place of
+ *        stdout
  */
 static int
 case_start(void **state)
@@ -392,7 +396,7 @@ case_start(void **state)
         memset(&sa, 0, sizeof(sa));
         sa.sa_handler = sigpipe_handled;
         sigemptyset(&sa.sa_mask);
-        assert_int_equal(sigaction(SIGPIPE, &sa, NULL), 0);
+        assert_int_equal(sigaction(SIGPIPE, &sa, &m_sigpipe_found), 0);
         m_sigpipe_ignored_at_init = 0;
         assert_int_equal(pipe(fds), 0);
         close(fds[0]);
@@ -446,22 +450,18 @@ stdout_back(void)
 
 /**
  * @brief Puts the process's stdout back, closes the pipe, and gives SIGPIPE
- *        its default action back
+ *        back the action case_start() found, whatever the case and main() did
+ *        with it meanwhile
  */
 static int
 case_end(void **state)
 {
-        struct sigaction sa;
-
         UNUSED_ARG(state);
         stdout_back();
         if (m_reader_gone != -1)
                 close(m_reader_gone);
         m_reader_gone = -1;
-        memset(&sa, 0, sizeof(sa));
-        sa.sa_handler = SIG_DFL;
-        sigemptyset(&sa.sa_mask);
-        (void)sigaction(SIGPIPE, &sa, NULL);
+        (void)sigaction(SIGPIPE, &m_sigpipe_found, NULL);
 
         return 0;
 }
