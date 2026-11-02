@@ -555,6 +555,22 @@ lock_hold(const int type)
         return fd;
 }
 
+/* 1 where another descriptor's lock of \a type, not waiting, is refused with
+ * EWOULDBLOCK, as it is while the lock is held against it
+ */
+static int
+lock_refused(const int type)
+{
+        const int fd = open(lock_dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        int refused;
+
+        assert_true(fd >= 0);
+        refused = flock(fd, type | LOCK_NB) != 0 && errno == EWOULDBLOCK;
+        close(fd);
+
+        return refused;
+}
+
 static long
 lock_ms_since(const struct timespec *start)
 {
@@ -759,7 +775,7 @@ test_resctrl_lock_times_out(void **state __attribute__((unused)))
 
 /* a lock whose holder gives it up during the wait, in the lock's first sleep,
  * is taken at the try after the sleep, however late its thread runs: the
- * clock is frozen for the case
+ * clock is frozen for the case. It is held until it is released
  */
 static void
 test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
@@ -767,6 +783,7 @@ test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
         const int holder = lock_hold(LOCK_EX);
         struct lock_watchdog watchdog;
         int fired;
+        int held;
         int ret;
 
         lock_released_holder = holder;
@@ -777,11 +794,50 @@ test_resctrl_lock_taken_once_given_up(void **state __attribute__((unused)))
         __atomic_store_n(&lock_clock_frozen, 0, __ATOMIC_SEQ_CST);
         lock_released_holder = -1;
         close(holder);
+        held = lock_refused(LOCK_SH);
 
         assert_false(fired);
         assert_int_equal(lock_sleeps, 1);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_true(held);
+        assert_false(lock_refused(LOCK_EX));
+}
+
+/* a lock that was taken is held until it is released: an exclusive one
+ * against another descriptor's shared and exclusive locks, a shared one
+ * against an exclusive lock alone; and neither after its release. Each is
+ * released before anything is asserted, so that a case after a failed one
+ * does not find it held
+ */
+static void
+test_resctrl_lock_held_until_released(void **state __attribute__((unused)))
+{
+        int ex_against_sh;
+        int ex_against_ex;
+        int sh_against_ex;
+        int sh_against_sh;
+        int taken;
+
+        taken = resctrl_lock_exclusive();
+        ex_against_sh = lock_refused(LOCK_SH);
+        ex_against_ex = lock_refused(LOCK_EX);
+        if (taken == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+        assert_int_equal(taken, PQOS_RETVAL_OK);
+        assert_true(ex_against_sh);
+        assert_true(ex_against_ex);
+        assert_false(lock_refused(LOCK_EX));
+
+        taken = resctrl_lock_shared();
+        sh_against_ex = lock_refused(LOCK_EX);
+        sh_against_sh = lock_refused(LOCK_SH);
+        if (taken == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+        assert_int_equal(taken, PQOS_RETVAL_OK);
+        assert_true(sh_against_ex);
+        assert_false(sh_against_sh);
+        assert_false(lock_refused(LOCK_EX));
 }
 
 /* a thread that sleeps past the timeout in its wait, as one that is not run
@@ -1263,6 +1319,9 @@ main(void)
                                             lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_taken_once_given_up, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_held_until_released, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_not_taken_past_the_timeout, lock_setup,
