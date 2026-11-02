@@ -1089,6 +1089,50 @@ test_resctrl_lock_cancelled_as_it_is_taken(void **state __attribute__((unused)))
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
 }
 
+/* the cancellation case's worker with its cancellation asynchronous through
+ * the lock, as a caller may have it: a cancellation pending is acted on as
+ * soon as the lock puts the caller's state back
+ */
+static void *
+lock_cancelled_async_worker(void *arg __attribute__((unused)))
+{
+        int type;
+
+        (void)pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &type);
+        lock_cancelled_ret = resctrl_lock_exclusive();
+        (void)pthread_setcanceltype(type, &type);
+        pthread_testcancel();
+
+        return NULL;
+}
+
+/* and so it is for a caller whose cancellation is asynchronous: the lock's
+ * handler is in before the caller's state is put back, where the cancellation
+ * is acted on at once
+ */
+static void
+test_resctrl_lock_cancelled_as_it_is_taken_async(void **state
+                                                 __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        void *result = NULL;
+        int ran;
+
+        lock_cancelled_ret = -1;
+        __atomic_store_n(&lock_cancel_in_open, 1, __ATOMIC_SEQ_CST);
+        ran = lock_run_worker(lock_cancelled_async_worker, &result);
+        __atomic_store_n(&lock_cancel_in_open, 0, __ATOMIC_SEQ_CST);
+
+        assert_int_equal(ran, 0);
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_cancelled_ret, -1);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_true(lock_free_now());
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
 /* and so is one asked for in the wait, in its first sleep, in which the holder
  * gives the lock up, so that the try after the sleep takes it, however late
  * its thread runs: the clock is frozen for the case, which a timeout would
@@ -1237,6 +1281,9 @@ main(void)
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_cancelled_as_it_is_taken, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_as_it_is_taken_async, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_cancelled_in_the_wait_then_taken, lock_setup,

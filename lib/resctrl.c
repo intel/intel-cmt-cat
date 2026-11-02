@@ -125,20 +125,28 @@ resctrl_lock_cancelled(void *arg)
 }
 
 /**
- * @brief Acts on a cancellation asked for while the lock was being taken,
- *        with the lock given up
+ * @brief Puts the caller's cancellation state back once the lock is held, and
+ *        acts on a cancellation asked for while it was being taken, with the
+ *        lock given up
  *
  * The thread's cancellation was off from before the open until the lock was
  * held, so one asked for meanwhile is pending. Acted on at the caller's next
  * cancellation point, it would leave the lock held and its descriptor open,
  * with nothing to give either up: the API lock's destructor gives the API
  * lock back alone, and the next lock would wait out its timeout on this one.
- * On its own, so that the handler's scope holds nothing else.
+ * The handler is in before the state is put back, so a caller whose
+ * cancellation is asynchronous, and acted on as soon as it is on, gives the
+ * lock up as well. On its own, so that the handler's scope holds nothing else.
+ *
+ * @param [in] state the caller's cancellation state
  */
 static void
-resctrl_lock_handed_over(void)
+resctrl_lock_handed_over(const int state)
 {
+        int off;
+
         pthread_cleanup_push(resctrl_lock_cancelled, NULL);
+        (void)pthread_setcancelstate(state, &off);
         pthread_testcancel();
         pthread_cleanup_pop(0);
 }
@@ -154,9 +162,12 @@ resctrl_lock_handed_over(void)
  * with nothing to close it. It is put back before a failure is logged, since
  * a log written to a pipe, or a callback, can block, and a thread that cannot
  * be cancelled there would keep the API lock. A cancellation asked for since
- * the start is acted on as the wait ends: in that log, or, where the lock was
- * taken, before it is handed over, with the lock given up - see
- * resctrl_lock_handed_over().
+ * the start is acted on, where the lock was taken, before it is handed over,
+ * with the lock given up - see resctrl_lock_handed_over(). Where the wait
+ * failed, it is acted on in the log where the log reaches a cancellation
+ * point, as a write() does; where it does not, as at a level that writes
+ * nothing, the call returns with it still pending, for the caller's next
+ * cancellation point, with nothing left open.
  *
  * @param[in] type lock type
  *
@@ -183,15 +194,13 @@ resctrl_lock(const int type)
         }
 
         err = resctrl_lock_try(resctrl_lock_fd, type);
-        if (err != 0) {
-                close(resctrl_lock_fd);
-                resctrl_lock_fd = -1;
-        }
-        (void)pthread_setcancelstate(state, &state);
         if (err == 0) {
-                resctrl_lock_handed_over();
+                resctrl_lock_handed_over(state);
                 return PQOS_RETVAL_OK;
         }
+        close(resctrl_lock_fd);
+        resctrl_lock_fd = -1;
+        (void)pthread_setcancelstate(state, &state);
 
         if (err == ETIMEDOUT)
                 LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
