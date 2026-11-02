@@ -1892,9 +1892,9 @@ optarg_is_next_word(char **argv)
  * from then on the process holds the library's lock and what the library has
  * taken. At its default action, SIGPIPE ended the process at a write to a pipe
  * whose reader had gone, before its clean-up, with the lock file left behind.
- * Ignored, it leaves such a write to fail with EPIPE: libpqos says the first
- * failure of its log on stderr, the monitoring loop records its own output's,
- * and stdout_check() says the tool's other output's at the end.
+ * Ignored, it leaves such a write to fail with EPIPE: log_write() keeps the
+ * first failure of the library's log, the monitoring loop records its own
+ * output's, and log_check() and stdout_check() say the others' at the end.
  *
  * @return Operational status
  * @retval 0 on success
@@ -1943,6 +1943,63 @@ stdout_check(void)
         return -1;
 }
 
+/**
+ * The descriptor of the library's log, stdout unless -l named a file, and the
+ * first failure of a write to it: an errno, -1 for a write that wrote less than
+ * it was given, or 0 while every write has worked
+ */
+static int m_log_fd = -1;
+static int m_log_failed;
+
+/**
+ * @brief Writes a message of the library's log to its descriptor
+ *
+ * The library is given this in place of the descriptor, and hands it the bytes
+ * it would have written there. Written by the library, a write that failed was
+ * said on stderr, inside the API that was logging and with its lock held, and
+ * left the exit status as it was: with SIGPIPE ignored, a log on stdout whose
+ * reader had gone was lost with the session exiting 0, as stdout's error
+ * indicator does not see a write to its descriptor. The first failure is kept
+ * here instead, for log_check() to say once the library is finalised.
+ *
+ * @param [in] context unused
+ * @param [in] size length of \a message
+ * @param [in] message what to write
+ */
+static void
+log_write(void *context, const size_t size, const char *message)
+{
+        const ssize_t written = write(m_log_fd, message, size);
+        int none = 0;
+
+        UNUSED_ARG(context);
+        if (written >= 0 && (size_t)written == size)
+                return;
+        (void)__atomic_compare_exchange_n(&m_log_failed, &none,
+                                          written < 0 ? errno : -1, 0,
+                                          __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+}
+
+/**
+ * @brief Says a write of the library's log that failed
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 if a write failed, which is said on stderr
+ */
+static int
+log_check(void)
+{
+        const int err = __atomic_load_n(&m_log_failed, __ATOMIC_RELAXED);
+
+        if (err == 0)
+                return 0;
+        fprintf(stderr, "Failed to write the log to %s%s%s\n",
+                m_log_fd == STDOUT_FILENO ? "standard output" : sel_log_file,
+                err > 0 ? ": " : "", err > 0 ? strerror(err) : "");
+        return -1;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1961,6 +2018,8 @@ main(int argc, char **argv)
         m_cmd_name = argv[0];
 
         memset(&cfg, 0, sizeof(cfg));
+        m_log_fd = -1;
+        m_log_failed = 0;
 
         while ((cmd = getopt_long(argc, argv,
                                   ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDr:vVIPR:",
@@ -2361,17 +2420,23 @@ main(int argc, char **argv)
          * Set up file descriptor for message log
          */
         if (sel_log_file == NULL) {
-                cfg.fd_log = STDOUT_FILENO;
+                m_log_fd = STDOUT_FILENO;
         } else {
-                cfg.fd_log = pqos_open(sel_log_file, O_WRONLY | O_CREAT,
-                                       FILE_READ_WRITE);
-                if (cfg.fd_log == -1) {
+                m_log_fd = pqos_open(sel_log_file, O_WRONLY | O_CREAT,
+                                     FILE_READ_WRITE);
+                if (m_log_fd == -1) {
                         printf("Error opening %s log file: %s!\n", sel_log_file,
                                strerror(errno));
                         exit_val = EXIT_FAILURE;
                         goto error_exit_1;
                 }
         }
+        /* written through log_write(), which keeps a failure for the exit
+         * status
+         */
+        cfg.fd_log = -1;
+        cfg.callback_log = log_write;
+        cfg.context_log = NULL;
 
         if (sel_print_version)
                 print_tool_version();
@@ -2614,11 +2679,17 @@ error_exit_1:
         if (!monitored && stdout_check() != 0)
                 exit_val = EXIT_FAILURE;
 
+        /* the library's log, which the library is done with: pqos_fini() waits
+         * for the messages on their way
+         */
+        if (log_check() != 0)
+                exit_val = EXIT_FAILURE;
+
         /**
          * Close file descriptor for message log
          */
-        if (sel_log_file != NULL && cfg.fd_log != -1)
-                close(cfg.fd_log);
+        if (sel_log_file != NULL && m_log_fd != -1)
+                close(m_log_fd);
 
         /**
          * Free allocated memory

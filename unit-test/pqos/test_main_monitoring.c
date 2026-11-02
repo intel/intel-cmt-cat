@@ -96,6 +96,13 @@ static char m_calls[64];
 /** 1 where SIGPIPE was ignored when main() initialised the library */
 static int m_sigpipe_ignored_at_init;
 
+/** a line the library's initialisation logs, as libpqos says a warning there,
+ * or NULL for none; and whether a failure of the log had been said by the
+ * time the library was finalised
+ */
+static const char *m_init_log;
+static int m_log_said_before_fini;
+
 /** the write end of a pipe whose reader has gone, which a case puts in place
  * of stdout's descriptor, and that descriptor, kept meanwhile
  */
@@ -112,14 +119,27 @@ called(const char *what)
         strcat(m_calls, " ");
 }
 
+/**
+ * Logs m_init_log as libpqos would: to the descriptor it was given, a write
+ * that fails leaving the status alone, and to the callback
+ */
 int
 __wrap_pqos_init(const struct pqos_config *config)
 {
         struct sigaction sa;
 
-        UNUSED_ARG(config);
         m_sigpipe_ignored_at_init =
             sigaction(SIGPIPE, NULL, &sa) == 0 && sa.sa_handler == SIG_IGN;
+        if (m_init_log != NULL) {
+                const size_t size = strlen(m_init_log);
+
+                if (config->fd_log >= 0 &&
+                    write(config->fd_log, m_init_log, size) < 0)
+                        fprintf(stderr, "log_emit: printing to file failed\n");
+                if (config->callback_log != NULL)
+                        config->callback_log(config->context_log, size,
+                                             m_init_log);
+        }
         return PQOS_RETVAL_OK;
 }
 
@@ -127,6 +147,8 @@ int
 __wrap_pqos_fini(void)
 {
         called("fini");
+        m_log_said_before_fini =
+            output_stderr_has_text("Failed to write the log");
         return PQOS_RETVAL_OK;
 }
 
@@ -323,13 +345,19 @@ case_start(void **state)
  * not main()'s, and are not recorded.
  */
 static void
-stdout_to_the_pipe(const char *text)
+stdout_to(const int fd, const char *text)
 {
         (void)__real_fflush(stdout);
         m_stdout_saved = dup(STDOUT_FILENO);
         assert_int_not_equal(m_stdout_saved, -1);
-        assert_int_not_equal(dup2(m_reader_gone, STDOUT_FILENO), -1);
+        assert_int_not_equal(dup2(fd, STDOUT_FILENO), -1);
         (void)fputs(text, stdout);
+}
+
+static void
+stdout_to_the_pipe(const char *text)
+{
+        stdout_to(m_reader_gone, text);
 }
 
 /**
@@ -509,6 +537,58 @@ test_a_monitoring_run_leaves_stdout_to_its_flush(void **state)
         assert_string_equal(m_calls, "loop stop fini flush ");
 }
 
+/**
+ * @brief A write of the library's log that failed makes pqos exit 1
+ *
+ * The library writes its log on stdout, here at its initialisation, to the
+ * descriptor straight: stdout's error indicator does not see it, and a
+ * monitoring run whose output goes to a file has nothing else on stdout to
+ * fail. As "pqos -m llc:0 -o out.txt | head -n 1" where the reader goes before
+ * the library's warning. The failure is said once the library is finalised.
+ */
+static void
+test_a_failed_write_of_the_log_makes_pqos_exit_1(void **state)
+{
+        int ret;
+
+        UNUSED_ARG(state);
+        stdout_to_the_pipe("");
+        m_init_log = "WARN: resctrl filesystem mounted!\n";
+        ret = run_monitoring("all:0", 0, 0);
+        m_init_log = NULL;
+        stdout_back();
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_stderr_has_text(
+            "Failed to write the log to standard output: %s\n",
+            strerror(EPIPE)));
+        assert_false(m_log_said_before_fini);
+        assert_string_equal(m_calls, "loop stop fini flush ");
+}
+
+/**
+ * @brief And one that wrote is not
+ */
+static void
+test_a_log_that_was_written_exits_0(void **state)
+{
+        const int null = open("/dev/null", O_WRONLY);
+        int ret;
+
+        UNUSED_ARG(state);
+        assert_int_not_equal(null, -1);
+        stdout_to(null, "");
+        close(null);
+        m_init_log = "WARN: resctrl filesystem mounted!\n";
+        ret = run_monitoring("all:1", 0, 0);
+        m_init_log = NULL;
+        stdout_back();
+
+        assert_int_equal(ret, EXIT_SUCCESS);
+        assert_false(output_has_text("Failed to write"));
+        assert_false(output_has_text("printing to file failed"));
+}
+
 int
 main(void)
 {
@@ -532,7 +612,12 @@ main(void)
             cmocka_unit_test(test_an_output_whose_end_fails_makes_pqos_exit_1),
             cmocka_unit_test_setup_teardown(
                 test_a_monitoring_run_leaves_stdout_to_its_flush, case_start,
-                case_end)};
+                case_end),
+            cmocka_unit_test_setup_teardown(
+                test_a_failed_write_of_the_log_makes_pqos_exit_1, case_start,
+                case_end),
+            cmocka_unit_test_setup_teardown(test_a_log_that_was_written_exits_0,
+                                            case_start, case_end)};
         struct pqos_cpuinfo *cpu =
             calloc(1, sizeof(*cpu) + 4 * sizeof(struct pqos_coreinfo));
         int ret;
