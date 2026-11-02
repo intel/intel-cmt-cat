@@ -87,17 +87,21 @@ __wrap_open(const char *path, int flags, ...)
 
 /* the sleeps of the lock's waits, and how many of them found the thread's
  * cancellation on, counted with the atomic builtins: a case's other thread
- * reads them. A case can have the first sleep:
+ * reads them; and what the first two asked for. A case can have the first
+ * sleep:
  * - give a holder's lock up, and sleep as asked;
  * - give a holder's lock up, and last longer than the lock's timeout, as for a
  *   thread that is not run for a while;
- * - ask for the sleeping thread's own cancellation, which the wait has off.
+ * - ask for the sleeping thread's own cancellation, which the wait has off;
+ * - end at once, as a signal cuts a sleep short, with half of it left.
  */
 static unsigned lock_sleeps;
 static unsigned lock_sleeps_cancellable;
+static struct timespec lock_sleeps_asked[2];
 static int lock_released_holder = -1;
 static int lock_overslept_holder = -1;
 static int lock_cancel_in_sleep;
+static int lock_sleep_interrupted;
 
 int
 __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
@@ -105,9 +109,13 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
         int found;
         int set;
 
+        unsigned n;
+
         (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &found);
         (void)pthread_setcancelstate(found, &set);
-        __atomic_add_fetch(&lock_sleeps, 1, __ATOMIC_SEQ_CST);
+        n = __atomic_add_fetch(&lock_sleeps, 1, __ATOMIC_SEQ_CST);
+        if (n <= DIM(lock_sleeps_asked))
+                lock_sleeps_asked[n - 1] = *req;
         if (found == PTHREAD_CANCEL_ENABLE)
                 __atomic_add_fetch(&lock_sleeps_cancellable, 1,
                                    __ATOMIC_SEQ_CST);
@@ -116,6 +124,14 @@ __wrap_nanosleep(const struct timespec *req, struct timespec *rem)
         if (lock_released_holder != -1) {
                 (void)flock(lock_released_holder, LOCK_UN);
                 lock_released_holder = -1;
+        }
+        if (__atomic_exchange_n(&lock_sleep_interrupted, 0, __ATOMIC_SEQ_CST)) {
+                if (rem != NULL) {
+                        rem->tv_sec = req->tv_sec / 2;
+                        rem->tv_nsec = req->tv_nsec / 2;
+                }
+                errno = EINTR;
+                return -1;
         }
         if (lock_overslept_holder != -1) {
                 const struct timespec past = {0, 150000000L};
@@ -524,6 +540,8 @@ lock_setup(void **state __attribute__((unused)))
         lock_released_holder = -1;
         lock_overslept_holder = -1;
         lock_cancel_in_sleep = 0;
+        lock_sleep_interrupted = 0;
+        memset(lock_sleeps_asked, 0, sizeof(lock_sleeps_asked));
         lock_clock_fails_in = 0;
         lock_clock_frozen = 0;
         lock_opens = 0;
@@ -838,6 +856,42 @@ test_resctrl_lock_held_until_released(void **state __attribute__((unused)))
         assert_true(sh_against_ex);
         assert_false(sh_against_sh);
         assert_false(lock_refused(LOCK_EX));
+}
+
+/* a sleep of the wait that a signal cuts short is slept out, the time it had
+ * left asked for again, before the lock is tried again: here the holder gives
+ * the lock up in that sleep, so a try straight after the signal would take it
+ * at once, with one sleep made. The clock is frozen for the case
+ */
+static void
+test_resctrl_lock_interrupted_sleep_slept_out(void **state
+                                              __attribute__((unused)))
+{
+        const int holder = lock_hold(LOCK_EX);
+        struct lock_watchdog watchdog;
+        int fired;
+        int ret;
+
+        lock_released_holder = holder;
+        lock_sleep_interrupted = 1;
+        __atomic_store_n(&lock_clock_frozen, 1, __ATOMIC_SEQ_CST);
+        lock_watchdog_start(&watchdog, holder);
+        ret = resctrl_lock_exclusive();
+        fired = lock_watchdog_stop(&watchdog);
+        __atomic_store_n(&lock_clock_frozen, 0, __ATOMIC_SEQ_CST);
+        lock_released_holder = -1;
+        close(holder);
+        if (ret == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        assert_false(fired);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(lock_sleeps, 2);
+        assert_int_equal(lock_sleeps_asked[1].tv_sec,
+                         lock_sleeps_asked[0].tv_sec / 2);
+        assert_int_equal(lock_sleeps_asked[1].tv_nsec,
+                         lock_sleeps_asked[0].tv_nsec / 2);
+        assert_true(lock_sleeps_asked[0].tv_nsec > 0);
 }
 
 /* a thread that sleeps past the timeout in its wait, as one that is not run
@@ -1322,6 +1376,9 @@ main(void)
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_held_until_released, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_interrupted_sleep_slept_out, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_not_taken_past_the_timeout, lock_setup,

@@ -57,6 +57,20 @@ static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 #define RESCTRL_LOCK_RETRY_NS   1000000L
 
 /**
+ * @brief Sleeps the resctrl lock's retry interval, the rest of it after each
+ *        signal that cuts it short
+ */
+static void
+resctrl_lock_sleep(void)
+{
+        struct timespec req = {0, RESCTRL_LOCK_RETRY_NS};
+        struct timespec rem;
+
+        while (nanosleep(&req, &rem) != 0 && errno == EINTR)
+                req = rem;
+}
+
+/**
  * @brief Tries to take the resctrl lock until it is had, or until the timeout
  *        has passed
  *
@@ -68,7 +82,8 @@ static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
  * cancelled, any alarm the application had pending: they share the process's
  * one ITIMER_REAL. The timeout is when the tries stop, at the first look at
  * the clock after a sleep, not a bound on how long they take: a sleep can end
- * late.
+ * late. One that a signal cuts short is slept out, so that the tries keep
+ * their pace whatever signals the process takes.
  *
  * @param [in] fd descriptor of the resctrl filesystem
  * @param [in] type lock type
@@ -79,7 +94,6 @@ static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 static int
 resctrl_lock_try(const int fd, const int type)
 {
-        const struct timespec retry = {0, RESCTRL_LOCK_RETRY_NS};
         struct timespec start;
         struct timespec now;
         int err;
@@ -92,7 +106,7 @@ resctrl_lock_try(const int fd, const int type)
                 err = errno;
                 if (err != EWOULDBLOCK && err != EINTR)
                         break;
-                (void)nanosleep(&retry, NULL);
+                resctrl_lock_sleep();
                 if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
                         err = errno;
                         break;
