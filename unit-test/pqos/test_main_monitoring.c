@@ -96,11 +96,11 @@ static char m_calls[64];
 /** 1 where SIGPIPE was ignored when main() initialised the library */
 static int m_sigpipe_ignored_at_init;
 
-/** the process's stdout, and a stream that a case puts in its place: the
- * write end of a pipe whose reader has gone
+/** the write end of a pipe whose reader has gone, which a case puts in place
+ * of stdout's descriptor, and that descriptor, kept meanwhile
  */
-static FILE *m_stdout;
-static FILE *m_reader_gone;
+static int m_reader_gone = -1;
+static int m_stdout_saved = -1;
 
 static void
 called(const char *what)
@@ -290,8 +290,8 @@ sigpipe_handled(int signo)
 }
 
 /**
- * @brief Has SIGPIPE handled, not ignored, and gives a case a stdout whose
- *        reader has gone, for it to put in place of the process's
+ * @brief Has SIGPIPE handled, not ignored, and gives a case a pipe whose
+ *        reader has gone, for it to put in place of stdout
  */
 static int
 case_start(void **state)
@@ -305,21 +305,53 @@ case_start(void **state)
         sigemptyset(&sa.sa_mask);
         assert_int_equal(sigaction(SIGPIPE, &sa, NULL), 0);
         m_sigpipe_ignored_at_init = 0;
-        m_stdout = stdout;
         assert_int_equal(pipe(fds), 0);
         close(fds[0]);
-        m_reader_gone = fdopen(fds[1], "w");
-        if (m_reader_gone == NULL)
-                close(fds[1]);
-        assert_non_null(m_reader_gone);
+        m_reader_gone = fds[1];
 
         return 0;
 }
 
 /**
- * @brief Puts the process's stdout back, closes the pipe's stream, whose last
- *        write fails as SIGPIPE is still handled or ignored, and gives
- *        SIGPIPE its default action back
+ * @brief Puts the pipe whose reader has gone in place of stdout, with \a text
+ *        in the stream for a flush to write
+ *
+ * The descriptor is put in place, not the stream: stdout cannot be assigned
+ * where the C library declares it const, as musl does. What the stream holds
+ * goes where it was going first. \a text has no newline, so that the stream
+ * keeps it, line buffered, as on a terminal, or not. The fixture's flushes are
+ * not main()'s, and are not recorded.
+ */
+static void
+stdout_to_the_pipe(const char *text)
+{
+        (void)__real_fflush(stdout);
+        m_stdout_saved = dup(STDOUT_FILENO);
+        assert_int_not_equal(m_stdout_saved, -1);
+        assert_int_not_equal(dup2(m_reader_gone, STDOUT_FILENO), -1);
+        (void)fputs(text, stdout);
+}
+
+/**
+ * @brief Puts the process's stdout back: what the stream still holds is
+ *        dropped by a flush to the pipe, which fails, as SIGPIPE is handled
+ *        or ignored, and the stream's error indicator is cleared
+ */
+static void
+stdout_back(void)
+{
+        if (m_stdout_saved == -1)
+                return;
+        (void)__real_fflush(stdout);
+        (void)dup2(m_stdout_saved, STDOUT_FILENO);
+        close(m_stdout_saved);
+        m_stdout_saved = -1;
+        clearerr(stdout);
+}
+
+/**
+ * @brief Puts the process's stdout back, closes the pipe, and gives SIGPIPE
+ *        its default action back
  */
 static int
 case_end(void **state)
@@ -327,10 +359,10 @@ case_end(void **state)
         struct sigaction sa;
 
         UNUSED_ARG(state);
-        stdout = m_stdout;
-        if (m_reader_gone != NULL)
-                (void)fclose(m_reader_gone);
-        m_reader_gone = NULL;
+        stdout_back();
+        if (m_reader_gone != -1)
+                close(m_reader_gone);
+        m_reader_gone = -1;
         memset(&sa, 0, sizeof(sa));
         sa.sa_handler = SIG_DFL;
         sigemptyset(&sa.sa_mask);
@@ -392,10 +424,10 @@ test_the_library_is_initialised_with_sigpipe_ignored(void **state)
 /**
  * @brief A write to stdout that failed, where no monitoring ran, is said
  *
- * What the tool prints is captured here, so the stream put in place of stdout
- * holds a line of the tool's for main()'s check to write; the write to the
- * pipe fails with EPIPE. The process's stdout is put back as soon as main()
- * returns.
+ * What the tool prints is captured here, so stdout, with the pipe in place of
+ * its descriptor, holds a line of the tool's for main()'s check to write; the
+ * write to the pipe fails with EPIPE. The process's stdout is put back as
+ * soon as main() returns.
  */
 static void
 test_a_failed_write_to_stdout_makes_pqos_exit_1(void **state)
@@ -403,10 +435,9 @@ test_a_failed_write_to_stdout_makes_pqos_exit_1(void **state)
         int ret;
 
         UNUSED_ARG(state);
-        (void)fputs("PQoS Library version: 26.6.0\n", m_reader_gone);
-        stdout = m_reader_gone;
+        stdout_to_the_pipe("PQoS Library version: 26.6.0");
         ret = run_version();
-        stdout = m_stdout;
+        stdout_back();
 
         assert_int_equal(ret, EXIT_FAILURE);
         assert_int_equal(output_exit_was_called(), 0);
@@ -432,11 +463,10 @@ test_an_earlier_failed_write_to_stdout_makes_pqos_exit_1(void **state)
         int ret;
 
         UNUSED_ARG(state);
-        (void)fputs("PQoS Library version: 26.6.0\n", m_reader_gone);
-        assert_int_not_equal(fflush(m_reader_gone), 0);
-        stdout = m_reader_gone;
+        stdout_to_the_pipe("PQoS Library version: 26.6.0");
+        assert_int_not_equal(__real_fflush(stdout), 0);
         ret = run_version();
-        stdout = m_stdout;
+        stdout_back();
 
         assert_int_equal(ret, EXIT_FAILURE);
         assert_true(
@@ -470,10 +500,9 @@ test_a_monitoring_run_leaves_stdout_to_its_flush(void **state)
         int ret;
 
         UNUSED_ARG(state);
-        (void)fputs("TIME 2026-10-30 16:00:00\n", m_reader_gone);
-        stdout = m_reader_gone;
+        stdout_to_the_pipe("TIME 2026-10-30 16:00:00");
         ret = run_monitoring("all:3", 0, 0);
-        stdout = m_stdout;
+        stdout_back();
 
         assert_int_equal(ret, EXIT_SUCCESS);
         assert_false(output_has_text("Failed to write"));
