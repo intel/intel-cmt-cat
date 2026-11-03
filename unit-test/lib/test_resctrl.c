@@ -1465,6 +1465,122 @@ test_resctrl_lock_failure_logged_cancellable(void **state
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
 }
 
+/* what resctrl_lock_exclusive() gave a worker that ends holding the lock */
+static int lock_ended_ret = -1;
+
+/* takes the lock and ends its thread with it held, as a locked section that
+ * calls pthread_exit() does
+ */
+static void *
+lock_exit_worker(void *arg __attribute__((unused)))
+{
+        lock_ended_ret = resctrl_lock_exclusive();
+        pthread_exit(NULL);
+}
+
+/* takes the lock and is cancelled with it held, at a cancellation point of
+ * its locked section
+ */
+static void *
+lock_cancel_holding_worker(void *arg __attribute__((unused)))
+{
+        lock_ended_ret = resctrl_lock_exclusive();
+        (void)pthread_cancel(pthread_self());
+        pthread_testcancel();
+
+        return NULL;
+}
+
+/* a log callback that ends the thread it is called on, as an application's
+ * may
+ */
+static void
+lock_log_ends_the_thread(void *context __attribute__((unused)),
+                         const size_t size __attribute__((unused)),
+                         const char *message __attribute__((unused)))
+{
+        pthread_exit(NULL);
+}
+
+/* takes the lock and logs in its locked section, where the callback ends the
+ * thread
+ */
+static void *
+lock_log_exit_worker(void *arg __attribute__((unused)))
+{
+        lock_ended_ret = resctrl_lock_exclusive();
+        LOG_ERROR("a locked section logs\n");
+
+        return NULL;
+}
+
+/* runs \a worker, which takes the lock and ends with it held, giving what it
+ * returned, and the log back to the silent one afterwards
+ */
+static void *
+lock_run_ending_worker(void *(*worker)(void *))
+{
+        void *result = NULL;
+
+        lock_ended_ret = -1;
+        assert_int_equal(lock_run_worker(worker, &result), 0);
+        test_log_init_silent();
+
+        return result;
+}
+
+/* the worker took the lock, and its end gave it up: its descriptor closed, no
+ * other descriptor refused the lock, and the lock taken again at once
+ */
+static void
+assert_lock_given_up(const unsigned fds)
+{
+        assert_int_equal(lock_ended_ret, PQOS_RETVAL_OK);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_int_equal(lock_refused(LOCK_EX), 0);
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(lock_sleeps, 0);
+}
+
+/* a thread that calls pthread_exit() holding the lock gives it up as it ends,
+ * without a release
+ */
+static void
+test_resctrl_lock_given_up_at_thread_exit(void **state __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+
+        assert_null(lock_run_ending_worker(lock_exit_worker));
+        assert_lock_given_up(fds);
+}
+
+/* a thread cancelled holding the lock gives it up as it ends */
+static void
+test_resctrl_lock_given_up_when_cancelled_holding_it(void **state
+                                                     __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+
+        assert_ptr_equal(lock_run_ending_worker(lock_cancel_holding_worker),
+                         PTHREAD_CANCELED);
+        assert_lock_given_up(fds);
+}
+
+/* a log callback that ends the thread in a locked section, as one called from
+ * a log while the lock is held, has the lock given up as the thread ends
+ */
+static void
+test_resctrl_lock_given_up_when_a_log_callback_ends_the_thread(
+    void **state __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+
+        (void)log_init(-1, lock_log_ends_the_thread, NULL, LOG_VER_DEFAULT);
+        assert_null(lock_run_ending_worker(lock_log_exit_worker));
+        assert_lock_given_up(fds);
+}
+
 static void *
 lock_cancelled_before_worker(void *arg __attribute__((unused)))
 {
@@ -1760,6 +1876,15 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_shared_beside_shared, lock_setup,
                 lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_given_up_at_thread_exit, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_given_up_when_cancelled_holding_it,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_given_up_when_a_log_callback_ends_the_thread,
+                lock_setup, lock_teardown),
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);

@@ -70,6 +70,10 @@ extern "C" {
 /**
  * @brief Obtain shared lock on resctrl filesystem
  *
+ * A thread that ends holding the lock, by pthread_exit() or a cancellation
+ * acted on in a locked section, gives it up as it ends, as it would with
+ * resctrl_lock_release(); and so does resctrl_lock_exclusive()'s.
+ *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
