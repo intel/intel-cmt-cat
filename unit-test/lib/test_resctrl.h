@@ -49,5 +49,7 @@ int __wrap_pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
 int __real_pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
 int __wrap_pthread_setspecific(pthread_key_t key, const void *value);
 int __real_pthread_setspecific(pthread_key_t key, const void *value);
+int __wrap_pthread_setcancelstate(int state, int *oldstate);
+int __real_pthread_setcancelstate(int state, int *oldstate);
 
 #endif /* TEST_RESCTRL_H_ */

@@ -125,7 +125,8 @@ $(LIB_DEPS) $(TESTS_DEPS): Makefile $(FLAGS_STAMP)
 # written down. Included here rather than at the top so that the default goal is
 # still "all".
 DEPFILES_TO_READ = $(LIB_DEPS) $(TESTS_DEPS) $(OBJ_DIR)/cxl_fixture.d \
-	$(OBJ_DIR)/lock_fixture.d $(OBJ_DIR)/liblock_probe.d
+	$(OBJ_DIR)/lock_fixture.d $(OBJ_DIR)/liblock_probe.d \
+	$(OBJ_DIR)/libresctrl_probe.d
 include ../depfiles.mk
 
 
@@ -304,6 +305,18 @@ $(OBJ_DIR)/liblock_probe.d: $(LIB_DIR)/lock.c Makefile $(FLAGS_STAMP)
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MT $(BIN_DIR)/liblock_probe.so -MT $@ -MF $@ $(CFLAGS) \
 		-DPQOS_LOCAL= -ULOCKFILE -DLOCKFILE=\"lock/libpqos\" $<
+
+# and for the resctrl lock built as a shared object for its unload case, from
+# the three sources it is built from: -MF keeps only the last source's, so each
+# is asked on its own and the answers put together
+RESCTRL_PROBE_SRCS = $(LIB_DIR)/resctrl.c $(LIB_DIR)/log.c $(LIB_DIR)/common.c
+RESCTRL_PROBE_FLAGS = -DPQOS_LOCAL= -DRESCTRL_PATH=\"$(abspath $(BIN_DIR))\"
+$(OBJ_DIR)/libresctrl_probe.d: $(RESCTRL_PROBE_SRCS) Makefile $(FLAGS_STAMP)
+	mkdir -p $(OBJ_DIR)
+	for src in $(RESCTRL_PROBE_SRCS); do \
+		$(CC) -MM -MP -MT $(BIN_DIR)/libresctrl_probe.so -MT $@ \
+			$(CFLAGS) $(RESCTRL_PROBE_FLAGS) $$src || exit 1; \
+	done > $@
 
 # each binary waits for its own, which the pattern above cannot say: these rules
 # carry no recipe and only add a prerequisite.
@@ -663,9 +676,20 @@ $(BIN_DIR)/test_hw_cap_l2ca_cdp: test_hw_cap_l2ca_cdp.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-$(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
+# the resctrl lock as a shared object of its own, for the case that unloads it
+# while a thread that took the lock lives: it locks the directory beside it,
+# which nothing else locks
+$(BIN_DIR)/libresctrl_probe.so: $(RESCTRL_PROBE_SRCS) \
+		$(OBJ_DIR)/libresctrl_probe.d Makefile $(FLAGS_STAMP)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -fPIC -shared $(RESCTRL_PROBE_FLAGS) \
+		$(RESCTRL_PROBE_SRCS) -o $@ -lpthread
+
+$(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS) \
+		$(BIN_DIR)/libresctrl_probe.so
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-DRESCTRL_PROBE_PATH=\"$(abspath $(BIN_DIR))/libresctrl_probe.so\" \
 		-Wl,--wrap=open \
 		-Wl,--wrap=close \
 		-Wl,--wrap=nanosleep \
@@ -678,8 +702,9 @@ $(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
 		-Wl,--wrap=flock \
 		-Wl,--wrap=pthread_key_create \
 		-Wl,--wrap=pthread_setspecific \
+		-Wl,--wrap=pthread_setcancelstate \
 		-Wl,--start-group \
-		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+		$(LDFLAGS) -ldl $(LIB_OBJS) $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_resctrl_schemata: test_resctrl_schemata.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)

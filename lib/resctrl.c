@@ -64,11 +64,20 @@
 #define RESCTRL_NO_SUCH_OPTION "pqos_no_such_option"
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
-static pid_t resctrl_lock_pid;   /**< The process that took the lock */
+static pid_t resctrl_lock_pid;   /**< The process that took it, once taken */
+
+/**
+ * A descriptor of the resctrl lock and the process that took the lock on it
+ */
+struct resctrl_lock_holder {
+        int fd;    /**< the lock's descriptor, -1 for none */
+        pid_t pid; /**< the process that took the lock on it */
+};
 
 /**
  * The descriptor of the resctrl lock this thread holds, -1 where it holds
- * none, which the key's destructor gives up where the thread ends holding it.
+ * none, and the process that took the lock on it, recorded once the lock is
+ * taken, which the key's destructor gives up where the thread ends holding it.
  * A thread that calls pthread_exit() in a locked section - from a log
  * callback, say - or is cancelled at a cancellation point there, a log's
  * write() above all, never reaches resctrl_lock_release(): the descriptor and
@@ -86,15 +95,22 @@ static pid_t resctrl_lock_pid;   /**< The process that took the lock */
  * since a key freed meanwhile makes the next attempt succeed. In whatever
  * order the two destructors run, this one gives up the descriptor this thread
  * took and no other (resctrl_lock_give_up()).
+ *
+ * The process is the record's own, not the latest to try for the lock: a child
+ * forked by a thread holding the lock inherits the record, and a lock it then
+ * tries for and fails to take must not make that record its own, or the
+ * thread's end would unlock the parent's lock on the open file description
+ * the two share.
  */
-static __thread int resctrl_lock_held = -1;
+static __thread struct resctrl_lock_holder resctrl_lock_held = {-1, 0};
 static pthread_key_t resctrl_lock_key;
 static int resctrl_lock_key_valid = 0;
 static pthread_mutex_t resctrl_lock_key_mutex = PTHREAD_MUTEX_INITIALIZER;
 static __thread int resctrl_lock_said = 0;
 
 /**
- * @brief Gives up the resctrl lock that this thread holds on descriptor \a fd:
+ * @brief Gives up the resctrl lock that this thread holds on descriptor \a fd,
+ *        taken by process \a pid:
  *        this thread's record and resctrl_lock_fd cleared, where it still
  *        names \a fd - another thread may hold a lock of its own by then, the
  *        API lock given to it first - the flock released and the descriptor
@@ -108,21 +124,22 @@ static __thread int resctrl_lock_said = 0;
  * on the open file description the two share.
  *
  * @param [in] fd the lock's descriptor
+ * @param [in] pid the process that took the lock on \a fd
  *
  * @return flock()'s answer, 0 where the lock is not this process's to give up
  */
 static int
-resctrl_lock_give_up(int fd)
+resctrl_lock_give_up(int fd, const pid_t pid)
 {
         int expected = fd;
         int state;
         int ret = 0;
 
         (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
-        resctrl_lock_held = -1;
+        resctrl_lock_held.fd = -1;
         (void)__atomic_compare_exchange_n(&resctrl_lock_fd, &expected, -1, 0,
                                           __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-        if (__atomic_load_n(&resctrl_lock_pid, __ATOMIC_SEQ_CST) == getpid())
+        if (pid == getpid())
                 ret = flock(fd, LOCK_UN);
         close(fd);
         (void)pthread_setcancelstate(state, &state);
@@ -139,10 +156,10 @@ resctrl_lock_give_up(int fd)
 static void
 resctrl_lock_exit(void *value)
 {
-        const int fd = *(const int *)value;
+        const struct resctrl_lock_holder *held = value;
 
-        if (fd >= 0)
-                (void)resctrl_lock_give_up(fd);
+        if (held->fd >= 0)
+                (void)resctrl_lock_give_up(held->fd, held->pid);
 }
 
 /**
@@ -161,6 +178,10 @@ resctrl_lock_key_unload(void)
 /**
  * @brief Creates the key, the first time a lock gets here
  *
+ * Cancellation is off while the mutex is held: a caller whose cancellation is
+ * asynchronous, cancelled there, would leave it locked, and every later lock
+ * would wait on it for good, past the lock's timeout.
+ *
  * @return 0 on success, pthread_key_create()'s error otherwise, for the next
  *         lock to try again
  */
@@ -168,9 +189,11 @@ static int
 resctrl_lock_key_create(void)
 {
         int err = 0;
+        int state;
 
         if (__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE))
                 return 0;
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
         (void)pthread_mutex_lock(&resctrl_lock_key_mutex);
         if (!__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE)) {
                 err = pthread_key_create(&resctrl_lock_key, resctrl_lock_exit);
@@ -179,6 +202,7 @@ resctrl_lock_key_create(void)
                                          __ATOMIC_RELEASE);
         }
         (void)pthread_mutex_unlock(&resctrl_lock_key_mutex);
+        (void)pthread_setcancelstate(state, &state);
 
         return err;
 }
@@ -290,7 +314,7 @@ resctrl_lock_cancelled(void *arg)
 {
         UNUSED_PARAM(arg);
 
-        (void)resctrl_lock_give_up(resctrl_lock_held);
+        (void)resctrl_lock_give_up(resctrl_lock_held.fd, resctrl_lock_held.pid);
 }
 
 /**
@@ -364,7 +388,6 @@ resctrl_lock(const int type)
                 LOG_ERROR("Could not open %s directory\n", RESCTRL_PATH);
                 return PQOS_RETVAL_ERROR;
         }
-        __atomic_store_n(&resctrl_lock_pid, getpid(), __ATOMIC_SEQ_CST);
         __atomic_store_n(&resctrl_lock_fd, fd, __ATOMIC_SEQ_CST);
 
         err = resctrl_lock_try(fd, type);
@@ -372,7 +395,10 @@ resctrl_lock(const int type)
                 /* recorded with cancellation still off: from here on, the
                  * thread gives the lock up however it ends
                  */
-                resctrl_lock_held = fd;
+                resctrl_lock_held.pid = getpid();
+                resctrl_lock_held.fd = fd;
+                __atomic_store_n(&resctrl_lock_pid, resctrl_lock_held.pid,
+                                 __ATOMIC_SEQ_CST);
                 resctrl_lock_handed_over(state);
                 return PQOS_RETVAL_OK;
         }
@@ -407,16 +433,24 @@ int
 resctrl_lock_release(void)
 {
         const int fd = __atomic_load_n(&resctrl_lock_fd, __ATOMIC_SEQ_CST);
+        pid_t pid;
 
         if (fd < 0) {
                 LOG_ERROR("Resctrl filesystem not locked\n");
                 return PQOS_RETVAL_ERROR;
         }
+        /* the process that took it: this thread's record where it is the
+         * holder, as it is for every release the library makes
+         */
+        if (resctrl_lock_held.fd == fd)
+                pid = resctrl_lock_held.pid;
+        else
+                pid = __atomic_load_n(&resctrl_lock_pid, __ATOMIC_SEQ_CST);
 
         /* given up, and the descriptor closed, before anything is logged: a
          * log is a cancellation point, and a callback may end the thread
          */
-        if (resctrl_lock_give_up(fd) != 0)
+        if (resctrl_lock_give_up(fd, pid) != 0)
                 LOG_WARN("Failed to release lock on resctrl filesystem\n");
 
         return PQOS_RETVAL_OK;

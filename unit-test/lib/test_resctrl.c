@@ -36,11 +36,13 @@
 #include "test.h"
 
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <mntent.h>
 #include <pthread.h>
 #include <sched.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <sys/file.h>
@@ -148,6 +150,32 @@ __wrap_pthread_setspecific(pthread_key_t key, const void *value)
                         return refused;
 
         return __real_pthread_setspecific(key, value);
+}
+
+/* pthread_setcancelstate() as it is, but where a case arms it for a thread,
+ * that thread's next turning cancellation off waits there: it posts
+ * lock_pause_entered and goes on once lock_pause_go is posted. The lock's
+ * give-up turns it off first of all, so a thread that ends holding the lock
+ * waits before anything of it is given up
+ */
+static pthread_t lock_pause_thread;
+static int lock_pause_armed;
+static sem_t lock_pause_entered;
+static sem_t lock_pause_go;
+
+int
+__wrap_pthread_setcancelstate(int state, int *oldstate)
+{
+        if (state == PTHREAD_CANCEL_DISABLE &&
+            __atomic_load_n(&lock_pause_armed, __ATOMIC_SEQ_CST) &&
+            pthread_equal(pthread_self(), lock_pause_thread) &&
+            __atomic_exchange_n(&lock_pause_armed, 0, __ATOMIC_SEQ_CST)) {
+                (void)sem_post(&lock_pause_entered);
+                while (sem_wait(&lock_pause_go) != 0 && errno == EINTR)
+                        ;
+        }
+
+        return __real_pthread_setcancelstate(state, oldstate);
 }
 
 /* the sleeps of the lock's waits, and how many of them found the thread's
@@ -956,6 +984,7 @@ lock_setup(void **state __attribute__((unused)))
         lock_unlock_fails = 0;
         lock_key_create_errno = 0;
         lock_setspecific_fails = 0;
+        lock_pause_armed = 0;
 
         return lock_dir == NULL ? -1 : 0;
 }
@@ -1749,23 +1778,55 @@ test_resctrl_lock_released_not_given_up_again_at_exit(void **state
         assert_int_equal(lock_refused(LOCK_EX), 0);
 }
 
-/* a child forked while the lock is held, whose thread ends, closes its copy of
- * the descriptor without giving up the lock, which is the parent's and is
- * held on the open file description the two share
+/* the descriptor a forked child inherited with the lock's record, which a
+ * thread of the child's own watches for being closed: it ends the child, with
+ * 0 once it is, and 1 where it is still open after 5 s
+ */
+static int lock_child_fd = -1;
+
+static void *
+lock_child_watcher(void *arg __attribute__((unused)))
+{
+        const struct timespec ms = {0, 1000000L};
+        int i;
+
+        for (i = 0; i < 5000; i++) {
+                if (fcntl(lock_child_fd, F_GETFD) < 0 && errno == EBADF)
+                        _exit(0);
+                (void)__real_nanosleep(&ms, NULL);
+        }
+        _exit(1);
+}
+
+/* forks while the lock is held exclusively, and has the child, where \a retry
+ * says so, try for the lock and fail to take it against the parent's, then
+ * end the thread that inherited the record while a thread of its own watches
+ * the inherited descriptor: the child's exit must close the descriptor
+ * without giving up the lock, which is the parent's, held on the open file
+ * description the two share
  */
 static void
-test_resctrl_lock_kept_when_a_forked_child_ends(void **state
-                                                __attribute__((unused)))
+lock_fork_and_end_child(const int retry)
 {
         const unsigned fds = lock_open_fds();
         int status = -1;
         pid_t child;
 
         assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        lock_child_fd = lock_opened_fd;
         (void)fflush(NULL);
         child = fork();
-        if (child == 0)
+        if (child == 0) {
+                pthread_t watcher;
+
+                if (retry && resctrl_lock_exclusive() != PQOS_RETVAL_ERROR)
+                        _exit(2);
+                if (pthread_create(&watcher, NULL, lock_child_watcher, NULL) !=
+                    0)
+                        _exit(3);
+                /* the child goes on with its watcher alone */
                 pthread_exit(NULL);
+        }
         assert_true(child > 0);
         assert_int_equal(waitpid(child, &status, 0), child);
         assert_true(WIFEXITED(status));
@@ -1775,6 +1836,144 @@ test_resctrl_lock_kept_when_a_forked_child_ends(void **state
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
         assert_int_equal(lock_open_fds(), fds);
         assert_int_equal(lock_refused(LOCK_EX), 0);
+}
+
+static void
+test_resctrl_lock_kept_when_a_forked_child_ends(void **state
+                                                __attribute__((unused)))
+{
+        lock_fork_and_end_child(0);
+}
+
+/* the same, with the child having tried for the lock in between: a failed try
+ * does not make the inherited record the child's to unlock
+ */
+static void
+test_resctrl_lock_kept_when_a_forked_child_tried_for_it(void **state
+                                                        __attribute__((unused)))
+{
+        lock_fork_and_end_child(1);
+}
+
+/* a thread that ends holding the lock, stopped before its give-up has done
+ * anything, as one is once the API lock's destructor has given the API lock
+ * to another thread; that one takes the lock of its own meanwhile
+ */
+static void *
+lock_paused_exit_worker(void *arg __attribute__((unused)))
+{
+        if (resctrl_lock_shared() != PQOS_RETVAL_OK)
+                return NULL;
+        lock_pause_thread = pthread_self();
+        __atomic_store_n(&lock_pause_armed, 1, __ATOMIC_SEQ_CST);
+        pthread_exit(NULL);
+}
+
+/* the give-up of a thread that ended holding the lock leaves the lock another
+ * thread has taken since held, and releasable
+ */
+static void
+test_resctrl_lock_exit_leaves_a_later_holder_held(void **state
+                                                  __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        struct timespec deadline;
+        pthread_t worker;
+
+        assert_int_equal(sem_init(&lock_pause_entered, 0, 0), 0);
+        assert_int_equal(sem_init(&lock_pause_go, 0, 0), 0);
+        assert_int_equal(
+            pthread_create(&worker, NULL, lock_paused_exit_worker, NULL), 0);
+        assert_int_equal(__real_clock_gettime(CLOCK_REALTIME, &deadline), 0);
+        deadline.tv_sec += 5;
+        assert_int_equal(sem_timedwait(&lock_pause_entered, &deadline), 0);
+
+        assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
+        assert_int_equal(sem_post(&lock_pause_go), 0);
+        assert_int_equal(pthread_join(worker, NULL), 0);
+
+        assert_int_equal(lock_refused(LOCK_EX), 1);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_int_equal(lock_refused(LOCK_EX), 0);
+        (void)sem_destroy(&lock_pause_entered);
+        (void)sem_destroy(&lock_pause_go);
+}
+
+/** the resctrl lock as a shared object of its own, built beside this binary,
+ *  which locks the directory it is in
+ */
+#ifndef RESCTRL_PROBE_PATH
+#define RESCTRL_PROBE_PATH "bin/libresctrl_probe.so"
+#endif
+
+/** the probe library's entry points, as dlsym() gives them */
+struct resctrl_probe {
+        int (*lock)(void);
+        int (*release)(void);
+};
+
+static pthread_barrier_t lock_unload_barrier;
+
+/* takes and releases the lock from the probe library, which arms its key for
+ * the thread, then outlives the library
+ */
+static void *
+lock_user_of_the_probe(void *arg)
+{
+        const struct resctrl_probe *probe = arg;
+
+        if (probe->lock() != PQOS_RETVAL_OK ||
+            probe->release() != PQOS_RETVAL_OK)
+                _exit(4);
+        /* the key is armed: the library may go now */
+        (void)pthread_barrier_wait(&lock_unload_barrier);
+        /* and it is gone: this thread's exit runs the keys' destructors */
+        (void)pthread_barrier_wait(&lock_unload_barrier);
+        return NULL;
+}
+
+/* a thread that took the lock outlives the library, unloaded, and exits: the
+ * library deleted its key as it went, so the exit does not call a destructor
+ * that is no longer mapped. In a child, since that failure is a crash
+ */
+static void
+test_resctrl_lock_thread_outlives_the_unloaded_library(void **state
+                                                       __attribute__((unused)))
+{
+        int status = -1;
+        pid_t child;
+
+        (void)fflush(NULL);
+        child = fork();
+        assert_true(child >= 0);
+        if (child == 0) {
+                struct resctrl_probe probe;
+                pthread_t t;
+                void *handle =
+                    dlopen(RESCTRL_PROBE_PATH, RTLD_NOW | RTLD_LOCAL);
+
+                if (handle == NULL)
+                        _exit(2);
+                *(void **)&probe.lock = dlsym(handle, "resctrl_lock_shared");
+                *(void **)&probe.release =
+                    dlsym(handle, "resctrl_lock_release");
+                if (probe.lock == NULL || probe.release == NULL)
+                        _exit(2);
+                (void)pthread_barrier_init(&lock_unload_barrier, NULL, 2);
+                if (pthread_create(&t, NULL, lock_user_of_the_probe, &probe) !=
+                    0)
+                        _exit(2);
+                (void)pthread_barrier_wait(&lock_unload_barrier);
+                if (dlclose(handle) != 0)
+                        _exit(2);
+                (void)pthread_barrier_wait(&lock_unload_barrier);
+                _exit(pthread_join(t, NULL) == 0 ? 0 : 1);
+        }
+
+        assert_int_equal(waitpid(child, &status, 0), child);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
 }
 
 /* what the log callback found as the release warned that its unlock failed */
@@ -2203,6 +2402,15 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_kept_when_a_forked_child_ends, lock_setup,
                 lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_kept_when_a_forked_child_tried_for_it,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_exit_leaves_a_later_holder_held, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_thread_outlives_the_unloaded_library,
+                lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_closed_before_the_unlock_warning, lock_setup,
                 lock_teardown),

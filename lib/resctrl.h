@@ -78,7 +78,8 @@ extern "C" {
  * and a thread that then ends holding it leaves it held; each later lock
  * tries the key again. A child forked while the lock is held, releasing it or
  * ending the thread that inherited it, closes its copy of the descriptor
- * without unlocking it, so the lock stays the parent's.
+ * without unlocking it, so the lock stays the parent's, even where the child
+ * has since tried for the lock and failed to take it.
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
