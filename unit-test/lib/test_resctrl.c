@@ -40,10 +40,12 @@
 #include <fcntl.h>
 #include <mntent.h>
 #include <pthread.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <sys/file.h>
 #include <sys/syscall.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -59,11 +61,13 @@ static char *lock_dir;
 static unsigned lock_opens;
 static int lock_open_errno;
 static int lock_cancel_in_open;
+static int lock_opened_fd = -1;
 
 int
 __wrap_open(const char *path, int flags, ...)
 {
         int mode = 0;
+        int fd;
 
         if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
                 va_list ap;
@@ -81,10 +85,69 @@ __wrap_open(const char *path, int flags, ...)
                 if (__atomic_exchange_n(&lock_cancel_in_open, 0,
                                         __ATOMIC_SEQ_CST))
                         (void)pthread_cancel(pthread_self());
-                path = lock_dir;
+                fd = __real_open(lock_dir, flags, mode);
+                __atomic_store_n(&lock_opened_fd, fd, __ATOMIC_SEQ_CST);
+                return fd;
         }
 
         return __real_open(path, flags, mode);
+}
+
+/* flock() as it is, but where a case asks for it, the next unlock fails
+ * after it has given the lock up, as one the kernel reports an error for
+ */
+static int lock_unlock_fails;
+
+int
+__wrap_flock(int fd, int operation)
+{
+        int ret = __real_flock(fd, operation);
+
+        if ((operation & ~LOCK_NB) == LOCK_UN &&
+            __atomic_exchange_n(&lock_unlock_fails, 0, __ATOMIC_SEQ_CST)) {
+                errno = EIO;
+                return -1;
+        }
+
+        return ret;
+}
+
+/* the keys created, counted, and as many of the next creations as a case asks
+ * for refused with lock_key_create_errno; and as many of the next values set
+ * refused, as with a key the process has run out of memory for
+ */
+static unsigned lock_key_creates;
+static int lock_key_create_errno;
+static unsigned lock_setspecific_fails;
+
+int
+__wrap_pthread_key_create(pthread_key_t *key, void (*destructor)(void *))
+{
+        const int err =
+            __atomic_load_n(&lock_key_create_errno, __ATOMIC_SEQ_CST);
+
+        __atomic_add_fetch(&lock_key_creates, 1, __ATOMIC_SEQ_CST);
+        if (err != 0)
+                return err;
+
+        return __real_pthread_key_create(key, destructor);
+}
+
+int
+__wrap_pthread_setspecific(pthread_key_t key, const void *value)
+{
+        /* a pthread function's error, which is positive */
+        const int refused = ENOMEM;
+        unsigned left =
+            __atomic_load_n(&lock_setspecific_fails, __ATOMIC_SEQ_CST);
+
+        while (left > 0)
+                if (__atomic_compare_exchange_n(&lock_setspecific_fails, &left,
+                                                left - 1, 0, __ATOMIC_SEQ_CST,
+                                                __ATOMIC_SEQ_CST))
+                        return refused;
+
+        return __real_pthread_setspecific(key, value);
 }
 
 /* the sleeps of the lock's waits, and how many of them found the thread's
@@ -889,6 +952,10 @@ lock_setup(void **state __attribute__((unused)))
         lock_opens = 0;
         lock_open_errno = 0;
         lock_cancel_in_open = 0;
+        lock_opened_fd = -1;
+        lock_unlock_fails = 0;
+        lock_key_create_errno = 0;
+        lock_setspecific_fails = 0;
 
         return lock_dir == NULL ? -1 : 0;
 }
@@ -1492,7 +1559,7 @@ lock_cancel_holding_worker(void *arg __attribute__((unused)))
 }
 
 /* a log callback that ends the thread it is called on, as an application's
- * may
+ * callback may
  */
 static void
 lock_log_ends_the_thread(void *context __attribute__((unused)),
@@ -1502,8 +1569,11 @@ lock_log_ends_the_thread(void *context __attribute__((unused)),
         pthread_exit(NULL);
 }
 
+/* what a worker returns where it goes on past the point it was to end at */
+#define LOCK_WORKER_WENT_ON ((void *)1)
+
 /* takes the lock and logs in its locked section, where the callback ends the
- * thread
+ * thread; a worker the log has not ended returns LOCK_WORKER_WENT_ON
  */
 static void *
 lock_log_exit_worker(void *arg __attribute__((unused)))
@@ -1511,7 +1581,7 @@ lock_log_exit_worker(void *arg __attribute__((unused)))
         lock_ended_ret = resctrl_lock_exclusive();
         LOG_ERROR("a locked section logs\n");
 
-        return NULL;
+        return LOCK_WORKER_WENT_ON;
 }
 
 /* runs \a worker, which takes the lock and ends with it held, giving what it
@@ -1576,9 +1646,245 @@ test_resctrl_lock_given_up_when_a_log_callback_ends_the_thread(
 {
         const unsigned fds = lock_open_fds();
 
-        (void)log_init(-1, lock_log_ends_the_thread, NULL, LOG_VER_DEFAULT);
+        assert_int_equal(
+            log_init(-1, lock_log_ends_the_thread, NULL, LOG_VER_DEFAULT),
+            LOG_RETVAL_OK);
         assert_null(lock_run_ending_worker(lock_log_exit_worker));
         assert_lock_given_up(fds);
+}
+
+/* what a release gave a worker */
+static int lock_released_ret = -1;
+
+/* takes the lock, has its cancellation asked for, as it would be by another
+ * thread meanwhile, and releases the lock; ends at its next cancellation point
+ */
+static void *
+lock_release_cancelled_worker(void *arg __attribute__((unused)))
+{
+        lock_ended_ret = resctrl_lock_exclusive();
+        (void)pthread_cancel(pthread_self());
+        lock_released_ret = resctrl_lock_release();
+        pthread_testcancel();
+
+        return LOCK_WORKER_WENT_ON;
+}
+
+/* a release with a cancellation pending gives the lock up and closes its
+ * descriptor before the cancellation is acted on: close() is a cancellation
+ * point, and the thread would otherwise end with the descriptor open and
+ * nothing left to close it
+ */
+static void
+test_resctrl_lock_release_not_cut_short_by_a_cancellation(
+    void **state __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+
+        lock_released_ret = -1;
+        assert_ptr_equal(lock_run_ending_worker(lock_release_cancelled_worker),
+                         PTHREAD_CANCELED);
+        assert_int_equal(lock_released_ret, PQOS_RETVAL_OK);
+        assert_lock_given_up(fds);
+}
+
+/* the stage a worker that releases before it ends has reached, and the
+ * descriptor it locked with
+ */
+static int lock_stage;
+static int lock_worker_fd = -1;
+
+static void
+lock_stage_wait(const int stage)
+{
+        while (__atomic_load_n(&lock_stage, __ATOMIC_SEQ_CST) < stage)
+                (void)sched_yield();
+}
+
+/* takes the lock and releases it, then waits for the case to take the lock
+ * itself before it ends
+ */
+static void *
+lock_release_then_exit_worker(void *arg __attribute__((unused)))
+{
+        lock_ended_ret = resctrl_lock_exclusive();
+        lock_worker_fd = __atomic_load_n(&lock_opened_fd, __ATOMIC_SEQ_CST);
+        lock_released_ret = resctrl_lock_release();
+        __atomic_store_n(&lock_stage, 1, __ATOMIC_SEQ_CST);
+        lock_stage_wait(2);
+        pthread_exit(NULL);
+}
+
+/* a thread that released the lock before it ends gives nothing up as it ends:
+ * not the lock another holder has taken since, on the very descriptor number
+ * the thread's own had
+ */
+static void
+test_resctrl_lock_released_not_given_up_again_at_exit(void **state
+                                                      __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        pthread_t thread;
+        int ret;
+
+        lock_stage = 0;
+        lock_worker_fd = -1;
+        lock_released_ret = -1;
+        assert_int_equal(
+            pthread_create(&thread, NULL, lock_release_then_exit_worker, NULL),
+            0);
+        lock_stage_wait(1);
+        ret = resctrl_lock_exclusive();
+        __atomic_store_n(&lock_stage, 2, __ATOMIC_SEQ_CST);
+        assert_int_equal(pthread_join(thread, NULL), 0);
+
+        assert_int_equal(lock_ended_ret, PQOS_RETVAL_OK);
+        assert_int_equal(lock_released_ret, PQOS_RETVAL_OK);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        /* the number the worker's descriptor had, reused */
+        assert_int_equal(lock_opened_fd, lock_worker_fd);
+        assert_int_equal(lock_refused(LOCK_EX), 1);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_int_equal(lock_refused(LOCK_EX), 0);
+}
+
+/* a child forked while the lock is held, whose thread ends, closes its copy of
+ * the descriptor without giving up the lock, which is the parent's and is
+ * held on the open file description the two share
+ */
+static void
+test_resctrl_lock_kept_when_a_forked_child_ends(void **state
+                                                __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        int status = -1;
+        pid_t child;
+
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        (void)fflush(NULL);
+        child = fork();
+        if (child == 0)
+                pthread_exit(NULL);
+        assert_true(child > 0);
+        assert_int_equal(waitpid(child, &status, 0), child);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+
+        assert_int_equal(lock_refused(LOCK_EX), 1);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_int_equal(lock_refused(LOCK_EX), 0);
+}
+
+/* what the log callback found as the release warned that its unlock failed */
+static int lock_warned_fds = -1;
+static int lock_warned_refused = -1;
+
+static void
+lock_log_checks_given_up(void *context __attribute__((unused)),
+                         const size_t size __attribute__((unused)),
+                         const char *message __attribute__((unused)))
+{
+        if (lock_warned_fds >= 0)
+                return;
+        lock_warned_fds = (int)lock_open_fds();
+        lock_warned_refused = lock_refused(LOCK_EX);
+}
+
+/* a release whose unlock fails warns of it with the descriptor already
+ * closed and the lock free, as a callback that ends the thread there leaves
+ * nothing behind
+ */
+static void
+test_resctrl_lock_closed_before_the_unlock_warning(void **state
+                                                   __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        int ret;
+
+        lock_warned_fds = -1;
+        lock_warned_refused = -1;
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(
+            log_init(-1, lock_log_checks_given_up, NULL, LOG_VER_DEFAULT),
+            LOG_RETVAL_OK);
+        lock_unlock_fails = 1;
+        ret = resctrl_lock_release();
+        test_log_init_silent();
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(lock_unlock_fails, 0);
+        assert_int_equal(lock_warned_fds, (int)fds);
+        assert_int_equal(lock_warned_refused, 0);
+}
+
+/* takes the lock and releases it twice, then takes it a third time and ends
+ * holding it
+ */
+static void *
+lock_twice_then_exit_worker(void *arg __attribute__((unused)))
+{
+        int i;
+
+        for (i = 0; i < 2; i++) {
+                if (resctrl_lock_exclusive() != PQOS_RETVAL_OK ||
+                    resctrl_lock_release() != PQOS_RETVAL_OK)
+                        return LOCK_WORKER_WENT_ON;
+        }
+        lock_ended_ret = resctrl_lock_exclusive();
+        pthread_exit(NULL);
+}
+
+/* a thread whose key value cannot be set locks and releases as before, is
+ * told once, and tries again at each lock: once set, the thread gives the lock
+ * up as it ends
+ */
+static void
+test_resctrl_lock_holder_recorded_once_it_can_be(void **state
+                                                 __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        void *result;
+
+        lock_setspecific_fails = 2;
+        test_log_count_start();
+        result = lock_run_ending_worker(lock_twice_then_exit_worker);
+
+        assert_null(result);
+        assert_int_equal(*test_log_count(), 1);
+        assert_int_equal(lock_setspecific_fails, 0);
+        assert_lock_given_up(fds);
+}
+
+/* a key that cannot be created leaves the lock as it was, said once for the
+ * thread, and the next lock creates it: a thread that ends holding the lock
+ * afterwards gives it up. The first of the lock's cases, as the key, once
+ * made, is kept for the process: the count of creations shows it was not made
+ * before
+ */
+static void
+test_resctrl_lock_key_created_once_it_can_be(void **state
+                                             __attribute__((unused)))
+{
+        unsigned fds;
+
+        assert_int_equal(lock_key_creates, 0);
+        lock_key_create_errno = EAGAIN;
+        test_log_count_start();
+        assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(test_log_count_stop(), 1);
+        assert_int_equal(lock_key_creates, 2);
+
+        lock_key_create_errno = 0;
+        fds = lock_open_fds();
+        assert_null(lock_run_ending_worker(lock_exit_worker));
+        assert_int_equal(lock_key_creates, 3);
+        assert_lock_given_up(fds);
+        assert_int_equal(lock_key_creates, 3);
 }
 
 static void *
@@ -1831,6 +2137,9 @@ main(void)
             cmocka_unit_test(test_resctrl_cpumask_write),
             cmocka_unit_test(test_resctrl_cpumask_write_zero),
             cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_key_created_once_it_can_be, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_keeps_the_callers_alarm, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(test_resctrl_lock_times_out,
@@ -1885,6 +2194,21 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_given_up_when_a_log_callback_ends_the_thread,
                 lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_release_not_cut_short_by_a_cancellation,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_released_not_given_up_again_at_exit,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_kept_when_a_forked_child_ends, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_closed_before_the_unlock_warning, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_holder_recorded_once_it_can_be, lock_setup,
+                lock_teardown),
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);

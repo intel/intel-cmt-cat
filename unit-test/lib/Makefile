@@ -675,6 +675,9 @@ $(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
 		-Wl,--wrap=syscall \
 		-Wl,--wrap=setmntent \
 		-Wl,--wrap=getmntent_r \
+		-Wl,--wrap=flock \
+		-Wl,--wrap=pthread_key_create \
+		-Wl,--wrap=pthread_setspecific \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

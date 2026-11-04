@@ -72,7 +72,13 @@ extern "C" {
  *
  * A thread that ends holding the lock, by pthread_exit() or a cancellation
  * acted on in a locked section, gives it up as it ends, as it would with
- * resctrl_lock_release(); and so does resctrl_lock_exclusive()'s.
+ * resctrl_lock_release(); and so does resctrl_lock_exclusive()'s. That needs a
+ * thread-specific key: where one cannot be created or set for the thread,
+ * the lock is taken all the same, a warning is logged once for the thread,
+ * and a thread that then ends holding it leaves it held; each later lock
+ * tries the key again. A child forked while the lock is held, releasing it or
+ * ending the thread that inherited it, closes its copy of the descriptor
+ * without unlocking it, so the lock stays the parent's.
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success

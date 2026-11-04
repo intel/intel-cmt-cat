@@ -33,6 +33,7 @@
 #ifndef TEST_RESCTRL_H_
 #define TEST_RESCTRL_H_
 
+#include <pthread.h>
 #include <time.h>
 
 /* the resctrl lock's cases wrap these: the linker's names for the originals */
@@ -42,5 +43,11 @@ int __wrap_nanosleep(const struct timespec *req, struct timespec *rem);
 int __real_nanosleep(const struct timespec *req, struct timespec *rem);
 int __wrap_clock_gettime(clockid_t clk, struct timespec *tp);
 int __real_clock_gettime(clockid_t clk, struct timespec *tp);
+int __wrap_flock(int fd, int operation);
+int __real_flock(int fd, int operation);
+int __wrap_pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
+int __real_pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
+int __wrap_pthread_setspecific(pthread_key_t key, const void *value);
+int __real_pthread_setspecific(pthread_key_t key, const void *value);
 
 #endif /* TEST_RESCTRL_H_ */

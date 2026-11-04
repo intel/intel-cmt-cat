@@ -64,6 +64,7 @@
 #define RESCTRL_NO_SUCH_OPTION "pqos_no_such_option"
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
+static pid_t resctrl_lock_pid;   /**< The process that took the lock */
 
 /**
  * The descriptor of the resctrl lock this thread holds, -1 where it holds
@@ -75,16 +76,21 @@ static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
  * its timeout on it, and resctrl could not be unmounted while it was open.
  * The API lock's own destructor gives back the API lock alone.
  *
- * The key is created as the library is loaded, before lock_init() creates
- * the API lock's, which glibc then runs this one's destructor before; in
- * whatever order they run, the destructor gives up the descriptor this thread
- * took and no other (resctrl_lock_give_up()). A key that cannot be created,
- * PTHREAD_KEYS_MAX being a pool the whole process shares, leaves the lock as
- * it was before, without that, which the first lock says.
+ * The key is created by the first lock, under resctrl_lock_key_mutex, and
+ * kept for the process. By then pqos_init()'s lock_init() has created the API
+ * lock's key, which an initialisation cannot do without: this one, which the
+ * lock can do without, does not take the last key of the pool from it. A key
+ * that cannot be created - PTHREAD_KEYS_MAX is a pool the whole process
+ * shares - or a value that cannot be set leaves the lock as it was before,
+ * without that, which each thread is told once; the next lock tries again,
+ * since a key freed meanwhile makes the next attempt succeed. In whatever
+ * order the two destructors run, this one gives up the descriptor this thread
+ * took and no other (resctrl_lock_give_up()).
  */
 static __thread int resctrl_lock_held = -1;
 static pthread_key_t resctrl_lock_key;
 static int resctrl_lock_key_valid = 0;
+static pthread_mutex_t resctrl_lock_key_mutex = PTHREAD_MUTEX_INITIALIZER;
 static __thread int resctrl_lock_said = 0;
 
 /**
@@ -94,21 +100,32 @@ static __thread int resctrl_lock_said = 0;
  *        API lock given to it first - the flock released and the descriptor
  *        closed, before anything is logged
  *
+ * Cancellation is off throughout: close() is a cancellation point, and one
+ * pending there would end the thread with the record cleared and the
+ * descriptor still open, which nothing would then give up. A descriptor this
+ * process did not lock with - one a child inherited across fork() with the
+ * record - is closed without an unlock, which would give up the parent's lock
+ * on the open file description the two share.
+ *
  * @param [in] fd the lock's descriptor
  *
- * @return flock()'s answer
+ * @return flock()'s answer, 0 where the lock is not this process's to give up
  */
 static int
 resctrl_lock_give_up(int fd)
 {
         int expected = fd;
-        int ret;
+        int state;
+        int ret = 0;
 
+        (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
         resctrl_lock_held = -1;
         (void)__atomic_compare_exchange_n(&resctrl_lock_fd, &expected, -1, 0,
                                           __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-        ret = flock(fd, LOCK_UN);
+        if (__atomic_load_n(&resctrl_lock_pid, __ATOMIC_SEQ_CST) == getpid())
+                ret = flock(fd, LOCK_UN);
         close(fd);
+        (void)pthread_setcancelstate(state, &state);
 
         return ret;
 }
@@ -129,16 +146,6 @@ resctrl_lock_exit(void *value)
 }
 
 /**
- * @brief Creates the key as the library is loaded
- */
-__attribute__((constructor)) static void
-resctrl_lock_key_load(void)
-{
-        if (pthread_key_create(&resctrl_lock_key, resctrl_lock_exit) == 0)
-                __atomic_store_n(&resctrl_lock_key_valid, 1, __ATOMIC_RELEASE);
-}
-
-/**
  * @brief Deletes the key as the library is unloaded, so that no thread's exit
  *        calls into it afterwards
  */
@@ -152,27 +159,45 @@ resctrl_lock_key_unload(void)
 }
 
 /**
- * @brief Arms the key for this thread, the first time it locks: its value is
- *        this thread's record, which its destructor reads. A thread whose
- *        value cannot be set locks as before, and is told once
+ * @brief Creates the key, the first time a lock gets here
+ *
+ * @return 0 on success, pthread_key_create()'s error otherwise, for the next
+ *         lock to try again
+ */
+static int
+resctrl_lock_key_create(void)
+{
+        int err = 0;
+
+        if (__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE))
+                return 0;
+        (void)pthread_mutex_lock(&resctrl_lock_key_mutex);
+        if (!__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE)) {
+                err = pthread_key_create(&resctrl_lock_key, resctrl_lock_exit);
+                if (err == 0)
+                        __atomic_store_n(&resctrl_lock_key_valid, 1,
+                                         __ATOMIC_RELEASE);
+        }
+        (void)pthread_mutex_unlock(&resctrl_lock_key_mutex);
+
+        return err;
+}
+
+/**
+ * @brief Arms the key for this thread, until it is armed: its value is this
+ *        thread's record, which its destructor reads. A thread whose key
+ *        cannot be created or value set locks as before, and is told once
  */
 static void
 resctrl_lock_arm(void)
 {
-        int err;
+        int err = resctrl_lock_key_create();
 
-        if (!__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE)) {
-                if (!resctrl_lock_said) {
-                        resctrl_lock_said = 1;
-                        LOG_WARN("resctrl lock holder not recorded, a thread "
-                                 "that ends holding it will not give it "
-                                 "back\n");
-                }
-                return;
+        if (err == 0) {
+                if (pthread_getspecific(resctrl_lock_key) != NULL)
+                        return;
+                err = pthread_setspecific(resctrl_lock_key, &resctrl_lock_held);
         }
-        if (pthread_getspecific(resctrl_lock_key) != NULL)
-                return;
-        err = pthread_setspecific(resctrl_lock_key, &resctrl_lock_held);
         if (err != 0 && !resctrl_lock_said) {
                 resctrl_lock_said = 1;
                 LOG_WARN("resctrl lock holder not recorded, a thread that ends "
@@ -339,6 +364,7 @@ resctrl_lock(const int type)
                 LOG_ERROR("Could not open %s directory\n", RESCTRL_PATH);
                 return PQOS_RETVAL_ERROR;
         }
+        __atomic_store_n(&resctrl_lock_pid, getpid(), __ATOMIC_SEQ_CST);
         __atomic_store_n(&resctrl_lock_fd, fd, __ATOMIC_SEQ_CST);
 
         err = resctrl_lock_try(fd, type);
