@@ -152,6 +152,19 @@ __wrap_pthread_setspecific(pthread_key_t key, const void *value)
         return __real_pthread_setspecific(key, value);
 }
 
+/* getpid() as it is, but where a case sets lock_getpid_as, the PID it gives
+ * instead, as a process in a PID namespace of its own can have its parent's
+ */
+static pid_t lock_getpid_as;
+
+pid_t
+__wrap_getpid(void)
+{
+        const pid_t as = __atomic_load_n(&lock_getpid_as, __ATOMIC_SEQ_CST);
+
+        return as != 0 ? as : __real_getpid();
+}
+
 /* pthread_setcancelstate() as it is, but where a case arms it for a thread,
  * that thread's next turning cancellation off waits there: it posts
  * lock_pause_entered and goes on once lock_pause_go is posted. The lock's
@@ -985,6 +998,7 @@ lock_setup(void **state __attribute__((unused)))
         lock_key_create_errno = 0;
         lock_setspecific_fails = 0;
         lock_pause_armed = 0;
+        lock_getpid_as = 0;
 
         return lock_dir == NULL ? -1 : 0;
 }
@@ -1798,15 +1812,24 @@ lock_child_watcher(void *arg __attribute__((unused)))
         _exit(1);
 }
 
-/* forks while the lock is held exclusively, and has the child, where \a retry
- * says so, try for the lock and fail to take it against the parent's, then
- * end the thread that inherited the record while a thread of its own watches
- * the inherited descriptor: the child's exit must close the descriptor
- * without giving up the lock, which is the parent's, held on the open file
- * description the two share
+/* what a forked child does with the record it inherits */
+enum lock_child {
+        LOCK_CHILD_ENDS,             /**< ends its thread */
+        LOCK_CHILD_TRIES_THEN_ENDS,  /**< fails to take the lock, then ends */
+        LOCK_CHILD_TRIES_THEN_GOES,  /**< fails to take it, then releases */
+        LOCK_CHILD_PARENTS_PID_ENDS, /**< has the parent's PID, then ends */
+};
+
+/* forks while the lock is held exclusively, and has the child do \a what:
+ * try for the lock and fail to take it against the parent's where it says so,
+ * then end the thread that inherited the record while a thread of its own
+ * watches the inherited descriptor, or release the lock and look at the
+ * descriptor itself. Either must close the descriptor without giving up the
+ * lock, which is the parent's, held on the open file description the two
+ * share
  */
 static void
-lock_fork_and_end_child(const int retry)
+lock_fork_and_end_child(const enum lock_child what)
 {
         const unsigned fds = lock_open_fds();
         int status = -1;
@@ -1817,10 +1840,24 @@ lock_fork_and_end_child(const int retry)
         (void)fflush(NULL);
         child = fork();
         if (child == 0) {
+                const pid_t parent = getppid();
                 pthread_t watcher;
 
-                if (retry && resctrl_lock_exclusive() != PQOS_RETVAL_ERROR)
+                if ((what == LOCK_CHILD_TRIES_THEN_ENDS ||
+                     what == LOCK_CHILD_TRIES_THEN_GOES) &&
+                    resctrl_lock_exclusive() != PQOS_RETVAL_ERROR)
                         _exit(2);
+                if (what == LOCK_CHILD_TRIES_THEN_GOES) {
+                        if (resctrl_lock_release() != PQOS_RETVAL_OK)
+                                _exit(4);
+                        _exit(fcntl(lock_child_fd, F_GETFD) < 0 &&
+                                      errno == EBADF
+                                  ? 0
+                                  : 1);
+                }
+                if (what == LOCK_CHILD_PARENTS_PID_ENDS)
+                        __atomic_store_n(&lock_getpid_as, parent,
+                                         __ATOMIC_SEQ_CST);
                 if (pthread_create(&watcher, NULL, lock_child_watcher, NULL) !=
                     0)
                         _exit(3);
@@ -1842,7 +1879,7 @@ static void
 test_resctrl_lock_kept_when_a_forked_child_ends(void **state
                                                 __attribute__((unused)))
 {
-        lock_fork_and_end_child(0);
+        lock_fork_and_end_child(LOCK_CHILD_ENDS);
 }
 
 /* the same, with the child having tried for the lock in between: a failed try
@@ -1852,7 +1889,28 @@ static void
 test_resctrl_lock_kept_when_a_forked_child_tried_for_it(void **state
                                                         __attribute__((unused)))
 {
-        lock_fork_and_end_child(1);
+        lock_fork_and_end_child(LOCK_CHILD_TRIES_THEN_ENDS);
+}
+
+/* and a child that releases the lock after that failed try gives up the
+ * record it inherited, closing the descriptor, still without the unlock
+ */
+static void
+test_resctrl_lock_kept_when_a_forked_child_tried_then_released(
+    void **state __attribute__((unused)))
+{
+        lock_fork_and_end_child(LOCK_CHILD_TRIES_THEN_GOES);
+}
+
+/* the same as a child that ends, for one whose PID is its parent's, as a
+ * child in a PID namespace of its own can have: the record was marked as it
+ * forked, which the PID alone would not tell
+ */
+static void
+test_resctrl_lock_kept_when_a_forked_child_has_its_pid(void **state
+                                                       __attribute__((unused)))
+{
+        lock_fork_and_end_child(LOCK_CHILD_PARENTS_PID_ENDS);
 }
 
 /* a thread that ends holding the lock, stopped before its give-up has done
@@ -2134,6 +2192,47 @@ test_resctrl_lock_cancelled_before_the_call(void **state
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
 }
 
+/* what was logged that the holder is not recorded */
+static unsigned lock_not_recorded_said;
+
+static void
+lock_log_counts_not_recorded(void *context __attribute__((unused)),
+                             const size_t size __attribute__((unused)),
+                             const char *message)
+{
+        if (strstr(message, "holder not recorded") != NULL)
+                __atomic_add_fetch(&lock_not_recorded_said, 1,
+                                   __ATOMIC_SEQ_CST);
+}
+
+/* and it is acted on before the key is armed, which, failing, logs: a log
+ * callback is no cancellation point, and one that blocked would keep the
+ * thread, with the API lock, from the cancellation pending
+ */
+static void
+test_resctrl_lock_cancelled_before_the_arming(void **state
+                                              __attribute__((unused)))
+{
+        void *result = NULL;
+        int ran;
+
+        lock_cancelled_ret = -1;
+        lock_not_recorded_said = 0;
+        lock_setspecific_fails = 1;
+        assert_int_equal(
+            log_init(-1, lock_log_counts_not_recorded, NULL, LOG_VER_DEFAULT),
+            LOG_RETVAL_OK);
+        ran = lock_run_worker(lock_cancelled_before_worker, &result);
+        test_log_init_silent();
+
+        assert_int_equal(ran, 0);
+        assert_ptr_equal(result, PTHREAD_CANCELED);
+        assert_int_equal(lock_cancelled_ret, -1);
+        assert_int_equal(lock_not_recorded_said, 0);
+        assert_int_equal(lock_setspecific_fails, 1);
+        lock_setspecific_fails = 0;
+}
+
 /* a cancellation asked for once the lock has started, here as its descriptor
  * is opened, with the lock free, is acted on before the lock is handed over,
  * with the lock given up: acted on at the caller's next cancellation point, it
@@ -2247,6 +2346,34 @@ test_resctrl_lock_cancelled_in_the_wait_then_taken(void **state
 
         assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+}
+
+/* the three cases above, with the thread's key not armed - its value refused -
+ * so that no destructor gives the lock up behind the cancellation handler's
+ * back: the handler alone does
+ */
+static void
+test_resctrl_lock_cancelled_as_it_is_taken_unarmed(void **state)
+{
+        lock_setspecific_fails = 1;
+        test_resctrl_lock_cancelled_as_it_is_taken(state);
+        assert_int_equal(lock_setspecific_fails, 0);
+}
+
+static void
+test_resctrl_lock_cancelled_as_it_is_taken_async_unarmed(void **state)
+{
+        lock_setspecific_fails = 1;
+        test_resctrl_lock_cancelled_as_it_is_taken_async(state);
+        assert_int_equal(lock_setspecific_fails, 0);
+}
+
+static void
+test_resctrl_lock_cancelled_in_the_wait_then_taken_unarmed(void **state)
+{
+        lock_setspecific_fails = 1;
+        test_resctrl_lock_cancelled_in_the_wait_then_taken(state);
+        assert_int_equal(lock_setspecific_fails, 0);
 }
 
 /* a lock whose descriptor cannot be opened fails, saying so, and leaves the
@@ -2368,6 +2495,9 @@ main(void)
                 test_resctrl_lock_cancelled_before_the_call, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_before_the_arming, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_cancelled_as_it_is_taken, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
@@ -2376,6 +2506,15 @@ main(void)
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_cancelled_in_the_wait_then_taken, lock_setup,
                 lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_as_it_is_taken_unarmed, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_as_it_is_taken_async_unarmed,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_cancelled_in_the_wait_then_taken_unarmed,
+                lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(test_resctrl_lock_open_failure,
                                             lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
@@ -2404,6 +2543,12 @@ main(void)
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_kept_when_a_forked_child_tried_for_it,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_kept_when_a_forked_child_tried_then_released,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_kept_when_a_forked_child_has_its_pid,
                 lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_exit_leaves_a_later_holder_held, lock_setup,

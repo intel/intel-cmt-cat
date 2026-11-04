@@ -703,6 +703,7 @@ $(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS) \
 		-Wl,--wrap=pthread_key_create \
 		-Wl,--wrap=pthread_setspecific \
 		-Wl,--wrap=pthread_setcancelstate \
+		-Wl,--wrap=getpid \
 		-Wl,--start-group \
 		$(LDFLAGS) -ldl $(LIB_OBJS) $< -Wl,--end-group -o $@
 

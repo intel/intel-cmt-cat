@@ -79,6 +79,10 @@ endif
 # so or static build
 ifeq ($(SHARED),y)
 CFLAGS += -fPIC
+# never unloaded: a thread's exit may be running the resctrl lock's or the API
+# lock's key destructor, which deleting the key does not wait for, as another
+# thread unloads the library
+LDFLAGS += -z nodelete
 LIBNAME = $(LIB).so.$(VERSION)
 LIBPERM = 0755
 else

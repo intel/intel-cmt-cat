@@ -79,7 +79,8 @@ extern "C" {
  * tries the key again. A child forked while the lock is held, releasing it or
  * ending the thread that inherited it, closes its copy of the descriptor
  * without unlocking it, so the lock stays the parent's, even where the child
- * has since tried for the lock and failed to take it.
+ * has since tried for the lock and failed to take it, or has the parent's PID
+ * in a PID namespace of its own.
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success

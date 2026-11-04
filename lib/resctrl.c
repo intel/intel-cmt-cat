@@ -105,6 +105,7 @@ struct resctrl_lock_holder {
 static __thread struct resctrl_lock_holder resctrl_lock_held = {-1, 0};
 static pthread_key_t resctrl_lock_key;
 static int resctrl_lock_key_valid = 0;
+static int resctrl_lock_atfork_set = 0;
 static pthread_mutex_t resctrl_lock_key_mutex = PTHREAD_MUTEX_INITIALIZER;
 static __thread int resctrl_lock_said = 0;
 
@@ -163,8 +164,28 @@ resctrl_lock_exit(void *value)
 }
 
 /**
+ * @brief Marks the record a child inherits across fork() as not its own
+ *
+ * Run in the child, by its one thread, the one that forked, whose record it
+ * is. A PID alone does not tell the child from its parent: a parent that is
+ * PID 1 of its namespace, and calls unshare(CLONE_NEWPID) before it forks,
+ * has a child that is PID 1 too. No process is PID 0.
+ */
+static void
+resctrl_lock_forked(void)
+{
+        resctrl_lock_held.pid = 0;
+        __atomic_store_n(&resctrl_lock_pid, 0, __ATOMIC_SEQ_CST);
+}
+
+/**
  * @brief Deletes the key as the library is unloaded, so that no thread's exit
  *        calls into it afterwards
+ *
+ * That does not wait for a destructor already running, which an unload would
+ * leave running code no longer mapped: the shared library is linked with
+ * -z nodelete, so it is never unloaded. This is for a copy of the static
+ * library inside an object that is.
  */
 __attribute__((destructor)) static void
 resctrl_lock_key_unload(void)
@@ -176,8 +197,12 @@ resctrl_lock_key_unload(void)
 }
 
 /**
- * @brief Creates the key, the first time a lock gets here
+ * @brief Creates the key, the first time a lock gets here, and has a child
+ *        forked from then on mark the record it inherits
+ *        (resctrl_lock_forked())
  *
+ * Either that fails is tried again by the next lock; a child forked while the
+ * handler is not in has the PID to tell its record from its parent's.
  * Cancellation is off while the mutex is held: a caller whose cancellation is
  * asynchronous, cancelled there, would leave it locked, and every later lock
  * would wait on it for good, past the lock's timeout.
@@ -191,10 +216,14 @@ resctrl_lock_key_create(void)
         int err = 0;
         int state;
 
-        if (__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE))
+        if (__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE) &&
+            __atomic_load_n(&resctrl_lock_atfork_set, __ATOMIC_ACQUIRE))
                 return 0;
         (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
         (void)pthread_mutex_lock(&resctrl_lock_key_mutex);
+        if (!__atomic_load_n(&resctrl_lock_atfork_set, __ATOMIC_ACQUIRE) &&
+            pthread_atfork(NULL, NULL, resctrl_lock_forked) == 0)
+                __atomic_store_n(&resctrl_lock_atfork_set, 1, __ATOMIC_RELEASE);
         if (!__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE)) {
                 err = pthread_key_create(&resctrl_lock_key, resctrl_lock_exit);
                 if (err == 0)
@@ -377,8 +406,11 @@ resctrl_lock(const int type)
 
         ASSERT(type == LOCK_SH || type == LOCK_EX);
 
-        resctrl_lock_arm();
+        /* before the arming, which may log, and a log callback that blocks
+         * is no cancellation point
+         */
         pthread_testcancel();
+        resctrl_lock_arm();
         (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
 
         /* O_CLOEXEC: held for as long as the resctrl lock is */
@@ -432,20 +464,22 @@ resctrl_lock_exclusive(void)
 int
 resctrl_lock_release(void)
 {
-        const int fd = __atomic_load_n(&resctrl_lock_fd, __ATOMIC_SEQ_CST);
-        pid_t pid;
+        int fd = resctrl_lock_held.fd;
+        pid_t pid = resctrl_lock_held.pid;
 
+        /* this thread's record, where it holds one, as it does for every
+         * release the library makes - a forked child's inherited one too,
+         * after a lock of its own that it failed to take cleared
+         * resctrl_lock_fd - and the process's otherwise
+         */
+        if (fd < 0) {
+                fd = __atomic_load_n(&resctrl_lock_fd, __ATOMIC_SEQ_CST);
+                pid = __atomic_load_n(&resctrl_lock_pid, __ATOMIC_SEQ_CST);
+        }
         if (fd < 0) {
                 LOG_ERROR("Resctrl filesystem not locked\n");
                 return PQOS_RETVAL_ERROR;
         }
-        /* the process that took it: this thread's record where it is the
-         * holder, as it is for every release the library makes
-         */
-        if (resctrl_lock_held.fd == fd)
-                pid = resctrl_lock_held.pid;
-        else
-                pid = __atomic_load_n(&resctrl_lock_pid, __ATOMIC_SEQ_CST);
 
         /* given up, and the descriptor closed, before anything is logged: a
          * log is a cancellation point, and a callback may end the thread
