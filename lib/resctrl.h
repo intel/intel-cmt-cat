@@ -80,7 +80,8 @@ extern "C" {
  * ending the thread that inherited it, closes its copy of the descriptor
  * without unlocking it, so the lock stays the parent's, even where the child
  * has since tried for the lock and failed to take it, or has the parent's PID
- * in a PID namespace of its own.
+ * in a PID namespace of its own. A child that takes a shared lock of its own
+ * beside the parent's closes the inherited copy as it takes it.
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success

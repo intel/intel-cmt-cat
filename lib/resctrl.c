@@ -425,8 +425,15 @@ resctrl_lock(const int type)
         err = resctrl_lock_try(fd, type);
         if (err == 0) {
                 /* recorded with cancellation still off: from here on, the
-                 * thread gives the lock up however it ends
+                 * thread gives the lock up however it ends. A record a
+                 * forked child inherited - a shared lock of its own can be
+                 * taken beside its parent's - is given up first: closed,
+                 * not unlocked, as it is not this process's
                  */
+                if (resctrl_lock_held.fd >= 0 &&
+                    resctrl_lock_held.pid != getpid())
+                        (void)resctrl_lock_give_up(resctrl_lock_held.fd,
+                                                   resctrl_lock_held.pid);
                 resctrl_lock_held.pid = getpid();
                 resctrl_lock_held.fd = fd;
                 __atomic_store_n(&resctrl_lock_pid, resctrl_lock_held.pid,

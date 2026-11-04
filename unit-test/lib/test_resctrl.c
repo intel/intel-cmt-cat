@@ -1913,6 +1913,48 @@ test_resctrl_lock_kept_when_a_forked_child_has_its_pid(void **state
         lock_fork_and_end_child(LOCK_CHILD_PARENTS_PID_ENDS);
 }
 
+/* a child forked while the lock is held shared can take a shared lock of its
+ * own beside its parent's, on a descriptor of its own: taking it closes the
+ * descriptor the child inherited, without the unlock, rather than leave it
+ * open for the child's life, and the release gives up the child's own
+ */
+static void
+test_resctrl_lock_inherited_closed_as_a_child_takes_one(void **state
+                                                        __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+        int status = -1;
+        pid_t child;
+
+        assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
+        lock_child_fd = lock_opened_fd;
+        (void)fflush(NULL);
+        child = fork();
+        if (child == 0) {
+                const unsigned inherited = lock_open_fds();
+
+                if (resctrl_lock_shared() != PQOS_RETVAL_OK)
+                        _exit(2);
+                if (fcntl(lock_child_fd, F_GETFD) >= 0 || errno != EBADF)
+                        _exit(1);
+                if (lock_opened_fd == lock_child_fd ||
+                    lock_open_fds() != inherited)
+                        _exit(3);
+                if (resctrl_lock_release() != PQOS_RETVAL_OK)
+                        _exit(4);
+                _exit(lock_open_fds() == inherited - 1 ? 0 : 5);
+        }
+        assert_true(child > 0);
+        assert_int_equal(waitpid(child, &status, 0), child);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+
+        assert_int_equal(lock_refused(LOCK_EX), 1);
+        assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
+        assert_int_equal(lock_open_fds(), fds);
+        assert_int_equal(lock_refused(LOCK_EX), 0);
+}
+
 /* a thread that ends holding the lock, stopped before its give-up has done
  * anything, as one is once the API lock's destructor has given the API lock
  * to another thread; that one takes the lock of its own meanwhile
@@ -2549,6 +2591,9 @@ main(void)
                 lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_kept_when_a_forked_child_has_its_pid,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_inherited_closed_as_a_child_takes_one,
                 lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_exit_leaves_a_later_holder_held, lock_setup,
