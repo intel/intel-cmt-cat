@@ -51,6 +51,12 @@ int __wrap_pthread_setspecific(pthread_key_t key, const void *value);
 int __real_pthread_setspecific(pthread_key_t key, const void *value);
 int __wrap_pthread_setcancelstate(int state, int *oldstate);
 int __real_pthread_setcancelstate(int state, int *oldstate);
+int __wrap_pthread_atfork(void (*prepare)(void),
+                          void (*parent)(void),
+                          void (*child)(void));
+int __real_pthread_atfork(void (*prepare)(void),
+                          void (*parent)(void),
+                          void (*child)(void));
 pid_t __wrap_getpid(void);
 pid_t __real_getpid(void);
 

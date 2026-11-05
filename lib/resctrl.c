@@ -105,7 +105,7 @@ struct resctrl_lock_holder {
 static __thread struct resctrl_lock_holder resctrl_lock_held = {-1, 0};
 static pthread_key_t resctrl_lock_key;
 static int resctrl_lock_key_valid = 0;
-static int resctrl_lock_atfork_set = 0;
+static int resctrl_lock_atfork_state = 0;
 static pthread_mutex_t resctrl_lock_key_mutex = PTHREAD_MUTEX_INITIALIZER;
 static __thread int resctrl_lock_said = 0;
 
@@ -164,7 +164,28 @@ resctrl_lock_exit(void *value)
 }
 
 /**
- * @brief Marks the record a child inherits across fork() as not its own
+ * @brief Before a fork: waits for a key being created, holding the key's
+ *        mutex across the fork, so the child does not inherit it locked by a
+ *        thread it does not have
+ */
+static void
+resctrl_lock_fork_prepare(void)
+{
+        (void)pthread_mutex_lock(&resctrl_lock_key_mutex);
+}
+
+/**
+ * @brief After a fork, in the parent: gives the key's mutex back
+ */
+static void
+resctrl_lock_fork_parent(void)
+{
+        (void)pthread_mutex_unlock(&resctrl_lock_key_mutex);
+}
+
+/**
+ * @brief After a fork, in the child: gives the key's mutex back and marks the
+ *        record the child inherits as not its own
  *
  * Run in the child, by its one thread, the one that forked, whose record it
  * is. A PID alone does not tell the child from its parent: a parent that is
@@ -174,8 +195,39 @@ resctrl_lock_exit(void *value)
 static void
 resctrl_lock_forked(void)
 {
+        (void)pthread_mutex_unlock(&resctrl_lock_key_mutex);
         resctrl_lock_held.pid = 0;
         __atomic_store_n(&resctrl_lock_pid, 0, __ATOMIC_SEQ_CST);
+}
+
+/**
+ * @brief Registers the fork handlers, once: before the key's mutex is ever
+ *        taken, and without it, so no fork can find it locked without them
+ *
+ * A thread that finds another registering them does not wait - a child forked
+ * meanwhile would wait for good - and goes on without the key that once.
+ *
+ * @return 0 once they are in, pthread_atfork()'s error, or EAGAIN while
+ *         another thread registers them, for the next lock to try again
+ */
+static int
+resctrl_lock_atfork_register(void)
+{
+        int expected = 0;
+        int err;
+
+        if (__atomic_load_n(&resctrl_lock_atfork_state, __ATOMIC_ACQUIRE) == 2)
+                return 0;
+        if (!__atomic_compare_exchange_n(&resctrl_lock_atfork_state, &expected,
+                                         1, 0, __ATOMIC_ACQ_REL,
+                                         __ATOMIC_ACQUIRE))
+                return expected == 2 ? 0 : EAGAIN;
+        err = pthread_atfork(resctrl_lock_fork_prepare,
+                             resctrl_lock_fork_parent, resctrl_lock_forked);
+        __atomic_store_n(&resctrl_lock_atfork_state, err == 0 ? 2 : 0,
+                         __ATOMIC_RELEASE);
+
+        return err;
 }
 
 /**
@@ -197,18 +249,19 @@ resctrl_lock_key_unload(void)
 }
 
 /**
- * @brief Creates the key, the first time a lock gets here, and has a child
- *        forked from then on mark the record it inherits
- *        (resctrl_lock_forked())
+ * @brief Creates the key, the first time a lock gets here, once the fork
+ *        handlers are in (resctrl_lock_atfork_register())
  *
- * Either that fails is tried again by the next lock; a child forked while the
- * handler is not in has the PID to tell its record from its parent's.
- * Cancellation is off while the mutex is held: a caller whose cancellation is
- * asynchronous, cancelled there, would leave it locked, and every later lock
- * would wait on it for good, past the lock's timeout.
+ * Without the handlers the key is not created: a child forked then could not
+ * tell its record from its parent's where it has the parent's PID, and the
+ * thread's end would unlock the parent's lock. Either that fails is tried
+ * again by the next lock. Cancellation is off throughout: a caller whose
+ * cancellation is asynchronous, cancelled with the mutex held or the handlers
+ * half registered, would leave them so for good, and every later lock would
+ * wait on the mutex past the lock's timeout.
  *
- * @return 0 on success, pthread_key_create()'s error otherwise, for the next
- *         lock to try again
+ * @return 0 on success, the registration's or pthread_key_create()'s error
+ *         otherwise, for the next lock to try again
  */
 static int
 resctrl_lock_key_create(void)
@@ -217,20 +270,22 @@ resctrl_lock_key_create(void)
         int state;
 
         if (__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE) &&
-            __atomic_load_n(&resctrl_lock_atfork_set, __ATOMIC_ACQUIRE))
+            __atomic_load_n(&resctrl_lock_atfork_state, __ATOMIC_ACQUIRE) == 2)
                 return 0;
         (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
-        (void)pthread_mutex_lock(&resctrl_lock_key_mutex);
-        if (!__atomic_load_n(&resctrl_lock_atfork_set, __ATOMIC_ACQUIRE) &&
-            pthread_atfork(NULL, NULL, resctrl_lock_forked) == 0)
-                __atomic_store_n(&resctrl_lock_atfork_set, 1, __ATOMIC_RELEASE);
-        if (!__atomic_load_n(&resctrl_lock_key_valid, __ATOMIC_ACQUIRE)) {
-                err = pthread_key_create(&resctrl_lock_key, resctrl_lock_exit);
-                if (err == 0)
-                        __atomic_store_n(&resctrl_lock_key_valid, 1,
-                                         __ATOMIC_RELEASE);
+        err = resctrl_lock_atfork_register();
+        if (err == 0) {
+                (void)pthread_mutex_lock(&resctrl_lock_key_mutex);
+                if (!__atomic_load_n(&resctrl_lock_key_valid,
+                                     __ATOMIC_ACQUIRE)) {
+                        err = pthread_key_create(&resctrl_lock_key,
+                                                 resctrl_lock_exit);
+                        if (err == 0)
+                                __atomic_store_n(&resctrl_lock_key_valid, 1,
+                                                 __ATOMIC_RELEASE);
+                }
+                (void)pthread_mutex_unlock(&resctrl_lock_key_mutex);
         }
-        (void)pthread_mutex_unlock(&resctrl_lock_key_mutex);
         (void)pthread_setcancelstate(state, &state);
 
         return err;
@@ -425,13 +480,14 @@ resctrl_lock(const int type)
         err = resctrl_lock_try(fd, type);
         if (err == 0) {
                 /* recorded with cancellation still off: from here on, the
-                 * thread gives the lock up however it ends. A record a
-                 * forked child inherited - a shared lock of its own can be
-                 * taken beside its parent's - is given up first: closed,
-                 * not unlocked, as it is not this process's
+                 * thread gives the lock up however it ends. A record the
+                 * thread already has, which a shared lock can be taken
+                 * beside, is given up first rather than lost: one a forked
+                 * child inherited, closed and not unlocked, as it is the
+                 * parent's; or this thread's own, taken again by a cleanup
+                 * handler or another key's destructor as the thread ends
                  */
-                if (resctrl_lock_held.fd >= 0 &&
-                    resctrl_lock_held.pid != getpid())
+                if (resctrl_lock_held.fd >= 0)
                         (void)resctrl_lock_give_up(resctrl_lock_held.fd,
                                                    resctrl_lock_held.pid);
                 resctrl_lock_held.pid = getpid();

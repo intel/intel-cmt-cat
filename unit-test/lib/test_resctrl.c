@@ -122,12 +122,24 @@ static unsigned lock_key_creates;
 static int lock_key_create_errno;
 static unsigned lock_setspecific_fails;
 
+/* where a case arms it, the next key creation waits before anything: it
+ * posts lock_key_create_entered and goes on once lock_key_create_go is posted
+ */
+static int lock_key_create_pause;
+static sem_t lock_key_create_entered;
+static sem_t lock_key_create_go;
+
 int
 __wrap_pthread_key_create(pthread_key_t *key, void (*destructor)(void *))
 {
-        const int err =
-            __atomic_load_n(&lock_key_create_errno, __ATOMIC_SEQ_CST);
+        int err;
 
+        if (__atomic_exchange_n(&lock_key_create_pause, 0, __ATOMIC_SEQ_CST)) {
+                (void)sem_post(&lock_key_create_entered);
+                while (sem_wait(&lock_key_create_go) != 0 && errno == EINTR)
+                        ;
+        }
+        err = __atomic_load_n(&lock_key_create_errno, __ATOMIC_SEQ_CST);
         __atomic_add_fetch(&lock_key_creates, 1, __ATOMIC_SEQ_CST);
         if (err != 0)
                 return err;
@@ -150,6 +162,26 @@ __wrap_pthread_setspecific(pthread_key_t key, const void *value)
                         return refused;
 
         return __real_pthread_setspecific(key, value);
+}
+
+/* the fork handlers' registrations, counted, and as many of the next ones as a
+ * case asks for refused with lock_atfork_errno
+ */
+static unsigned lock_atforks;
+static int lock_atfork_errno;
+
+int
+__wrap_pthread_atfork(void (*prepare)(void),
+                      void (*parent)(void),
+                      void (*child)(void))
+{
+        const int err = __atomic_load_n(&lock_atfork_errno, __ATOMIC_SEQ_CST);
+
+        __atomic_add_fetch(&lock_atforks, 1, __ATOMIC_SEQ_CST);
+        if (err != 0)
+                return err;
+
+        return __real_pthread_atfork(prepare, parent, child);
 }
 
 /* getpid() as it is, but where a case sets lock_getpid_as, the PID it gives
@@ -996,6 +1028,8 @@ lock_setup(void **state __attribute__((unused)))
         lock_opened_fd = -1;
         lock_unlock_fails = 0;
         lock_key_create_errno = 0;
+        lock_key_create_pause = 0;
+        lock_atfork_errno = 0;
         lock_setspecific_fails = 0;
         lock_pause_armed = 0;
         lock_getpid_as = 0;
@@ -1955,6 +1989,42 @@ test_resctrl_lock_inherited_closed_as_a_child_takes_one(void **state
         assert_int_equal(lock_refused(LOCK_EX), 0);
 }
 
+/* a cleanup handler, run as the thread ends holding the lock shared, that
+ * takes a shared lock again and releases it, as an application's handler, or
+ * a key's destructor run before the lock's, may: the lock is taken beside the
+ * one the thread held, whose record it would replace
+ */
+static void
+lock_reenter(void *arg __attribute__((unused)))
+{
+        if (resctrl_lock_shared() == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+}
+
+static void *
+lock_reenter_at_exit_worker(void *arg __attribute__((unused)))
+{
+        pthread_cleanup_push(lock_reenter, NULL);
+        lock_ended_ret = resctrl_lock_shared();
+        pthread_exit(NULL);
+        pthread_cleanup_pop(0);
+
+        return LOCK_WORKER_WENT_ON;
+}
+
+/* the lock taken again as the thread ends gives up the one the thread held
+ * first, rather than lose its record and leave it held for good
+ */
+static void
+test_resctrl_lock_taken_again_at_exit_gives_up_the_first(
+    void **state __attribute__((unused)))
+{
+        const unsigned fds = lock_open_fds();
+
+        assert_null(lock_run_ending_worker(lock_reenter_at_exit_worker));
+        assert_lock_given_up(fds);
+}
+
 /* a thread that ends holding the lock, stopped before its give-up has done
  * anything, as one is once the API lock's destructor has given the API lock
  * to another thread; that one takes the lock of its own meanwhile
@@ -2156,19 +2226,159 @@ test_resctrl_lock_holder_recorded_once_it_can_be(void **state
         assert_lock_given_up(fds);
 }
 
+/* takes the lock and releases it twice, each with the lock's answers, and
+ * on a thread of its own, so the case's thread has not been told yet; gives
+ * the count of answers that were not PQOS_RETVAL_OK
+ */
+static void *
+lock_twice_worker(void *arg __attribute__((unused)))
+{
+        intptr_t failed = 0;
+
+        failed += resctrl_lock_exclusive() != PQOS_RETVAL_OK;
+        failed += resctrl_lock_release() != PQOS_RETVAL_OK;
+        failed += resctrl_lock_shared() != PQOS_RETVAL_OK;
+        failed += resctrl_lock_release() != PQOS_RETVAL_OK;
+
+        return (void *)failed;
+}
+
+/* fork handlers that cannot be registered leave the lock as it was, said
+ * once for the thread, without the key even tried for: a child with its
+ * parent's PID could not tell the record it inherits from its parent's. The
+ * next lock registers them. The first of the lock's cases, as the handlers
+ * and the key, once had, are kept for the process; the key is still not
+ * created, for the cases after this one
+ */
+static void
+test_resctrl_lock_no_key_without_the_fork_handlers(void **state
+                                                   __attribute__((unused)))
+{
+        void *failed = LOCK_WORKER_WENT_ON;
+
+        assert_int_equal(lock_atforks, 0);
+        assert_int_equal(lock_key_creates, 0);
+        lock_atfork_errno = ENOMEM;
+        test_log_count_start();
+        assert_int_equal(lock_run_worker(lock_twice_worker, &failed), 0);
+        assert_int_equal(test_log_count_stop(), 1);
+        assert_null(failed);
+        assert_int_equal(lock_atforks, 2);
+        assert_int_equal(lock_key_creates, 0);
+
+        lock_atfork_errno = 0;
+        lock_key_create_errno = EAGAIN;
+        failed = LOCK_WORKER_WENT_ON;
+        assert_int_equal(lock_run_worker(lock_twice_worker, &failed), 0);
+        test_log_init_silent();
+        assert_null(failed);
+        assert_int_equal(lock_atforks, 3);
+        assert_int_equal(lock_key_creates, 2);
+}
+
+static void *
+lock_shared_then_release_worker(void *arg __attribute__((unused)))
+{
+        lock_ended_ret = resctrl_lock_shared();
+        if (lock_ended_ret == PQOS_RETVAL_OK)
+                (void)resctrl_lock_release();
+
+        return NULL;
+}
+
+/* ends a child that is still there after 5 s, with 1 */
+static void *
+lock_child_hang_watcher(void *arg __attribute__((unused)))
+{
+        const struct timespec limit = {5, 0};
+
+        (void)__real_nanosleep(&limit, NULL);
+        _exit(1);
+}
+
+/* forks, and has the child take the lock and release it; returns the child */
+static void *
+lock_fork_worker(void *arg __attribute__((unused)))
+{
+        pid_t child;
+
+        (void)fflush(NULL);
+        child = fork();
+        if (child == 0) {
+                pthread_t watcher;
+
+                if (pthread_create(&watcher, NULL, lock_child_hang_watcher,
+                                   NULL) != 0)
+                        _exit(3);
+                /* returns, at worst with the lock's timeout, rather than
+                 * wait for good on a mutex no thread of the child will give
+                 * back
+                 */
+                (void)resctrl_lock_shared();
+                (void)resctrl_lock_release();
+                _exit(0);
+        }
+
+        return (void *)(intptr_t)child;
+}
+
+/* a fork made while another thread creates the key waits for it to be done
+ * with the key's mutex, so the child does not inherit that mutex locked, by a
+ * thread the child does not have, and its first lock does not wait on it for
+ * good. The key's creation fails, so the key is still not created for the case
+ * after this one
+ */
+static void
+test_resctrl_lock_fork_waits_for_the_key_creation(void **state
+                                                  __attribute__((unused)))
+{
+        const struct timespec settle = {0, 100000000L};
+        pthread_t locker;
+        pthread_t forker;
+        void *result = NULL;
+        int status = -1;
+        pid_t child;
+
+        assert_int_equal(sem_init(&lock_key_create_entered, 0, 0), 0);
+        assert_int_equal(sem_init(&lock_key_create_go, 0, 0), 0);
+        lock_key_create_errno = EAGAIN;
+        lock_key_create_pause = 1;
+        assert_int_equal(pthread_create(&locker, NULL,
+                                        lock_shared_then_release_worker, NULL),
+                         0);
+        while (sem_wait(&lock_key_create_entered) != 0 && errno == EINTR)
+                ;
+        assert_int_equal(pthread_create(&forker, NULL, lock_fork_worker, NULL),
+                         0);
+        /* the fork made, or waiting for the key's mutex */
+        (void)__real_nanosleep(&settle, NULL);
+        assert_int_equal(sem_post(&lock_key_create_go), 0);
+        assert_int_equal(pthread_join(locker, NULL), 0);
+        assert_int_equal(pthread_join(forker, &result), 0);
+        test_log_init_silent();
+        child = (pid_t)(intptr_t)result;
+        assert_true(child > 0);
+        assert_int_equal(waitpid(child, &status, 0), child);
+        assert_true(WIFEXITED(status));
+        assert_int_equal(WEXITSTATUS(status), 0);
+        assert_int_equal(lock_ended_ret, PQOS_RETVAL_OK);
+        assert_int_equal(lock_refused(LOCK_EX), 0);
+        (void)sem_destroy(&lock_key_create_entered);
+        (void)sem_destroy(&lock_key_create_go);
+}
+
 /* a key that cannot be created leaves the lock as it was, said once for the
  * thread, and the next lock creates it: a thread that ends holding the lock
- * afterwards gives it up. The first of the lock's cases, as the key, once
- * made, is kept for the process: the count of creations shows it was not made
- * before
+ * afterwards gives it up. The key, once made, is kept for the process: the
+ * cases before this one only failed to make it
  */
 static void
 test_resctrl_lock_key_created_once_it_can_be(void **state
                                              __attribute__((unused)))
 {
+        const unsigned creates = lock_key_creates;
         unsigned fds;
 
-        assert_int_equal(lock_key_creates, 0);
         lock_key_create_errno = EAGAIN;
         test_log_count_start();
         assert_int_equal(resctrl_lock_exclusive(), PQOS_RETVAL_OK);
@@ -2176,14 +2386,14 @@ test_resctrl_lock_key_created_once_it_can_be(void **state
         assert_int_equal(resctrl_lock_shared(), PQOS_RETVAL_OK);
         assert_int_equal(resctrl_lock_release(), PQOS_RETVAL_OK);
         assert_int_equal(test_log_count_stop(), 1);
-        assert_int_equal(lock_key_creates, 2);
+        assert_int_equal(lock_key_creates, creates + 2);
 
         lock_key_create_errno = 0;
         fds = lock_open_fds();
         assert_null(lock_run_ending_worker(lock_exit_worker));
-        assert_int_equal(lock_key_creates, 3);
+        assert_int_equal(lock_key_creates, creates + 3);
         assert_lock_given_up(fds);
-        assert_int_equal(lock_key_creates, 3);
+        assert_int_equal(lock_key_creates, creates + 3);
 }
 
 static void *
@@ -2505,6 +2715,12 @@ main(void)
             cmocka_unit_test(test_resctrl_cpumask_write),
             cmocka_unit_test(test_resctrl_cpumask_write_zero),
             cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_no_key_without_the_fork_handlers, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_fork_waits_for_the_key_creation, lock_setup,
+                lock_teardown),
+            cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_key_created_once_it_can_be, lock_setup,
                 lock_teardown),
             cmocka_unit_test_setup_teardown(
@@ -2594,6 +2810,9 @@ main(void)
                 lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_inherited_closed_as_a_child_takes_one,
+                lock_setup, lock_teardown),
+            cmocka_unit_test_setup_teardown(
+                test_resctrl_lock_taken_again_at_exit_gives_up_the_first,
                 lock_setup, lock_teardown),
             cmocka_unit_test_setup_teardown(
                 test_resctrl_lock_exit_leaves_a_later_holder_held, lock_setup,

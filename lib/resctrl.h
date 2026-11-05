@@ -73,15 +73,17 @@ extern "C" {
  * A thread that ends holding the lock, by pthread_exit() or a cancellation
  * acted on in a locked section, gives it up as it ends, as it would with
  * resctrl_lock_release(); and so does resctrl_lock_exclusive()'s. That needs a
- * thread-specific key: where one cannot be created or set for the thread,
- * the lock is taken all the same, a warning is logged once for the thread,
- * and a thread that then ends holding it leaves it held; each later lock
- * tries the key again. A child forked while the lock is held, releasing it or
- * ending the thread that inherited it, closes its copy of the descriptor
- * without unlocking it, so the lock stays the parent's, even where the child
- * has since tried for the lock and failed to take it, or has the parent's PID
- * in a PID namespace of its own. A child that takes a shared lock of its own
- * beside the parent's closes the inherited copy as it takes it.
+ * thread-specific key, and fork handlers registered with it: where either
+ * cannot be had for the thread, the lock is taken all the same, a warning is
+ * logged once for the thread, and a thread that then ends holding it leaves it
+ * held; each later lock tries them again. A child forked while the lock is
+ * held, releasing it or ending the thread that inherited it, closes its copy
+ * of the descriptor without unlocking it, so the lock stays the parent's, even
+ * where the child has since tried for the lock and failed to take it, or has
+ * the parent's PID in a PID namespace of its own. A child that takes a shared
+ * lock of its own beside the parent's closes the inherited copy as it takes
+ * it; so does a thread that takes one again as it ends, from a cleanup handler
+ * or another key's destructor, and gives up the copy it held.
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
