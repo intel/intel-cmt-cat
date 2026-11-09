@@ -391,16 +391,99 @@ mba_reset_caps(const struct pqos_erdt_marc *marc,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Says that a class's MBA register lies past its domain's block
+ *
+ * @param [in] agent the CPU agent whose MARC describes the block
+ * @param [in] region_num memory region
+ * @param [in] clos class of service
+ */
+static void
+log_clos_past_mba_block(const struct pqos_cpu_agent_info *agent,
+                        const unsigned region_num,
+                        const unsigned clos)
+{
+        LOG_ERROR("MBA CLOS%u of memory region %u lies past the MBA register "
+                  "block of Domain ID 0x%x, %u page(s)\n",
+                  clos, region_num, agent->rmdd.domain_id,
+                  agent->marc.reg_block_size);
+}
+
+/**
+ * @brief Says that a class's I/O L3 CAT register lies past its domain's page
+ *
+ * @param [in] agent the device agent whose CARD describes the block
+ * @param [in] clos class of service
+ */
+static void
+log_clos_past_cat_block(const struct pqos_device_agent_info *agent,
+                        const unsigned clos)
+{
+        LOG_ERROR("L3 CAT CLOS%u lies past the CAT registers of Domain ID "
+                  "0x%x: at CAT Register Offset %#x a page has no room for "
+                  "it\n",
+                  clos, agent->rmdd.domain_id, agent->card.cat_reg_offset);
+}
+
+/**
+ * @brief Checks that every class of every region lies in each CPU domain's
+ *        MBA register block
+ *
+ * @param [in] erdt ERDT information
+ * @param [in] num_mem_regions number of memory regions the platform has
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK every register exists
+ * @retval PQOS_RETVAL_ERROR a class lies past a domain's block
+ */
+static int
+mba_classes_fit(const struct pqos_erdt_info *erdt,
+                const unsigned num_mem_regions)
+{
+        const unsigned num_clos = erdt_num_clos(erdt);
+
+        if (num_mem_regions == 0)
+                return PQOS_RETVAL_OK;
+
+        for (unsigned domain = 0; domain < erdt->num_cpu_agents; domain++) {
+                const struct pqos_cpu_agent_info *agent =
+                    &erdt->cpu_agents[domain];
+
+                if (!cpu_agent_has_mba(agent))
+                        continue;
+
+                if (!mba_clos_in_block(&agent->marc, (int)num_mem_regions - 1,
+                                       num_clos - 1)) {
+                        log_clos_past_mba_block(agent, num_mem_regions - 1,
+                                                num_clos - 1);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 mmio_alloc_reset_mba(void)
 {
         int ret;
         unsigned num_mem_regions;
         const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        unsigned num_clos;
 
         ASSERT(erdt != NULL);
 
         ret = mmio_get_num_mem_regions(&num_mem_regions);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        num_clos = erdt_num_clos(erdt);
+
+        /* every class of every region has to lie in its agent's register
+         * block before anything is written, so a descriptor that does not fit
+         * leaves the platform as it was rather than half reset
+         */
+        ret = mba_classes_fit(erdt, num_mem_regions);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -419,7 +502,7 @@ mmio_alloc_reset_mba(void)
                 /* the caps equal and unthrottled, as the hardware starts */
                 const unsigned bw = mba_bw_range(&agent->marc);
 
-                for (unsigned i = 0; i < erdt->max_clos; i++) {
+                for (unsigned i = 0; i < num_clos; i++) {
                         for (int j = 0; j < (int)num_mem_regions; j++) {
                                 ret = mba_reset_caps(&agent->marc, j, i, bw);
                                 if (ret != PQOS_RETVAL_OK)
@@ -470,7 +553,8 @@ mmio_mba_check_request(const struct pqos_mba *mba,
                 return PQOS_RETVAL_PARAM;
         }
 
-        if (mba->class_id >= erdt->max_clos || mba->num_mem_regions < 0 ||
+        /* the classes are 0 through the ERDT's Max CLOS */
+        if (mba->class_id > erdt->max_clos || mba->num_mem_regions < 0 ||
             (unsigned)mba->num_mem_regions > num_mem_regions)
                 return PQOS_RETVAL_PARAM;
 
@@ -488,6 +572,13 @@ mmio_mba_check_request(const struct pqos_mba *mba,
                                   "(0-%u)!\n",
                                   mba->class_id, region_num,
                                   num_mem_regions - 1);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (!mba_clos_in_block(&cpu_agent->marc, region_num,
+                                       mba->class_id)) {
+                        log_clos_past_mba_block(cpu_agent, (unsigned)region_num,
+                                                mba->class_id);
                         return PQOS_RETVAL_PARAM;
                 }
 
@@ -633,6 +724,7 @@ mmio_mba_get(const unsigned mba_id,
         const struct pqos_cpu_agent_info *cpu_agent;
         int num_mem_regions;
         unsigned supported;
+        unsigned clos_count;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(num_clos != NULL);
@@ -649,7 +741,8 @@ mmio_mba_get(const unsigned mba_id,
         if (num_mem_regions == 0)
                 num_mem_regions = (int)supported;
 
-        if (erdt->max_clos > max_num_clos)
+        clos_count = erdt_num_clos(erdt);
+        if (clos_count > max_num_clos)
                 return PQOS_RETVAL_ERROR;
 
         cpu_agent = get_mmio_cpu_agent_by_domain(erdt, mba_tab[0].domain_id);
@@ -661,7 +754,15 @@ mmio_mba_get(const unsigned mba_id,
         if (num_mem_regions < 0 || (unsigned)num_mem_regions > supported)
                 return PQOS_RETVAL_PARAM;
 
-        for (unsigned i = 0; i < erdt->max_clos; i++) {
+        if (num_mem_regions > 0 &&
+            !mba_clos_in_block(&cpu_agent->marc, num_mem_regions - 1,
+                               clos_count - 1)) {
+                log_clos_past_mba_block(
+                    cpu_agent, (unsigned)num_mem_regions - 1, clos_count - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        for (unsigned i = 0; i < clos_count; i++) {
                 mba_tab[i].ctrl = 0;
                 mba_tab[i].class_id = i;
                 mba_tab[i].mb_max = 0;
@@ -674,7 +775,7 @@ mmio_mba_get(const unsigned mba_id,
                         return ret;
         }
 
-        *num_clos = erdt->max_clos;
+        *num_clos = clos_count;
 
         return PQOS_RETVAL_OK;
 }
@@ -756,7 +857,7 @@ mmio_l3ca_set(const unsigned l3cat_id,
         ASSERT(erdt != NULL);
         UNUSED_PARAM(l3cat_id);
 
-        if (num_ca > erdt->max_clos)
+        if (num_ca > erdt_num_clos(erdt))
                 return PQOS_RETVAL_ERROR;
 
         // Check if all domains are valid
@@ -766,6 +867,21 @@ mmio_l3ca_set(const unsigned l3cat_id,
 
                 if (dev_agent == NULL || !dev_agent_has_l3ca(dev_agent)) {
                         log_domain_without_l3ca(erdt, ca[i].domain_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                /* the classes are 0 through the ERDT's Max CLOS: a register
+                 * past them is not one the platform has
+                 */
+                if (ca[i].class_id > erdt->max_clos) {
+                        LOG_ERROR("L3 CAT CLOS%u is out of range (CLOS%u is "
+                                  "max)!\n",
+                                  ca[i].class_id, erdt->max_clos);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (!iol3_clos_in_block(&dev_agent->card, ca[i].class_id)) {
+                        log_clos_past_cat_block(dev_agent, ca[i].class_id);
                         return PQOS_RETVAL_PARAM;
                 }
 
@@ -785,9 +901,7 @@ mmio_l3ca_set(const unsigned l3cat_id,
                                   io_l3_ways_mask);
                         return PQOS_RETVAL_PARAM;
                 }
-        }
 
-        for (i = 0; i < num_ca; i++) {
                 /* Check L3 CBM is non-contiguous */
                 if (!cap_get_mmio_l3ca_non_contiguous(erdt, ca[i].domain_id)) {
                         /* Check all CLOS CBM are contiguous */
@@ -807,7 +921,13 @@ mmio_l3ca_set(const unsigned l3cat_id,
                                   ca[i].class_id, ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
+        }
 
+        /* every entry has been checked, so no register is written for a
+         * request one of whose entries is refused; a write that fails midway
+         * leaves the entries before it applied
+         */
+        for (i = 0; i < num_ca; i++) {
                 ret = set_iol3_cbm_clos_v1(
                     &get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id)->card,
                     ca[i].class_id, ca[i].u.ways_mask);
@@ -828,6 +948,7 @@ mmio_l3ca_get(const unsigned l3cat_id,
         unsigned i = 0;
         const struct pqos_erdt_info *erdt = _pqos_get_erdt();
         uint64_t value = 0;
+        unsigned clos_count;
 
         ASSERT(num_ca != NULL);
         ASSERT(ca != NULL);
@@ -835,11 +956,12 @@ mmio_l3ca_get(const unsigned l3cat_id,
         ASSERT(erdt != NULL);
         UNUSED_PARAM(l3cat_id);
 
-        if (erdt->max_clos > max_num_ca)
+        clos_count = erdt_num_clos(erdt);
+        if (clos_count > max_num_ca)
                 return PQOS_RETVAL_ERROR;
 
         // Check if all domains are valid
-        for (unsigned i = 0; i < erdt->max_clos; i++) {
+        for (unsigned i = 0; i < clos_count; i++) {
                 const struct pqos_device_agent_info *dev_agent =
                     get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id);
 
@@ -847,9 +969,14 @@ mmio_l3ca_get(const unsigned l3cat_id,
                         log_domain_without_l3ca(erdt, ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
+
+                if (!iol3_clos_in_block(&dev_agent->card, i)) {
+                        log_clos_past_cat_block(dev_agent, i);
+                        return PQOS_RETVAL_ERROR;
+                }
         }
 
-        for (i = 0; i < erdt->max_clos; i++) {
+        for (i = 0; i < clos_count; i++) {
                 ret = get_iol3_cbm_clos_v1(
                     &get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id)->card,
                     i, REG_BLOCK_SIZE_ZERO, &value);
@@ -861,9 +988,39 @@ mmio_l3ca_get(const unsigned l3cat_id,
                 ca[i].class_id = i;
                 ca[i].u.ways_mask = value;
         }
-        *num_ca = erdt->max_clos;
+        *num_ca = clos_count;
 
         return ret;
+}
+
+/**
+ * @brief Checks that every class lies in each device domain's I/O L3 CAT page
+ *
+ * @param [in] erdt ERDT information
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK every register exists
+ * @retval PQOS_RETVAL_ERROR a class lies past a domain's page
+ */
+static int
+cat_classes_fit(const struct pqos_erdt_info *erdt)
+{
+        const unsigned num_clos = erdt_num_clos(erdt);
+
+        for (unsigned domain = 0; domain < erdt->num_dev_agents; domain++) {
+                const struct pqos_device_agent_info *agent =
+                    &erdt->dev_agents[domain];
+
+                if (!dev_agent_has_l3ca(agent))
+                        continue;
+
+                if (!iol3_clos_in_block(&agent->card, num_clos - 1)) {
+                        log_clos_past_cat_block(agent, num_clos - 1);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+
+        return PQOS_RETVAL_OK;
 }
 
 int
@@ -871,8 +1028,19 @@ mmio_alloc_reset_cat(void)
 {
         int ret;
         const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        unsigned num_clos;
 
         ASSERT(erdt != NULL);
+
+        num_clos = erdt_num_clos(erdt);
+
+        /* every class has to lie in its agent's page before anything is
+         * written, so a descriptor that does not fit leaves the platform as
+         * it was rather than half reset
+         */
+        ret = cat_classes_fit(erdt);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         for (unsigned domain = 0; domain < erdt->num_dev_agents; domain++) {
                 /* An agent enumerated for monitoring alone has no CARD block,
@@ -883,7 +1051,7 @@ mmio_alloc_reset_cat(void)
                 if (!dev_agent_has_l3ca(&erdt->dev_agents[domain]))
                         continue;
 
-                for (unsigned i = 0; i < erdt->max_clos; i++) {
+                for (unsigned i = 0; i < num_clos; i++) {
                         /* Reset I/ORDT L3 CAT: every way of the CBM, whose
                          * length is the RMDD's Number of IO L3 ways
                          */
@@ -908,8 +1076,28 @@ int
 mmio_alloc_reset(const struct pqos_alloc_config *cfg)
 {
         int ret = PQOS_RETVAL_OK;
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        unsigned num_mem_regions;
 
         ASSERT(cfg != NULL);
+        ASSERT(erdt != NULL);
+
+        /* the ERDT's classes are checked against every register block before
+         * any part of the reset runs, so a descriptor that does not fit leaves
+         * the MSR, MBA and I/O L3 CAT configuration as it was
+         */
+        ret = mmio_get_num_mem_regions(&num_mem_regions);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = mba_classes_fit(erdt, num_mem_regions);
+        if (ret == PQOS_RETVAL_OK)
+                ret = cat_classes_fit(erdt);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Failed to reset allocation configuration: the "
+                          "ERDT's classes do not fit the register blocks\n");
+                return ret;
+        }
 
         ret = alloc_reset(cfg);
         if (ret != PQOS_RETVAL_OK) {

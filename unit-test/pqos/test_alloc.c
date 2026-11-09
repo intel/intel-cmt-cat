@@ -49,6 +49,20 @@
  */
 static int m_fail_strdup;
 
+/* the largest table the utility asked for since the count was reset, so a case
+ * can tell that no table of a size was made rather than that none failed
+ */
+static size_t calloc_largest_nmemb;
+
+void *
+__wrap_calloc(size_t nmemb, size_t size)
+{
+        if (nmemb > calloc_largest_nmemb)
+                calloc_largest_nmemb = nmemb;
+
+        return __real_calloc(nmemb, size);
+}
+
 char *
 __wrap_strdup(const char *s)
 {
@@ -77,13 +91,63 @@ mock_inter_get(const enum pqos_interface inter, unsigned count)
 
 /* ======== set_l3_clos on the MMIO interface ======== */
 
+/* a table that describes no I/O L3 CAT registers bounds its classes by
+ * nothing, so the table read keeps its usual size: the library refuses such
+ * a domain before it reads one
+ */
+static void
+test_set_l3_clos_mmio_keeps_the_table_small_without_registers(void **state)
+{
+        unsigned sock_ids[1] = {0};
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_sysconfig sys = {.erdt = &erdt};
+        int ret = 0;
+
+        UNUSED_ARG(state);
+
+        erdt.max_clos = UINT32_MAX - 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x20;
+
+        mock_inter_get(PQOS_INTER_MMIO, 1);
+        sel_alloc_domain_id.num_domain_ids = 1;
+        sel_alloc_domain_id.domain_ids[0] = 0x20;
+
+        expect_function_call(__wrap_pqos_sysconfig_get);
+        will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_sysconfig_get, &sys);
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, PQOS_MAX_L3CA_CLOS);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_PARAM);
+
+        run_function(set_l3_clos, ret, 1, 0xf, sock_ids, 1,
+                     CAT_UPDATE_SCOPE_BOTH, NULL);
+
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("Failed to retrieve L3 classes of domain 0x20!"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
 static void
 test_set_l3_clos_mmio_reports_the_domain(void **state)
 {
         unsigned sock_ids[1] = {0};
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {
+            .max_clos = 1, .num_dev_agents = 1, .dev_agents = &dev_agent};
+        struct pqos_sysconfig sys = {.erdt = &erdt};
         int ret = 0;
 
         UNUSED_ARG(state);
+
+        /* a device domain with the registers, whose page bounds the classes */
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
 
         /* a class definition for a CPU domain on the MMIO interface. The
          * library cannot serve it, and the message used to name a socket, which
@@ -93,8 +157,12 @@ test_set_l3_clos_mmio_reports_the_domain(void **state)
         sel_alloc_domain_id.num_domain_ids = 1;
         sel_alloc_domain_id.domain_ids[0] = 0;
 
+        /* the table read is sized by the ERDT's classes, Max CLOS + 1 */
+        expect_function_call(__wrap_pqos_sysconfig_get);
+        will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_sysconfig_get, &sys);
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
-        expect_value(__wrap_pqos_l3ca_get, max_num_ca, PQOS_MAX_L3CA_CLOS);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, erdt.max_clos + 1);
         will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_ERROR);
 
         run_function(set_l3_clos, ret, 1, 0xf, sock_ids, 1,
@@ -715,7 +783,7 @@ test_print_domain_alloc_config_skips_domain_without_marc(void **state)
         struct pqos_mrrm_info mrrm = {0};
         struct pqos_erdt_info *saved_erdt = data->sys->erdt;
         struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
-        struct pqos_mba mba = {0};
+        struct pqos_mba mba[2] = {{0}};
         unsigned i;
 
         /* domain 0x10 was enumerated without a MARC block, so it has no MBA
@@ -737,13 +805,19 @@ test_print_domain_alloc_config_skips_domain_without_marc(void **state)
         data->sys->erdt = &erdt;
         data->sys->mrrm = &mrrm;
 
-        mba.class_id = 0;
-        mba.domain_id = cpu_agents[1].rmdd.domain_id;
-        mba.num_mem_regions = 1;
-        mba.mem_regions[0].region_num = 0;
-        mba.mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX] = 0x1ff;
-        mba.mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX] = -1;
-        mba.mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX] = -1;
+        /* Max CLOS 1 is two classes, which is what the read answers */
+        for (i = 0; i < DIM(mba); i++) {
+                mba[i].class_id = i;
+                mba[i].domain_id = cpu_agents[1].rmdd.domain_id;
+                mba[i].num_mem_regions = 1;
+                mba[i].mem_regions[0].region_num = 0;
+                mba[i].mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX] =
+                    0x1ff - (int)i;
+                mba[i].mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX] =
+                    -1;
+                mba[i].mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX] =
+                    -1;
+        }
 
         /* the region count and the MBA read are expected once, for the domain
          * that has a MARC block; a call for the other one would fail the case
@@ -751,10 +825,10 @@ test_print_domain_alloc_config_skips_domain_without_marc(void **state)
         will_return(__wrap_pqos_get_num_mem_regions, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_get_num_mem_regions, 1);
         expect_value(__wrap_pqos_mba_get, mba_id, cpu_agents[1].rmdd.domain_id);
-        expect_value(__wrap_pqos_mba_get, max_num_clos, erdt.max_clos);
+        expect_value(__wrap_pqos_mba_get, max_num_clos, erdt.max_clos + 1);
         will_return(__wrap_pqos_mba_get, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_mba_get, 1);
-        will_return(__wrap_pqos_mba_get, &mba);
+        will_return(__wrap_pqos_mba_get, DIM(mba));
+        will_return(__wrap_pqos_mba_get, mba);
 
         /* print_core_assoc() per core, plus one for print_iordt_alloc() */
         mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
@@ -773,6 +847,8 @@ test_print_domain_alloc_config_skips_domain_without_marc(void **state)
          */
         assert_true(output_has_text("Domain ID 17 MBA CLOS0 Memory Region 0 "
                                     "Optimal Bandwidth=> 0x1ff\n"));
+        assert_true(output_has_text("Domain ID 17 MBA CLOS1 Memory Region 0 "
+                                    "Optimal Bandwidth=> 0x1fe\n"));
         assert_true(output_has_text("Core information for socket 0:\n"));
         assert_false(output_has_text("Error retrieving MMIO registers"));
 
@@ -838,7 +914,7 @@ test_print_domain_alloc_config_skips_domain_without_card(void **state)
         struct pqos_mrrm_info mrrm = {0};
         struct pqos_erdt_info *saved_erdt = data->sys->erdt;
         struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
-        struct pqos_l3ca l3ca = {0};
+        struct pqos_l3ca l3ca[2] = {{0}};
         unsigned i;
 
         /* device domain 0x20 was enumerated for monitoring alone, so its CARD
@@ -855,19 +931,23 @@ test_print_domain_alloc_config_skips_domain_without_card(void **state)
         data->sys->erdt = &erdt;
         data->sys->mrrm = &mrrm;
 
-        l3ca.class_id = 0;
-        l3ca.domain_id = dev_agents[1].rmdd.domain_id;
-        l3ca.u.ways_mask = 0xf;
+        /* Max CLOS 1 is two classes, which is what the read answers */
+        for (i = 0; i < DIM(l3ca); i++) {
+                l3ca[i].class_id = i;
+                l3ca[i].domain_id = dev_agents[1].rmdd.domain_id;
+                l3ca[i].u.ways_mask = 0xf >> i;
+        }
 
-        /* the read is expected once, for the domain that has a CARD block; a
-         * call for the other one would fail the case
+        /* the read is expected once, for the domain that has a CARD block, with
+         * a table of the ERDT's classes; a call for the other domain would
+         * fail the case
          */
         expect_value(__wrap_pqos_l3ca_get, l3cat_id,
                      dev_agents[1].rmdd.domain_id);
-        expect_value(__wrap_pqos_l3ca_get, max_num_ca, PQOS_MAX_L3CA_CLOS);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, erdt.max_clos + 1);
         will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_l3ca_get, 1);
-        will_return(__wrap_pqos_l3ca_get, &l3ca);
+        will_return(__wrap_pqos_l3ca_get, DIM(l3ca));
+        will_return(__wrap_pqos_l3ca_get, l3ca);
 
         /* print_core_assoc() per core, plus one for print_iordt_alloc() */
         mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
@@ -886,11 +966,186 @@ test_print_domain_alloc_config_skips_domain_without_card(void **state)
          */
         assert_true(output_has_text("Domain ID 0x21 I/O L3CA CLOS0 => "
                                     "MASK 0xf\n"));
+        assert_true(output_has_text("Domain ID 0x21 I/O L3CA CLOS1 => "
+                                    "MASK 0x7\n"));
         assert_true(output_has_text("Core information for socket 0:\n"));
         assert_false(output_has_text("Error retrieving I/O L3CA"));
 
         data->sys->erdt = saved_erdt;
         data->sys->mrrm = saved_mrrm;
+}
+
+/* a platform of 17 classes, one more than PQOS_MAX_L3CA_CLOS: the table is
+ * sized by the ERDT, so the last class is read and shown
+ */
+/* a table that describes no register block bounds its classes by nothing, so
+ * no table of its classes is made for it, however many it says there are:
+ * the display runs through to the core associations
+ */
+static void
+test_print_domain_alloc_config_no_table_without_registers(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm = {0};
+        struct pqos_erdt_info *saved_erdt = data->sys->erdt;
+        struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
+        unsigned i;
+
+        /* both domains enumerated for monitoring alone: no MARC, no CARD */
+        erdt.max_clos = UINT32_MAX - 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent.rmdd.domain_id = 0x10;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x20;
+
+        data->sys->erdt = &erdt;
+        data->sys->mrrm = &mrrm;
+
+        /* print_core_assoc() per core, plus one for print_iordt_alloc() */
+        mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
+        for (i = 0; i < data->cpu_info->num_cores; i++) {
+                expect_value(__wrap_pqos_alloc_assoc_get, lcore, i);
+                will_return(__wrap_pqos_alloc_assoc_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_alloc_assoc_get, 0);
+        }
+
+        calloc_largest_nmemb = 0;
+        run_void_function(print_domain_alloc_config, NULL, NULL, NULL,
+                          data->cap_mba, data->sys);
+
+        assert_true(output_has_text("Core information for socket 0:\n"));
+        assert_false(output_has_text("Error allocating memory"));
+        /* no table of the ERDT's classes was asked for, not merely none
+         * refused: the largest table made is far below their count
+         */
+        assert_true(calloc_largest_nmemb < PQOS_MAX_L3CA_CLOS);
+
+        data->sys->erdt = saved_erdt;
+        data->sys->mrrm = saved_mrrm;
+}
+
+static void
+test_print_domain_alloc_config_reads_a_class_past_sixteen(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm = {0};
+        struct pqos_erdt_info *saved_erdt = data->sys->erdt;
+        struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
+        struct pqos_l3ca l3ca[17];
+        unsigned i;
+
+        erdt.max_clos = DIM(l3ca) - 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x21;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+
+        data->sys->erdt = &erdt;
+        data->sys->mrrm = &mrrm;
+
+        for (i = 0; i < DIM(l3ca); i++) {
+                memset(&l3ca[i], 0, sizeof(l3ca[i]));
+                l3ca[i].class_id = i;
+                l3ca[i].domain_id = dev_agent.rmdd.domain_id;
+                l3ca[i].u.ways_mask = 0xf;
+        }
+
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id, dev_agent.rmdd.domain_id);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, DIM(l3ca));
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_l3ca_get, DIM(l3ca));
+        will_return(__wrap_pqos_l3ca_get, l3ca);
+
+        /* print_core_assoc() per core, plus one for print_iordt_alloc() */
+        mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
+        for (i = 0; i < data->cpu_info->num_cores; i++) {
+                expect_value(__wrap_pqos_alloc_assoc_get, lcore, i);
+                will_return(__wrap_pqos_alloc_assoc_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_alloc_assoc_get, 0);
+        }
+
+        run_void_function(print_domain_alloc_config, NULL, NULL, NULL,
+                          data->cap_mba, data->sys);
+
+        assert_true(output_has_text("Domain ID 0x21 I/O L3CA CLOS0 => "
+                                    "MASK 0xf\n"));
+        assert_true(output_has_text("Domain ID 0x21 I/O L3CA CLOS16 => "
+                                    "MASK 0xf\n"));
+        assert_false(output_has_text("Error retrieving I/O L3CA"));
+
+        data->sys->erdt = saved_erdt;
+        data->sys->mrrm = saved_mrrm;
+}
+
+/* and the same platform's last class is found and set by -e on MMIO, the
+ * table read to find it being sized by the ERDT
+ */
+static void
+test_set_l3_clos_mmio_sets_a_class_past_sixteen(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_sysconfig sys = {.erdt = &erdt};
+        struct pqos_l3ca l3ca[17];
+        struct pqos_l3ca expected;
+        unsigned sock_ids[1] = {0};
+        unsigned i;
+        int ret = 0;
+
+        erdt.max_clos = DIM(l3ca) - 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        for (i = 0; i < DIM(l3ca); i++) {
+                memset(&l3ca[i], 0, sizeof(l3ca[i]));
+                l3ca[i].class_id = i;
+                l3ca[i].domain_id = 0x10;
+                l3ca[i].u.ways_mask = 0xf;
+        }
+
+        /* what the setter has to be handed: the class read back from the
+         * table, in its domain, with the new mask and no CDP
+         */
+        memset(&expected, 0, sizeof(expected));
+        expected.class_id = DIM(l3ca) - 1;
+        expected.domain_id = 0x10;
+        expected.u.ways_mask = 0x3;
+
+        mock_inter_get(PQOS_INTER_MMIO, 1);
+        sel_alloc_domain_id.num_domain_ids = 1;
+        sel_alloc_domain_id.domain_ids[0] = 0x10;
+
+        expect_function_call(__wrap_pqos_sysconfig_get);
+        will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_sysconfig_get, &sys);
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, DIM(l3ca));
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_l3ca_get, DIM(l3ca));
+        will_return(__wrap_pqos_l3ca_get, l3ca);
+        expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_set, num_clos, 1);
+        expect_memory(__wrap_pqos_l3ca_set, ca, &expected, sizeof(expected));
+        will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
+
+        run_function(set_l3_clos, ret, DIM(l3ca) - 1, 0x3, sock_ids, 1,
+                     CAT_UPDATE_SCOPE_BOTH, data->cpu_info);
+
+        assert_int_equal(ret, 1);
+        assert_true(output_has_text("Domain ID 16 L3CA CLOS16 => MASK 0x3\n"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
 }
 
 static void
@@ -2425,6 +2680,8 @@ main(void)
             cmocka_unit_test(
                 test_alloc_check_options_rejects_bandwidth_flag_without_class),
             cmocka_unit_test(test_set_l3_clos_mmio_reports_the_domain),
+            cmocka_unit_test(
+                test_set_l3_clos_mmio_keeps_the_table_small_without_registers),
             cmocka_unit_test(test_selfn_allocation_assoc_negative),
             cmocka_unit_test_teardown(test_selfn_allocation_assoc_llc,
                                       cleanup_assoc_core_and_pid_tabs),
@@ -2461,6 +2718,11 @@ main(void)
             cmocka_unit_test(test_print_domain_alloc_config_core_in_no_domain),
             cmocka_unit_test(
                 test_print_domain_alloc_config_skips_domain_without_card),
+            cmocka_unit_test(
+                test_print_domain_alloc_config_reads_a_class_past_sixteen),
+            cmocka_unit_test(
+                test_print_domain_alloc_config_no_table_without_registers),
+            cmocka_unit_test(test_set_l3_clos_mmio_sets_a_class_past_sixteen),
             cmocka_unit_test(test_alloc_apply_mba),
             cmocka_unit_test(test_alloc_apply_mba_max),
             cmocka_unit_test(test_alloc_apply_mba_mmio_domains_in_one_request),

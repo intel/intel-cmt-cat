@@ -366,6 +366,108 @@ test_cap_print_io_dev_with_channels(void **state)
         assert_int_equal(output_has_text("not an I/O RDT device"), 0);
 }
 
+/* The same device on the MMIO interface, where the classes and cache ways
+ * come from the ERDT: Max CLOS is the highest class, so 15 is the range 0 to
+ * 15, and the example takes the two highest classes
+ */
+static void
+test_cap_print_io_dev_mmio_classes(void **state)
+{
+        struct pqos_device_agent_info dev_agent = {
+            .rmdd = {.domain_id = 0x10, .num_io_l3_ways = 12}};
+        struct pqos_erdt_info erdt = {
+            .max_clos = 15, .num_dev_agents = 1, .dev_agents = &dev_agent};
+        struct pqos_sysconfig sys = {
+            .cap = &test_caps.cap, .dev = &test_devinfo, .erdt = &erdt};
+        int ret = PQOS_RETVAL_RESOURCE;
+
+        UNUSED_ARG(state);
+
+        /* the MMIO interface probes no minimum mask width: one way is one */
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+
+        expect_value(__wrap_pqos_io_devs_get, segment, 0);
+        expect_value(__wrap_pqos_io_devs_get, bdf, 0x0d00);
+        will_return(__wrap_pqos_io_devs_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_io_devs_get, &test_pci_with_channels);
+
+        select_io_dev("0000:0d:00.0");
+        run_function(cap_print_io_dev, ret, &sys);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(output_has_text("Domain ID            : 0x10"), 1);
+        assert_int_equal(output_has_text("Available CLOS     : 0 to 15"), 1);
+        assert_int_equal(output_has_text("Available Cache Ways: 12"), 1);
+        assert_int_equal(output_has_text("set CLOS 15 to the first 6 L3 cache "
+                                         "ways and CLOS 14 to the next 6 L3 "
+                                         "cache ways in Device Domain 0x10"),
+                         1);
+}
+
+/* Max CLOS 0 is one class, CLOS0: a range of one, and no example, which needs
+ * two classes
+ */
+static void
+test_cap_print_io_dev_mmio_one_class(void **state)
+{
+        struct pqos_device_agent_info dev_agent = {
+            .rmdd = {.domain_id = 0x10, .num_io_l3_ways = 12}};
+        struct pqos_erdt_info erdt = {
+            .max_clos = 0, .num_dev_agents = 1, .dev_agents = &dev_agent};
+        struct pqos_sysconfig sys = {
+            .cap = &test_caps.cap, .dev = &test_devinfo, .erdt = &erdt};
+        int ret = PQOS_RETVAL_RESOURCE;
+
+        UNUSED_ARG(state);
+
+        /* the MMIO interface probes no minimum mask width: one way is one */
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+
+        expect_value(__wrap_pqos_io_devs_get, segment, 0);
+        expect_value(__wrap_pqos_io_devs_get, bdf, 0x0d00);
+        will_return(__wrap_pqos_io_devs_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_io_devs_get, &test_pci_with_channels);
+
+        select_io_dev("0000:0d:00.0");
+        run_function(cap_print_io_dev, ret, &sys);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(output_has_text("Available CLOS     : 0 to 0"), 1);
+        assert_int_equal(output_has_text("Available Cache Ways: 12"), 1);
+        assert_int_equal(output_has_text("For example"), 0);
+}
+
+/* ======== cap_print_topology ======== */
+
+/* the topology report counts the classes the ERDT describes: Max CLOS 15 is
+ * 16 of them, and 0 is one
+ */
+static void
+test_cap_print_topology_counts_the_classes(void **state)
+{
+        struct pqos_erdt_info erdt = {.max_clos = 15};
+        struct pqos_sysconfig sys = {.cap = &test_caps.cap, .erdt = &erdt};
+
+        UNUSED_ARG(state);
+
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_topology, &sys);
+
+        assert_int_equal(output_has_text("Num CLOS:       16\n"), 1);
+        assert_int_equal(output_has_text("CPU Agents:     0\n"), 1);
+
+        erdt.max_clos = 0;
+        will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_inter_get, PQOS_INTER_MMIO);
+        run_void_function(cap_print_topology, &sys);
+
+        assert_int_equal(output_has_text("Num CLOS:       1\n"), 1);
+        assert_int_equal(output_has_text("Num CLOS:       16\n"), 0);
+}
+
 int
 __wrap_pqos_io_devs_get(struct pqos_pci_info *pci_info,
                         uint16_t segment,
@@ -1002,7 +1104,10 @@ main(void)
             cmocka_unit_test(test_cap_print_io_dev_absent_device),
             cmocka_unit_test(test_cap_print_io_dev_without_channels),
             cmocka_unit_test(test_cap_print_io_dev_without_iordt),
-            cmocka_unit_test(test_cap_print_io_dev_with_channels)};
+            cmocka_unit_test(test_cap_print_io_dev_with_channels),
+            cmocka_unit_test(test_cap_print_io_dev_mmio_classes),
+            cmocka_unit_test(test_cap_print_io_dev_mmio_one_class),
+            cmocka_unit_test(test_cap_print_topology_counts_the_classes)};
 
         /* a group of its own: these are about the memory region report rather
          * than the I/O device list, and a group name that covers both tells a

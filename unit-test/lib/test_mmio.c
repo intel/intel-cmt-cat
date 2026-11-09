@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "test_mmio.h"
+
+#include "allocation_common.h"
 #include "mmio.h"
 #include "mmio_allocation.h"
 #include "mmio_monitoring.h"
@@ -81,10 +84,6 @@ __wrap_pqos_munmap(void *mem, const uint64_t size)
         check_expected_ptr(mem);
         check_expected(size);
 }
-
-int __real_set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
-                                unsigned int clos_number,
-                                uint64_t value);
 
 const struct pqos_erdt_info *
 __wrap__pqos_get_erdt(void)
@@ -267,6 +266,30 @@ __wrap_set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
         check_expected_ptr(card);
         check_expected(clos_number);
         check_expected(value);
+
+        return mock_type(int);
+}
+
+int
+__wrap_alloc_reset(const struct pqos_alloc_config *cfg)
+{
+        function_called();
+        check_expected_ptr(cfg);
+
+        return mock_type(int);
+}
+
+int
+__wrap_get_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
+                            unsigned int clos_number,
+                            unsigned int block_number,
+                            uint64_t *value)
+{
+        check_expected_ptr(card);
+        check_expected(clos_number);
+        check_expected(block_number);
+
+        *value = mock_type(uint64_t);
 
         return mock_type(int);
 }
@@ -832,7 +855,7 @@ test_mba_get_ignores_num_clos_input(void **state __attribute__((unused)))
         const int num_reads = 2 * PQOS_MAX_MEM_REGIONS;
         int ret;
 
-        erdt.max_clos = 2;
+        erdt.max_clos = 1;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -883,7 +906,7 @@ test_mba_get_uses_mrrm_count(void **state __attribute__((unused)))
         const int num_reads = supported;
         int ret;
 
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -928,7 +951,7 @@ test_mba_get_rejects_unsupported_num_regions(void **state
         unsigned num_clos = 0;
         int ret;
 
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -1025,10 +1048,10 @@ test_mba_reset_uses_mrrm_count(void **state __attribute__((unused)))
         struct pqos_erdt_info erdt = {0};
         struct pqos_mrrm_info mrrm;
         const uint8_t supported = 2;
-        const int num_writes = 2 * supported; /* max_clos * regions */
+        const int num_writes = 2 * supported; /* classes * regions */
         int ret;
 
-        erdt.max_clos = 2;
+        erdt.max_clos = 1;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -1060,7 +1083,7 @@ assert_mba_reset_writes_field_max(const uint32_t range)
         struct pqos_mrrm_info mrrm;
         int ret;
 
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -1102,10 +1125,10 @@ test_mba_reset_writes_each_domain_range(void **state __attribute__((unused)))
         struct pqos_cpu_agent_info cpu_agents[2] = {0};
         struct pqos_erdt_info erdt = {0};
         struct pqos_mrrm_info mrrm;
-        const int num_writes = 2; /* max_clos * regions, an agent */
+        const int num_writes = 2; /* classes * regions, an agent */
         int ret;
 
-        erdt.max_clos = 2;
+        erdt.max_clos = 1;
         erdt.num_cpu_agents = DIM(cpu_agents);
         erdt.cpu_agents = cpu_agents;
         cpu_agent_init(&cpu_agents[0], 10);
@@ -1148,7 +1171,7 @@ assert_mba_reset_order(const unsigned min,
         struct pqos_mrrm_info mrrm;
         int ret;
 
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -1187,7 +1210,7 @@ assert_mba_reset_read_fails(const int type, const int reads)
         struct pqos_mrrm_info mrrm;
         int ret;
 
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent_init(&cpu_agent, 10);
@@ -1258,14 +1281,13 @@ test_mba_reset_skips_domain_without_marc(void **state __attribute__((unused)))
         struct pqos_erdt_info erdt = {0};
         struct pqos_mrrm_info mrrm;
         const uint8_t supported = 1;
-        const int num_writes =
-            1 * supported; /* max_clos * regions, one agent */
+        const int num_writes = 1 * supported; /* classes * regions, one agent */
         int ret;
 
         /* domain 10 was enumerated without a MARC block, so it holds no MBA
          * register; domain 20 has one
          */
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = DIM(cpu_agents);
         erdt.cpu_agents = cpu_agents;
         cpu_agents[0].rmdd.domain_id = 10;
@@ -1338,7 +1360,7 @@ test_mba_get_rejects_domain_without_marc(void **state __attribute__((unused)))
         unsigned num_clos = 0;
         int ret;
 
-        erdt.max_clos = 1;
+        erdt.max_clos = 0;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
         cpu_agent.rmdd.domain_id = 10;
@@ -1651,13 +1673,813 @@ test_mmio_l3ca_set_bounds_mask_by_io_l3_ways(void **state
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* the classes read are 0 through the ERDT's Max CLOS, each from its own
+ * register, and the count reported is theirs
+ */
+static void
+test_mmio_l3ca_get_reads_every_class(void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca[3] = {{0}};
+        unsigned num_ca = 0;
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+        ca[0].domain_id = 0x10;
+        ca[1].domain_id = 0x10;
+        /* past the count, a sentinel the read has no business touching */
+        ca[2].domain_id = 0x42;
+        ca[2].class_id = 7;
+        ca[2].cdp = 1;
+        ca[2].u.ways_mask = 0xabc;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        expect_value_count(__wrap_get_iol3_cbm_clos_v1, card, &dev_agent.card,
+                           2);
+        expect_value(__wrap_get_iol3_cbm_clos_v1, clos_number, 0);
+        expect_value(__wrap_get_iol3_cbm_clos_v1, clos_number, 1);
+        expect_value_count(__wrap_get_iol3_cbm_clos_v1, block_number,
+                           REG_BLOCK_SIZE_ZERO, 2);
+        will_return(__wrap_get_iol3_cbm_clos_v1, 0xf);
+        will_return(__wrap_get_iol3_cbm_clos_v1, PQOS_RETVAL_OK);
+        will_return(__wrap_get_iol3_cbm_clos_v1, 0x3);
+        will_return(__wrap_get_iol3_cbm_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_l3ca_get(0, DIM(ca), &num_ca, ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(num_ca, 2);
+        assert_int_equal(ca[0].class_id, 0);
+        assert_int_equal(ca[0].u.ways_mask, 0xf);
+        assert_int_equal(ca[1].class_id, 1);
+        assert_int_equal(ca[1].u.ways_mask, 0x3);
+        /* the table past the count is left as it was */
+        assert_int_equal(ca[2].domain_id, 0x42);
+        assert_int_equal(ca[2].class_id, 7);
+        assert_int_equal(ca[2].cdp, 1);
+        assert_int_equal(ca[2].u.ways_mask, 0xabc);
+}
+
+/* a table with fewer entries than the platform has classes is refused before
+ * any register is read, rather than filled up to its end
+ */
+static void
+test_mmio_l3ca_get_rejects_short_table(void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca[1] = {{0}};
+        unsigned num_ca = 0;
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+        ca[0].domain_id = 0x10;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+
+        ret = mmio_l3ca_get(0, DIM(ca), &num_ca, ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(num_ca, 0);
+}
+
+/* ======== the last class of the ERDT, and the one above it ======== */
+
+/* Max CLOS names the highest class, so a request for it is written, and one
+ * for the class above it is refused before any register is touched
+ */
+static void
+test_mba_set_accepts_the_last_class(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba requested;
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+
+        mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, 0x50);
+        requested.class_id = erdt.max_clos;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, marc,
+                     &cpu_agent.marc);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, region_num, 0);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number,
+                     erdt.max_clos);
+        expect_value(__wrap_set_mba_optimal_bw_region_clos_v1, value, 0x50);
+        will_return(__wrap_set_mba_optimal_bw_region_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_mba_set_rejects_class_above_max_clos(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba requested;
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+
+        mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, 0x50);
+        requested.class_id = erdt.max_clos + 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_mmio_l3ca_set_accepts_the_last_class(void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        ca.domain_id = 0x10;
+        ca.class_id = erdt.max_clos;
+        ca.u.ways_mask = 0xf;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, card, &dev_agent.card);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, clos_number, erdt.max_clos);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, value, 0xf);
+        will_return(__wrap_set_iol3_cbm_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_mmio_l3ca_set_rejects_class_above_max_clos(void **state
+                                                __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        ca.domain_id = 0x10;
+        ca.class_id = erdt.max_clos + 1;
+        ca.u.ways_mask = 0xf;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(
+            strstr(test_log, "CLOS2 is out of range (CLOS1 is max)"));
+}
+
+/* two classes in one request are both written, each to its own register */
+static void
+test_mmio_l3ca_set_writes_every_class(void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca[2] = {{0}};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        ca[0].domain_id = 0x10;
+        ca[0].class_id = 0;
+        ca[0].u.ways_mask = 0x3;
+        ca[1].domain_id = 0x10;
+        ca[1].class_id = 1;
+        ca[1].u.ways_mask = 0xc;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        expect_value_count(__wrap_set_iol3_cbm_clos_v1, card, &dev_agent.card,
+                           2);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, clos_number, 0);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, clos_number, 1);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, value, 0x3);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, value, 0xc);
+        will_return_count(__wrap_set_iol3_cbm_clos_v1, PQOS_RETVAL_OK, 2);
+
+        ret = mmio_l3ca_set(0, DIM(ca), ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* a request is written whole or not at all: an entry refused for its mask
+ * leaves the entries before it unwritten too
+ */
+static void
+test_mmio_l3ca_set_writes_nothing_when_an_entry_is_refused(
+    void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca[2] = {{0}};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        /* the first mask is contiguous, the second is not, which the domain
+         * does not allow: no write is queued, so one would fail the case
+         */
+        ca[0].domain_id = 0x10;
+        ca[0].class_id = 0;
+        ca[0].u.ways_mask = 0x3;
+        ca[1].domain_id = 0x10;
+        ca[1].class_id = 1;
+        ca[1].u.ways_mask = 0x5;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, DIM(ca), ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "CLOS1 bit mask is not contiguous"));
+}
+
+/* ======== the ERDT's classes against the register blocks ======== */
+
+/* the bounds themselves: a bank of the MBA block holds 64 classes of 8 bytes,
+ * banks of four regions follow each other, the block is Register Block Size
+ * pages, and no class number wraps into it
+ */
+static void
+test_mba_clos_in_block_bounds(void **state __attribute__((unused)))
+{
+        struct pqos_erdt_marc marc = {0};
+
+        marc.reg_block_size = 1;
+        assert_true(mba_clos_in_block(&marc, 0, 0));
+        assert_true(mba_clos_in_block(&marc, 0, 63));
+        assert_false(mba_clos_in_block(&marc, 0, 64));
+        assert_true(mba_clos_in_block(&marc, PQOS_MAX_MEM_REGIONS - 1, 63));
+        assert_false(mba_clos_in_block(&marc, -1, 0));
+        assert_false(mba_clos_in_block(&marc, 0, UINT32_MAX));
+
+        marc.reg_block_size = 0;
+        assert_false(mba_clos_in_block(&marc, 0, 0));
+}
+
+/* the CAT registers of a page start at the CARD's CAT Register Offset and
+ * hold 8 bytes per class, every page of the block alike
+ */
+static void
+test_iol3_clos_in_block_bounds(void **state __attribute__((unused)))
+{
+        struct pqos_erdt_card card = {0};
+
+        card.reg_block_size = 1;
+        assert_true(iol3_clos_in_block(&card, 0));
+        assert_true(
+            iol3_clos_in_block(&card, PAGE_SIZE / BYTES_PER_CLOS_ENTRY - 1));
+        assert_false(
+            iol3_clos_in_block(&card, PAGE_SIZE / BYTES_PER_CLOS_ENTRY));
+
+        card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+        assert_true(iol3_clos_in_block(&card, 0));
+        assert_false(iol3_clos_in_block(&card, 1));
+        assert_false(iol3_clos_in_block(&card, UINT32_MAX));
+
+        card.reg_block_size = 0;
+        assert_false(iol3_clos_in_block(&card, 0));
+}
+
+/* the accessors refuse a class past the block before they map it: no mapping
+ * is queued, so one would fail the case
+ */
+static void
+test_mba_accessors_refuse_class_past_bank(void **state __attribute__((unused)))
+{
+        struct pqos_erdt_marc marc = {0};
+        unsigned value = 0;
+
+        marc.opt_bw_reg_block_base_addr = 0xf0000000;
+        marc.min_bw_reg_block_base_addr = 0xf0001000;
+        marc.max_bw_reg_block_base_addr = 0xf0002000;
+        marc.reg_block_size = 1;
+
+        assert_int_equal(
+            __real_get_mba_optimal_bw_region_clos_v1(&marc, 0, 64, &value),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_set_mba_optimal_bw_region_clos_v1(&marc, 0, 64, 0x50),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_get_mba_min_bw_region_clos_v1(&marc, 0, 64, &value),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_set_mba_min_bw_region_clos_v1(&marc, 0, 64, 0x50),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_get_mba_max_bw_region_clos_v1(&marc, 0, 64, &value),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_set_mba_max_bw_region_clos_v1(&marc, 0, 64, 0x50),
+            PQOS_RETVAL_ERROR);
+
+        /* nor is a block of no page mapped */
+        marc.reg_block_size = 0;
+        assert_int_equal(
+            __real_get_mba_optimal_bw_region_clos_v1(&marc, 0, 0, &value),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_set_mba_optimal_bw_region_clos_v1(&marc, 0, 0, 0x50),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_get_mba_min_bw_region_clos_v1(&marc, 0, 0, &value),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_set_mba_min_bw_region_clos_v1(&marc, 0, 0, 0x50),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_get_mba_max_bw_region_clos_v1(&marc, 0, 0, &value),
+            PQOS_RETVAL_ERROR);
+        assert_int_equal(
+            __real_set_mba_max_bw_region_clos_v1(&marc, 0, 0, 0x50),
+            PQOS_RETVAL_ERROR);
+}
+
+/* and the last class of a bank is written where the indexing puts it */
+static void
+test_mba_accessor_writes_the_last_class_of_a_bank(void **state
+                                                  __attribute__((unused)))
+{
+        struct pqos_erdt_marc marc = {0};
+        uint64_t registers[PAGE_SIZE / sizeof(uint64_t)] = {0};
+        int ret;
+
+        marc.opt_bw_reg_block_base_addr = 0xf0000000;
+        marc.reg_block_size = 1;
+
+        expect_value(__wrap_pqos_mmap_write, address,
+                     marc.opt_bw_reg_block_base_addr);
+        expect_value(__wrap_pqos_mmap_write, size, PAGE_SIZE);
+        will_return(__wrap_pqos_mmap_write, registers);
+        expect_value(__wrap_pqos_munmap, mem, registers);
+        expect_value(__wrap_pqos_munmap, size, PAGE_SIZE);
+
+        ret = __real_set_mba_optimal_bw_region_clos_v1(&marc, 0, 63, 0x50);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(registers[63] & MBA_BW_ALL_BR0_MASK, 0x50);
+}
+
+static void
+test_iol3_accessors_refuse_class_past_page(void **state __attribute__((unused)))
+{
+        struct pqos_erdt_card card = {0};
+        uint64_t value = 0;
+
+        card.reg_base_addr = 0x3000;
+        card.reg_block_size = 1;
+        /* CLOS0's register is the last of the page, CLOS1's would lie past */
+        card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+
+        assert_int_equal(__real_get_iol3_cbm_clos_v1(&card, 1, 0, &value),
+                         PQOS_RETVAL_ERROR);
+        assert_int_equal(__real_set_iol3_cbm_clos_v1(&card, 1, 0xf),
+                         PQOS_RETVAL_ERROR);
+
+        card.reg_block_size = 0;
+        assert_int_equal(__real_get_iol3_cbm_clos_v1(&card, 0, 0, &value),
+                         PQOS_RETVAL_ERROR);
+}
+
+static void
+test_iol3_accessor_reads_the_last_class_of_a_page(void **state
+                                                  __attribute__((unused)))
+{
+        struct pqos_erdt_card card = {0};
+        uint64_t registers[PAGE_SIZE / sizeof(uint64_t)] = {0};
+        uint64_t value = 0;
+        int ret;
+
+        card.reg_base_addr = 0x3000;
+        card.reg_block_size = 1;
+        card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+        registers[PAGE_SIZE / sizeof(uint64_t) - 1] = 0xfULL << IOL3_CBM_SHIFT;
+
+        expect_value(__wrap_pqos_mmap_read, address, card.reg_base_addr);
+        expect_value(__wrap_pqos_mmap_read, size, PAGE_SIZE);
+        will_return(__wrap_pqos_mmap_read, registers);
+        expect_value(__wrap_pqos_munmap, mem, registers);
+        expect_value(__wrap_pqos_munmap, size, PAGE_SIZE);
+
+        ret = __real_get_iol3_cbm_clos_v1(&card, 0, 0, &value);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 0xf);
+}
+
+/* a get refuses a count that reaches past the block before any read */
+static void
+test_mba_get_rejects_count_past_bank(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba mba_tab[65] = {{0}};
+        unsigned num_clos = 0;
+        int ret;
+
+        erdt.max_clos = 64;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        mba_tab[0].domain_id = cpu_agent.rmdd.domain_id;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_get(0, DIM(mba_tab), &num_clos, mba_tab);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(num_clos, 0);
+        assert_non_null(strstr(test_log, "CLOS64"));
+        assert_non_null(strstr(test_log, "lies past"));
+}
+
+static void
+test_mmio_l3ca_get_rejects_class_past_page(void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca[2] = {{0}};
+        unsigned num_ca = 0;
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        dev_agent.card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+        ca[0].domain_id = 0x10;
+        ca[1].domain_id = 0x10;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_get(0, DIM(ca), &num_ca, ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(num_ca, 0);
+        assert_non_null(strstr(test_log, "CLOS1"));
+        assert_non_null(strstr(test_log, "lies past"));
+}
+
+/* a bank of the MBA register block holds 64 classes, so a class past them
+ * is refused before any register is touched, however many classes the
+ * ERDT's Max CLOS gives the platform
+ */
+static void
+test_mba_set_rejects_class_past_bank(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba requested;
+        int ret;
+
+        erdt.max_clos = 64;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+
+        mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, MBA_MAX_BW);
+        requested.class_id = 64;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "CLOS64"));
+        assert_non_null(strstr(test_log, "lies past"));
+}
+
+static void
+test_mba_reset_rejects_class_past_bank(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        int ret;
+
+        erdt.max_clos = 64;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = 0xFF;
+        memset(&mba_regs, 0, sizeof(mba_regs));
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        test_log[0] = '\0';
+
+        /* no read or write is queued: the reset ends before the registers */
+        ret = mmio_alloc_reset_mba();
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_non_null(strstr(test_log, "CLOS64"));
+        assert_non_null(strstr(test_log, "lies past"));
+}
+
+/* the CAT registers of a page start at the CARD's CAT Register Offset, so a
+ * class whose register would lie past the page is refused
+ */
+static void
+test_mmio_l3ca_set_rejects_class_past_page(void **state __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        /* room for CLOS0 alone */
+        dev_agent.card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        ca.class_id = 1;
+        ca.domain_id = 0x10;
+        ca.u.ways_mask = 0xf;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "CLOS1"));
+        assert_non_null(strstr(test_log, "lies past"));
+}
+
+static void
+test_alloc_reset_cat_rejects_class_past_page(void **state
+                                             __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        dev_agent.card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        /* no write is queued: the reset ends before the registers */
+        ret = mmio_alloc_reset_cat();
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_non_null(strstr(test_log, "CLOS1"));
+        assert_non_null(strstr(test_log, "lies past"));
+}
+
+/* every domain is checked before any is written: a later domain whose classes
+ * do not fit stops the reset before the first domain is touched
+ */
+static void
+test_alloc_reset_cat_checks_every_domain_before_writing(void **state
+                                                        __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        int ret;
+
+        /* the first domain's page holds every class; the second's registers
+         * start so late in the page that CLOS1 would lie past it
+         */
+        dev_agents[0].rmdd.domain_id = 0x10;
+        dev_agents[0].rmdd.num_io_l3_ways = 4;
+        dev_agents[0].card.reg_base_addr = 0xf0000000;
+        dev_agents[0].card.reg_block_size = 1;
+        dev_agents[1].rmdd.domain_id = 0x11;
+        dev_agents[1].rmdd.num_io_l3_ways = 4;
+        dev_agents[1].card.reg_base_addr = 0xf0001000;
+        dev_agents[1].card.reg_block_size = 1;
+        dev_agents[1].card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+        erdt.num_dev_agents = DIM(dev_agents);
+        erdt.dev_agents = dev_agents;
+        erdt.max_clos = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        /* no write is queued for either domain */
+        ret = mmio_alloc_reset_cat();
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_non_null(strstr(test_log, "0x11"));
+}
+
+/* ==== mmio_alloc_reset: every block checked before anything runs ==== */
+
+/* a CAT page that cannot hold the classes stops the whole reset before its MSR
+ * part and before any register is written, with the MBA blocks fitting
+ */
+static void
+test_alloc_reset_refuses_before_its_msr_part(void **state
+                                             __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_alloc_config cfg = {0};
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = 0xFF;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0003000;
+        dev_agent.card.reg_block_size = 1;
+        dev_agent.card.cat_reg_offset = PAGE_SIZE - BYTES_PER_CLOS_ENTRY;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        memset(&mba_regs, 0, sizeof(mba_regs));
+        test_log[0] = '\0';
+
+        /* neither alloc_reset() nor a register read or write is queued */
+        ret = mmio_alloc_reset(&cfg);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_non_null(strstr(test_log, "do not fit the register blocks"));
+}
+
+/* and an MBA bank that cannot hold them stops it as early, with the CAT page
+ * fitting
+ */
+static void
+test_alloc_reset_refuses_class_past_bank_before_its_msr_part(
+    void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_alloc_config cfg = {0};
+        int ret;
+
+        erdt.max_clos = 64;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = 0xFF;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0003000;
+        dev_agent.card.reg_block_size = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        test_log[0] = '\0';
+
+        ret = mmio_alloc_reset(&cfg);
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_non_null(strstr(test_log, "do not fit the register blocks"));
+}
+
+/* where every block holds the classes, the reset runs whole: the MSR part
+ * first, then every class of every region of the MBA block, then every class
+ * of the CAT page
+ */
+static void
+test_alloc_reset_runs_every_part_when_the_classes_fit(void **state
+                                                      __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_alloc_config cfg = {0};
+        int ret;
+
+        erdt.max_clos = 0;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        cpu_agent.marc.control_window_range = 0xFF;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.rmdd.num_io_l3_ways = 4;
+        dev_agent.card.reg_base_addr = 0xf0003000;
+        dev_agent.card.reg_block_size = 1;
+        memset(&mba_regs, 0, sizeof(mba_regs));
+
+        /* the ERDT is asked for by the reset and by each of its parts, the
+         * region count by the reset and by the MBA part
+         */
+        will_return_count(__wrap__pqos_get_erdt, &erdt, 3);
+        mrrm_will_return(&mrrm, 1);
+        mrrm_will_return(&mrrm, 1);
+        expect_function_call(__wrap_alloc_reset);
+        expect_value(__wrap_alloc_reset, cfg, &cfg);
+        will_return(__wrap_alloc_reset, PQOS_RETVAL_OK);
+        expect_mba_reset_reads(&cpu_agent.marc, 1);
+        expect_mba_reset_writes(&cpu_agent.marc, 0xFF, 1);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, card, &dev_agent.card);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, clos_number, 0);
+        expect_value(__wrap_set_iol3_cbm_clos_v1, value, 0xf);
+        will_return(__wrap_set_iol3_cbm_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_alloc_reset(&cfg);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 static void
 test_alloc_reset_cat_skips_monitoring_only_domain(void **state
                                                   __attribute__((unused)))
 {
         struct pqos_device_agent_info dev_agents[2] = {0};
         struct pqos_erdt_info erdt = {0};
-        const unsigned num_writes = 2; /* max_clos, for the one domain left */
+        const unsigned num_writes = 2; /* classes, for the one domain left */
         unsigned i;
         int ret;
 
@@ -1671,7 +2493,7 @@ test_alloc_reset_cat_skips_monitoring_only_domain(void **state
         dev_agents[1].card.reg_block_size = 1;
         erdt.num_dev_agents = DIM(dev_agents);
         erdt.dev_agents = dev_agents;
-        erdt.max_clos = num_writes;
+        erdt.max_clos = num_writes - 1;
 
         will_return(__wrap__pqos_get_erdt, &erdt);
 
@@ -1730,8 +2552,35 @@ main(void)
             cmocka_unit_test(
                 test_mmio_l3ca_set_domain_list_says_when_truncated),
             cmocka_unit_test(test_mmio_l3ca_set_bounds_mask_by_io_l3_ways),
+            cmocka_unit_test(test_alloc_reset_cat_skips_monitoring_only_domain),
+            cmocka_unit_test(test_mmio_l3ca_get_reads_every_class),
+            cmocka_unit_test(test_mmio_l3ca_get_rejects_short_table),
+            cmocka_unit_test(test_mba_set_accepts_the_last_class),
+            cmocka_unit_test(test_mba_set_rejects_class_above_max_clos),
+            cmocka_unit_test(test_mmio_l3ca_set_accepts_the_last_class),
+            cmocka_unit_test(test_mmio_l3ca_set_rejects_class_above_max_clos),
+            cmocka_unit_test(test_mmio_l3ca_set_writes_every_class),
             cmocka_unit_test(
-                test_alloc_reset_cat_skips_monitoring_only_domain)};
+                test_mmio_l3ca_set_writes_nothing_when_an_entry_is_refused),
+            cmocka_unit_test(
+                test_alloc_reset_cat_checks_every_domain_before_writing),
+            cmocka_unit_test(test_alloc_reset_refuses_before_its_msr_part),
+            cmocka_unit_test(
+                test_alloc_reset_refuses_class_past_bank_before_its_msr_part),
+            cmocka_unit_test(
+                test_alloc_reset_runs_every_part_when_the_classes_fit),
+            cmocka_unit_test(test_mba_clos_in_block_bounds),
+            cmocka_unit_test(test_iol3_clos_in_block_bounds),
+            cmocka_unit_test(test_mba_accessors_refuse_class_past_bank),
+            cmocka_unit_test(test_mba_accessor_writes_the_last_class_of_a_bank),
+            cmocka_unit_test(test_iol3_accessors_refuse_class_past_page),
+            cmocka_unit_test(test_iol3_accessor_reads_the_last_class_of_a_page),
+            cmocka_unit_test(test_mba_get_rejects_count_past_bank),
+            cmocka_unit_test(test_mmio_l3ca_get_rejects_class_past_page),
+            cmocka_unit_test(test_mba_set_rejects_class_past_bank),
+            cmocka_unit_test(test_mba_reset_rejects_class_past_bank),
+            cmocka_unit_test(test_mmio_l3ca_set_rejects_class_past_page),
+            cmocka_unit_test(test_alloc_reset_cat_rejects_class_past_page)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

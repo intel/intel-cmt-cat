@@ -31,6 +31,7 @@
  */
 
 #include "erdt.h"
+#include "mmio.h"
 #include "mock_common.h"
 #include "test.h"
 
@@ -45,7 +46,8 @@
 #define DEV                                                                    \
         (sizeof(struct acpi_table_erdt_rmdd) +                                 \
          sizeof(struct acpi_table_erdt_dacd) + DASE)
-#define SIZE      (sizeof(struct acpi_table_erdt_header) + CPU + DEV)
+#define CARD      sizeof(struct acpi_table_erdt_card)
+#define SIZE      (sizeof(struct acpi_table_erdt_header) + CPU + DEV + CARD)
 #define ERDT_FILE ACPI_TABLE_FS_PATH "/" ACPI_TABLE_SIG_ERDT
 struct fixture {
         _Alignas(uint64_t) uint8_t data[SIZE];
@@ -132,7 +134,7 @@ init_marc(struct fixture *f, const int with_marc)
         t = (void *)f->data;
         f->table.erdt = t;
         t->header.header.revision = ACPI_ERDT_REVISION;
-        t->header.header.length = SIZE - (CPU - cpu_length);
+        t->header.header.length = SIZE - CARD - (CPU - cpu_length);
         t->header.max_clos = 16;
         cpu = (void *)t->erdt_sub_structures;
         cpu->type = 0;
@@ -182,6 +184,33 @@ init(struct fixture *f)
 {
         init_marc(f, 1);
 }
+/**
+ * @brief Gives the device domain of f a CARD, the I/O L3 CAT registers
+ *
+ * @param [in,out] f the fixture init() wrote
+ * @param [in] cat_reg_offset where the CAT registers start in a page of the
+ *             block, the CARD's CAT Register Offset for I/O
+ */
+static void
+init_card(struct fixture *f, const uint16_t cat_reg_offset)
+{
+        struct acpi_table_erdt *t = f->table.erdt;
+        struct acpi_table_erdt_rmdd *cpu = (void *)t->erdt_sub_structures;
+        struct acpi_table_erdt_rmdd *dev =
+            (void *)((uint8_t *)cpu + cpu->length);
+        struct acpi_table_erdt_card *card =
+            (void *)((uint8_t *)dev + dev->length);
+
+        card->type = ACPI_ERDT_STRUCT_CARD_TYPE;
+        card->length = sizeof(*card);
+        card->register_indexing_function_version = 1;
+        card->register_base_address = 0xf0003000;
+        card->register_block_size = 1;
+        card->cache_allocation_register_offsets_for_io = cat_reg_offset;
+        card->cache_allocation_register_block_size = 16;
+        dev->length += sizeof(*card);
+        t->header.header.length += sizeof(*card);
+}
 static void
 expect_table(struct fixture *f)
 {
@@ -209,6 +238,11 @@ test_valid(void **state __attribute__((unused)))
         assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_OK);
         assert_int_equal(info->num_cpu_agents, 1);
         assert_int_equal(info->num_dev_agents, 1);
+        /* Max CLOS as the table gives it, the highest class, and one more
+         * class than that counted
+         */
+        assert_int_equal(info->max_clos, 16);
+        assert_int_equal(erdt_num_clos(info), 17);
         assert_int_equal(info->cpu_agents[0].cacd.enumeration_ids[0], 0x1234);
         marc = &info->cpu_agents[0].marc;
         assert_int_equal(marc->flags, 3);
@@ -283,6 +317,92 @@ test_errors(void **state __attribute__((unused)))
         expect_function_call(__wrap_acpi_fini);
         will_return(__wrap_acpi_fini, PQOS_RETVAL_OK);
         assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_ERROR);
+}
+/**
+ * @brief Parses the fixture's table and answers whether its classes fit
+ *
+ * The parse keeps whatever Max CLOS the table gives, as the other interfaces
+ * read the table for its domains alone; erdt_classes_fit() is what the MMIO
+ * interface refuses to start on.
+ *
+ * @param [in,out] f the fixture, written by init() and init_card()
+ * @param [in] max_clos the Max CLOS to give the table
+ *
+ * @return what erdt_classes_fit() returns for the parsed table
+ */
+static int
+parse_and_fit(struct fixture *f, const uint32_t max_clos)
+{
+        struct pqos_cap cap = {0};
+        struct pqos_cpuinfo cpu = {0};
+        struct pqos_erdt_info *info = NULL;
+        int ret;
+
+        f->table.erdt->header.max_clos = max_clos;
+        expect_table(f);
+
+        assert_int_equal(erdt_init(&cap, &cpu, &info), PQOS_RETVAL_OK);
+        assert_non_null(info);
+        assert_int_equal(info->max_clos, max_clos);
+
+        ret = erdt_classes_fit(info);
+        erdt_fini();
+
+        return ret;
+}
+/* the classes are 0 through Max CLOS, so a field at the type's maximum
+ * describes no countable number of them: the table parses, as every interface
+ * reads it, and the MMIO interface refuses to start on it
+ */
+static void
+test_an_uncountable_max_clos_does_not_fit(void **state __attribute__((unused)))
+{
+        struct fixture f;
+
+        init(&f);
+        assert_int_equal(parse_and_fit(&f, UINT32_MAX), PQOS_RETVAL_ERROR);
+
+        /* one below it is counted, as 0xFFFFFFFF classes, where no register
+         * block bounds them: a table of domains enumerated for monitoring
+         * alone
+         */
+        init_marc(&f, 0);
+        assert_int_equal(parse_and_fit(&f, UINT32_MAX - 1), PQOS_RETVAL_OK);
+}
+/* each class has to have its register in every block the table describes: a
+ * bank of an MBA register block holds 64 classes
+ */
+static void
+test_a_max_clos_past_the_mba_bank_does_not_fit(void **state
+                                               __attribute__((unused)))
+{
+        struct fixture f;
+
+        init(&f);
+        assert_int_equal(parse_and_fit(&f, 64), PQOS_RETVAL_ERROR);
+
+        /* the last class of the bank is one the platform has */
+        init(&f);
+        assert_int_equal(parse_and_fit(&f, 63), PQOS_RETVAL_OK);
+}
+/* and the I/O L3 CAT registers of a CARD page start at its CAT Register
+ * Offset, so a class whose register would lie past the page is one the device
+ * domain does not have
+ */
+static void
+test_a_max_clos_past_the_cat_page_does_not_fit(void **state
+                                               __attribute__((unused)))
+{
+        struct fixture f;
+
+        /* CLOS0's register is the last of the page, CLOS1's would lie past */
+        init(&f);
+        init_card(&f, PAGE_SIZE - BYTES_PER_CLOS_ENTRY);
+        assert_int_equal(parse_and_fit(&f, 1), PQOS_RETVAL_ERROR);
+
+        init(&f);
+        init_card(&f, PAGE_SIZE - BYTES_PER_CLOS_ENTRY);
+        assert_int_equal(parse_and_fit(&f, 0), PQOS_RETVAL_OK);
 }
 /* a platform without ERDT, which pqos_init() takes for a feature not there:
  * nothing is said at the default verbosity
@@ -398,6 +518,9 @@ main(void)
             cmocka_unit_test(test_valid),
             cmocka_unit_test(test_valid_without_marc),
             cmocka_unit_test(test_errors),
+            cmocka_unit_test(test_an_uncountable_max_clos_does_not_fit),
+            cmocka_unit_test(test_a_max_clos_past_the_mba_bank_does_not_fit),
+            cmocka_unit_test(test_a_max_clos_past_the_cat_page_does_not_fit),
             cmocka_unit_test(test_no_table_is_said_nothing_of),
             cmocka_unit_test(test_an_unreadable_table_is_said),
             cmocka_unit_test(test_a_table_that_cannot_be_looked_up_is_said),

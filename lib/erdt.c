@@ -38,6 +38,7 @@
 #include "common.h"
 #include "cpuinfo.h"
 #include "log.h"
+#include "mmio.h"
 #include "pci.h"
 #include "utils.h"
 
@@ -852,7 +853,6 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
                           p_acpi_erdt->header.header.length);
                 return PQOS_RETVAL_ERROR;
         }
-
         ret = erdt_count_rmdds(p_acpi_erdt, &num_cpu_agents, &num_dev_agents);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -1092,6 +1092,63 @@ channels_domains_fini(void)
         free(p_channels_domains->domain_id_idxs);
         free(p_channels_domains);
         p_channels_domains = NULL;
+}
+
+unsigned
+erdt_num_clos(const struct pqos_erdt_info *erdt)
+{
+        ASSERT(erdt != NULL);
+
+        return erdt->max_clos + 1;
+}
+
+int
+erdt_classes_fit(const struct pqos_erdt_info *erdt)
+{
+        ASSERT(erdt != NULL);
+
+        /* the classes are 0 through Max CLOS, so a field at the type's
+         * maximum describes no countable number of them
+         */
+        if (erdt->max_clos == UINT32_MAX) {
+                LOG_ERROR("Invalid ACPI ERDT Max CLOS: %u\n", erdt->max_clos);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        /* and each has to have its register in every block the table
+         * describes: a bank of an MBA block holds 64 classes, and the I/O L3
+         * CAT registers of a CARD page start at its CAT Register Offset
+         */
+        for (unsigned i = 0; i < erdt->num_cpu_agents; i++) {
+                const struct pqos_cpu_agent_info *agent = &erdt->cpu_agents[i];
+
+                if (agent->marc.reg_block_size == 0)
+                        continue;
+
+                if (!mba_clos_in_block(&agent->marc, 0, erdt->max_clos)) {
+                        LOG_ERROR("ERDT Max CLOS %u does not fit the MBA "
+                                  "register block of Domain ID 0x%x\n",
+                                  erdt->max_clos, agent->rmdd.domain_id);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+        for (unsigned i = 0; i < erdt->num_dev_agents; i++) {
+                const struct pqos_device_agent_info *agent =
+                    &erdt->dev_agents[i];
+
+                if (agent->card.reg_block_size == 0 ||
+                    agent->card.reg_base_addr == 0)
+                        continue;
+
+                if (!iol3_clos_in_block(&agent->card, erdt->max_clos)) {
+                        LOG_ERROR("ERDT Max CLOS %u does not fit the I/O L3 "
+                                  "CAT registers of Domain ID 0x%x\n",
+                                  erdt->max_clos, agent->rmdd.domain_id);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+
+        return PQOS_RETVAL_OK;
 }
 
 int

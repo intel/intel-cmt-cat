@@ -56,6 +56,14 @@ pqos_platform_mem_regions(unsigned *num_mem_regions)
         return 0;
 }
 
+unsigned
+pqos_erdt_num_clos(const struct pqos_erdt_info *erdt)
+{
+        ASSERT(erdt != NULL);
+
+        return erdt->max_clos + 1;
+}
+
 /**
  * @brief Converts a decimal string into an unsigned number.
  *

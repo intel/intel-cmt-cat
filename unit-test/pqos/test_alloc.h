@@ -33,6 +33,8 @@
 #ifndef TEST_ALLOC_H_
 #define TEST_ALLOC_H_
 
+#include <stddef.h>
+
 /* The string copy test_alloc.c makes fail on demand, through --wrap. Every
  * strdup() call in the binary goes through the wrap, the cases' own copies
  * included, and the m_fail_strdup'th one fails, wherever it is made; while
@@ -44,5 +46,7 @@
  */
 char *__real_strdup(const char *s);
 char *__wrap_strdup(const char *s);
+void *__real_calloc(size_t nmemb, size_t size);
+void *__wrap_calloc(size_t nmemb, size_t size);
 
 #endif /* TEST_ALLOC_H_ */

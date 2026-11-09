@@ -172,10 +172,15 @@ __wrap_os_cap_init(const enum pqos_interface inter)
 }
 
 /* the MMIO case's ERDT: where the case sets mmio_case, the wrapped
- * erdt_init() gives it and the core to domain map's init fails. Elsewhere
- * the originals run, and find no table
+ * erdt_init() gives it and the core to domain map's init fails. The MSR
+ * group's setup sets with_erdt, so that its init carries the same table, as
+ * an init on a platform with the table does, and the cases can see what the
+ * library makes of it; there the table is a static of this file, which the
+ * wrapped erdt_fini() leaves alone. Elsewhere the originals run, and find no
+ * table
  */
 static int mmio_case;
+static int with_erdt;
 static struct pqos_erdt_info mmio_erdt;
 
 int
@@ -183,7 +188,7 @@ __wrap_erdt_init(const struct pqos_cap *cap,
                  struct pqos_cpuinfo *cpu,
                  struct pqos_erdt_info **erdt_info)
 {
-        if (!mmio_case)
+        if (!mmio_case && !with_erdt)
                 return __real_erdt_init(cap, cpu, erdt_info);
 
         *erdt_info = &mmio_erdt;
@@ -195,7 +200,7 @@ __wrap_erdt_fini(void)
 {
         if (mmio_case)
                 function_called();
-        else
+        else if (!with_erdt)
                 __real_erdt_fini();
 }
 
@@ -208,6 +213,7 @@ __wrap_cores_domains_init(unsigned int num_cores,
                 return __real_cores_domains_init(num_cores, erdt,
                                                  cores_domains);
 
+        function_called();
         assert_ptr_equal(erdt, &mmio_erdt);
         return PQOS_RETVAL_ERROR;
 }
@@ -230,6 +236,7 @@ setup_cap_init_msr(void **state __attribute__((unused)))
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_MSR;
+        with_erdt = 1;
 
         return 0;
 }
@@ -251,6 +258,7 @@ setup_cap_init_os(void **state __attribute__((unused)))
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_OS;
+        with_erdt = 0;
 
         return 0;
 }
@@ -272,6 +280,7 @@ setup_cap_init_os_resctrl_mon(void **state __attribute__((unused)))
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_OS_RESCTRL_MON;
+        with_erdt = 0;
 
         return 0;
 }
@@ -441,6 +450,7 @@ test_pqos_init_mmio_map_failure_frees_the_erdt(void **state)
         will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
         will_return(__wrap_hw_cap_mba_discover, &(data->cap_mba));
         expect_function_call(__wrap_hw_cap_mon_discover);
+        expect_function_call(__wrap_cores_domains_init);
         expect_function_call(__wrap_erdt_fini);
         expect_function_call(__wrap_machine_fini);
         will_return(__wrap_machine_fini, PQOS_RETVAL_OK);
@@ -449,8 +459,52 @@ test_pqos_init_mmio_map_failure_frees_the_erdt(void **state)
         will_return(__wrap_lock_fini, 0);
 
         mmio_case = 1;
+        mmio_erdt.max_clos = 0;
         ret = pqos_init(&cfg);
         mmio_case = 0;
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+/* an init over MMIO on a table whose classes do not fit its register blocks
+ * fails before the core to domain map is made, and frees the table
+ */
+static void
+test_pqos_init_mmio_refuses_classes_that_do_not_fit(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_config cfg;
+        int ret;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.verbose = LOG_VER_SILENT;
+        cfg.fd_log = -1;
+        cfg.interface = PQOS_INTER_MMIO;
+
+        expect_function_call(__wrap_lock_init);
+        will_return(__wrap_lock_init, 0);
+        expect_function_call(__wrap_lock_get);
+        will_return(__wrap_cpuinfo_init, data->cpu);
+        will_return(__wrap_machine_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_machine_init);
+        will_return(__wrap_hw_cap_mon_discover, data->cap_mon);
+        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+        will_return(__wrap_hw_cap_mba_discover, &(data->cap_mba));
+        expect_function_call(__wrap_hw_cap_mon_discover);
+        /* no cores_domains_init(): the table is refused before it */
+        expect_function_call(__wrap_erdt_fini);
+        expect_function_call(__wrap_machine_fini);
+        will_return(__wrap_machine_fini, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_lock_fini);
+        will_return(__wrap_lock_fini, 0);
+
+        /* a Max CLOS that counts no classes */
+        mmio_case = 1;
+        mmio_erdt.max_clos = UINT32_MAX;
+        ret = pqos_init(&cfg);
+        mmio_case = 0;
+        mmio_erdt.max_clos = 0;
 
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
@@ -574,6 +628,55 @@ test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
                 will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(-1);
         }
+}
+
+/* a CDP change on the MMIO interface discovers the L3 CAT capability again
+ * from CPUID and puts the ERDT's cap back on its count; on the MSR interface
+ * the discovery's count stays
+ */
+static void
+test__pqos_cap_l3cdp_change_mmio_keeps_the_erdt_cap(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_l3ca discovered;
+        const struct pqos_cap *p_cap = NULL;
+        const struct pqos_cap_l3ca *l3ca = NULL;
+        unsigned i;
+        int ret;
+
+        /* the group whose init carried the table */
+        if (data->interface != PQOS_INTER_MSR)
+                return;
+
+        /* the library's own copy of the capability, which the change writes */
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
+        ret = pqos_cap_get(&p_cap, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        for (i = 0; i < p_cap->num_cap; i++)
+                if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                        l3ca = p_cap->capabilities[i].u.l3ca;
+        assert_non_null(l3ca);
+
+        /* the table's one class, where CPUID discovers 16 */
+        mmio_erdt.max_clos = 0;
+        discovered = data->cap_l3ca;
+        discovered.num_classes = 16;
+
+        _pqos_set_inter(PQOS_INTER_MMIO);
+        will_return(__wrap_hw_cap_l3ca_discover, &discovered);
+        _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+        assert_int_equal(l3ca->num_classes, 1);
+
+        _pqos_set_inter(PQOS_INTER_MSR);
+        will_return(__wrap_hw_cap_l3ca_discover, &discovered);
+        _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+        assert_int_equal(l3ca->num_classes, 16);
+
+        /* as the group's other cases expect to find it */
+        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+        _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+        assert_int_equal(l3ca->num_classes, data->cap_l3ca.num_classes);
 }
 
 #ifdef __linux__
@@ -822,6 +925,8 @@ main(void)
             cmocka_unit_test(test__pqos_get_cpu_after_init),
             cmocka_unit_test(test__pqos_check_init_after_init),
             cmocka_unit_test(test__pqos_cap_l3cdp_change_msr),
+            cmocka_unit_test(
+                test__pqos_cap_l3cdp_change_mmio_keeps_the_erdt_cap),
             cmocka_unit_test(test__pqos_cap_l2cdp_change_msr),
 #ifdef __linux__
             cmocka_unit_test(test__pqos_cap_l3cdp_change_os),
@@ -837,6 +942,8 @@ main(void)
 
         const struct CMUnitTest tests_cap_init_mmio[] = {
             cmocka_unit_test(test_pqos_init_mmio_map_failure_frees_the_erdt),
+            cmocka_unit_test(
+                test_pqos_init_mmio_refuses_classes_that_do_not_fit),
         };
 
         result += cmocka_run_group_tests(tests_cap_param, NULL, NULL);

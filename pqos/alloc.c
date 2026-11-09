@@ -299,6 +299,8 @@ msr_l3_id_differs_from_sockets(const struct pqos_cpuinfo *cpu)
         return differs;
 }
 
+static int domain_has_l3ca(const struct pqos_device_agent_info *dev_agent);
+
 /**
  * @brief Set L3 class definitions on selected sockets
  *
@@ -322,6 +324,8 @@ set_l3_clos(const unsigned class_id,
         unsigned i, set = 0;
         const char *package;
         unsigned count;
+        unsigned num_l3ca = PQOS_MAX_L3CA_CLOS;
+        struct pqos_l3ca *sock_l3ca = NULL;
         int ret = PQOS_RETVAL_OK;
         enum pqos_interface interface;
         unsigned id = 0;
@@ -338,6 +342,8 @@ set_l3_clos(const unsigned class_id,
         }
 
         if (interface == PQOS_INTER_MMIO) {
+                const struct pqos_sysconfig *sys = NULL;
+
                 if (sel_alloc_domain_id.num_domain_ids == 0) {
                         printf("--alloc-domain-id option is missing in command "
                                "line. Failed to set IORDT L3 CAT "
@@ -345,22 +351,43 @@ set_l3_clos(const unsigned class_id,
                         return -1;
                 }
                 count = sel_alloc_domain_id.num_domain_ids;
+
+                /* the classes the platform's ERDT describes, of which there may
+                 * be more than PQOS_MAX_L3CA_CLOS; a table whose classes no
+                 * register block bounds is not sized by them, as the library
+                 * refuses a domain without the registers before it reads one
+                 */
+                if (pqos_sysconfig_get(&sys) == PQOS_RETVAL_OK && sys != NULL &&
+                    sys->erdt != NULL)
+                        for (i = 0; i < sys->erdt->num_dev_agents; i++)
+                                if (domain_has_l3ca(
+                                        &sys->erdt->dev_agents[i])) {
+                                        num_l3ca =
+                                            pqos_erdt_num_clos(sys->erdt);
+                                        break;
+                                }
         } else
                 count = sock_num;
+
+        sock_l3ca = calloc(num_l3ca, sizeof(*sock_l3ca));
+        if (sock_l3ca == NULL) {
+                printf("Failed to set L3 CAT configuration!\n");
+                return -1;
+        }
 
         /**
          * Loop through each socket and set selected classes
          */
         for (i = 0; i < count; i++) {
                 unsigned j, num_ca;
-                struct pqos_l3ca ca, sock_l3ca[PQOS_MAX_L3CA_CLOS];
+                struct pqos_l3ca ca;
 
                 ret = PQOS_RETVAL_OK;
                 memset(&ca, 0, sizeof(ca));
-                memset(sock_l3ca, 0, sizeof(sock_l3ca));
+                memset(sock_l3ca, 0, num_l3ca * sizeof(*sock_l3ca));
 
                 if (interface == PQOS_INTER_MMIO) {
-                        for (j = 0; j < PQOS_MAX_L3CA_CLOS; j++) {
+                        for (j = 0; j < num_l3ca; j++) {
                                 sock_l3ca[j].domain_id =
                                     sel_alloc_domain_id.domain_ids[i];
                         }
@@ -370,8 +397,7 @@ set_l3_clos(const unsigned class_id,
                  * domain on the MMIO interface, where a socket does not select
                  * the L3 CAT registers
                  */
-                ret = pqos_l3ca_get(sock_ids[i], DIM(sock_l3ca), &num_ca,
-                                    sock_l3ca);
+                ret = pqos_l3ca_get(sock_ids[i], num_l3ca, &num_ca, sock_l3ca);
                 if (ret != PQOS_RETVAL_OK) {
                         if (interface == PQOS_INTER_MMIO)
                                 printf("Failed to retrieve L3 classes of "
@@ -454,6 +480,7 @@ set_l3_clos(const unsigned class_id,
                                ca.class_id, (long)ca.u.ways_mask);
                 set++;
         }
+        free(sock_l3ca);
         sel_alloc_mod += set;
         if (set < count)
                 return -1;
@@ -2745,10 +2772,11 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
         unsigned idx;
         unsigned clos_idx;
         unsigned num_ca;
+        unsigned num_clos;
         unsigned sock_count;
         unsigned *sockets = NULL;
         struct pqos_mba *mba_tab = NULL;
-        struct pqos_l3ca l3ca[PQOS_MAX_L3CA_CLOS];
+        struct pqos_l3ca *l3ca = NULL;
 
         if (!sys) {
                 printf("Error: 'sys' (pqos_sysconfig) is not available!\n");
@@ -2771,12 +2799,9 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                 return;
         }
 
-        for (idx = 0; idx < sys->erdt->num_dev_agents; idx++) {
-                memset(l3ca, 0, sizeof(l3ca));
-                for (clos_idx = 0; clos_idx < sys->erdt->max_clos; clos_idx++)
-                        l3ca[clos_idx].domain_id =
-                            sys->erdt->dev_agents[idx].rmdd.domain_id;
+        num_clos = pqos_erdt_num_clos(sys->erdt);
 
+        for (idx = 0; idx < sys->erdt->num_dev_agents; idx++) {
                 /* A device agent enumerated for monitoring alone has no
                  * I/O L3 CAT register to show, and pqos_l3ca_get() refuses
                  * such a domain. That is right for a domain the user named,
@@ -2788,8 +2813,25 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                 if (!domain_has_l3ca(&sys->erdt->dev_agents[idx]))
                         continue;
 
+                /* the table is made for the first domain that has the
+                 * registers, whose page bounds the classes; a table that
+                 * describes no such domain bounds them by nothing
+                 */
+                if (l3ca == NULL) {
+                        l3ca = calloc(num_clos, sizeof(*l3ca));
+                        if (l3ca == NULL) {
+                                printf("Error allocating memory for I/O L3 CAT "
+                                       "configuration\n");
+                                goto free_and_return;
+                        }
+                }
+                memset(l3ca, 0, num_clos * sizeof(*l3ca));
+                for (clos_idx = 0; clos_idx < num_clos; clos_idx++)
+                        l3ca[clos_idx].domain_id =
+                            sys->erdt->dev_agents[idx].rmdd.domain_id;
+
                 ret = pqos_l3ca_get(sys->erdt->dev_agents[idx].rmdd.domain_id,
-                                    DIM(l3ca), &num_ca, l3ca);
+                                    num_clos, &num_ca, l3ca);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Error retrieving I/O L3CA configuration for "
                                "Domain ID 0x%x: pqos_l3ca_get() returned %d\n",
@@ -2803,12 +2845,6 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                 }
 
                 printf("\n");
-        }
-
-        mba_tab = calloc(sys->erdt->max_clos, sizeof(*mba_tab));
-        if (mba_tab == NULL) {
-                printf("Error allocating memory for MBA configuration\n");
-                goto free_and_return;
         }
 
         for (idx = 0; idx < sys->erdt->num_cpu_agents; idx++) {
@@ -2825,6 +2861,18 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                 if (!domain_has_mba(&sys->erdt->cpu_agents[idx]))
                         continue;
 
+                /* the table is made for the first domain that has the
+                 * registers, whose block bounds the classes
+                 */
+                if (mba_tab == NULL) {
+                        mba_tab = calloc(num_clos, sizeof(*mba_tab));
+                        if (mba_tab == NULL) {
+                                printf("Error allocating memory for MBA "
+                                       "configuration\n");
+                                goto free_and_return;
+                        }
+                }
+
                 if (pqos_platform_mem_regions(&supported) != 0)
                         goto free_and_return;
 
@@ -2833,7 +2881,7 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                 mba_tab[0].num_mem_regions = (int)supported;
 
                 ret = pqos_mba_get(sys->erdt->cpu_agents[idx].rmdd.domain_id,
-                                   sys->erdt->max_clos, &num_mba, mba_tab);
+                                   num_clos, &num_mba, mba_tab);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Error retrieving MMIO registers for Domain "
                                "ID %x: pqos_mba_get() returned %d\n",
@@ -2885,6 +2933,7 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
         print_iordt_alloc(cap_mon, cap_l3ca, sys);
 
 free_and_return:
+        free(l3ca);
         free(mba_tab);
         free(sockets);
 }

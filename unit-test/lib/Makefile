@@ -1065,6 +1065,8 @@ $(BIN_DIR)/test_mmio: test_mmio.c $(LIB_OBJS)
 		-Wl,--wrap=set_mba_optimal_bw_region_clos_v1 \
 		-Wl,--wrap=set_mba_min_bw_region_clos_v1 \
 		-Wl,--wrap=set_mba_max_bw_region_clos_v1 \
+		-Wl,--wrap=get_iol3_cbm_clos_v1 \
+		-Wl,--wrap=alloc_reset \
 		-Wl,--wrap=set_iol3_cbm_clos_v1 \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@

@@ -674,27 +674,34 @@ error_exit:
 }
 
 /**
- * @brief Caps the reported number of allocation classes at the ERDT maximum
+ * @brief Caps the number of L3 CAT and MBA classes at the ERDT's
  *
  * L3 CAT and MBA capabilities are discovered through CPUID, which reports the
- * class count usable via the MSR interface. The MMIO allocation paths accept
- * class IDs below the ERDT maximum instead, so a larger CPUID value would be
- * advertised by -d while being rejected by -e.
+ * class count usable via the MSR interface, halved for L3 CAT when CDP is on.
+ * The MMIO allocation paths program the classes the ERDT describes instead, 0
+ * through its Max CLOS, so a larger CPUID count would be advertised by -d and
+ * accepted for an association while -e rejected it.
  *
- * Only a CPUID value above the ERDT maximum is reduced. A smaller value is left
- * alone, so that no class is advertised that CPUID does not report.
+ * Only a CPUID count above the ERDT's is reduced. The capability's count is
+ * what a core can be associated with and how many mask MSRs a reset writes,
+ * which CPUID bounds and CDP halves, so a smaller count stays: raised to the
+ * ERDT's, a reset under CDP would write mask registers the platform does not
+ * have. The MMIO paths count the ERDT's classes themselves.
  *
  * @param [in,out] cap detected capabilities
  * @param [in] erdt ERDT information
  */
-static void
+PQOS_STATIC void
 cap_limit_num_classes_to_erdt(struct pqos_cap *cap,
                               const struct pqos_erdt_info *erdt)
 {
         unsigned i;
+        unsigned num_clos;
 
-        if (cap == NULL || erdt == NULL || erdt->max_clos == 0)
+        if (cap == NULL || erdt == NULL)
                 return;
+
+        num_clos = erdt_num_clos(erdt);
 
         for (i = 0; i < cap->num_cap; i++) {
                 unsigned *num_classes;
@@ -710,13 +717,35 @@ cap_limit_num_classes_to_erdt(struct pqos_cap *cap,
                         continue;
                 }
 
-                if (*num_classes > erdt->max_clos) {
+                if (*num_classes > num_clos) {
                         LOG_INFO("Number of classes reduced from %u to the "
                                  "ERDT value %u\n",
-                                 *num_classes, erdt->max_clos);
-                        *num_classes = erdt->max_clos;
+                                 *num_classes, num_clos);
+                        *num_classes = num_clos;
                 }
         }
+}
+
+/**
+ * @brief Puts the ERDT's cap on the class counts back after a rediscovery
+ *
+ * A CDP change discovers the L3 CAT capability again, from CPUID. On the MMIO
+ * interface the ERDT caps that count, as it did at initialization, so the cap
+ * is applied again; the other interfaces keep the discovery's count.
+ *
+ * @param [in,out] cap detected capabilities
+ * @param [in] interface the interface in use
+ * @param [in] erdt ERDT information, NULL without a table
+ */
+PQOS_STATIC void
+cap_restore_erdt_num_classes(struct pqos_cap *cap,
+                             const enum pqos_interface interface,
+                             const struct pqos_erdt_info *erdt)
+{
+        if (interface != PQOS_INTER_MMIO)
+                return;
+
+        cap_limit_num_classes_to_erdt(cap, erdt);
 }
 
 /**
@@ -1009,6 +1038,18 @@ pqos_init(const struct pqos_config *config)
         /* Must be initialized after ERDT due to its data usage
          */
         if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                /* the classes this interface programs have to have their
+                 * registers in the blocks the table describes; the other
+                 * interfaces read the table for its domains alone
+                 */
+                ret = erdt_classes_fit(erdt);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("ERDT table is not usable by the MMIO "
+                                  "interface!\n");
+                        erdt_fini();
+                        goto machine_init_error;
+                }
+
                 ret = cores_domains_init(cpu->num_cores, erdt, &cores_domains);
                 if (ret != PQOS_RETVAL_OK) {
                         /* an init that failed is not finalised by pqos_fini(),
@@ -1431,6 +1472,8 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 
         if (ret == PQOS_RETVAL_OK) {
                 *l3_cap = cap;
+                cap_restore_erdt_num_classes(m_sysconf.cap, interface,
+                                             m_sysconf.erdt);
                 return;
         }
 

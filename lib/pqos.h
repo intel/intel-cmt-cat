@@ -940,6 +940,10 @@ struct pqos_device_agent_info {
  * ERDT Top-Level ACPI Structure
  */
 struct pqos_erdt_info {
+        /**
+         * Max CLOS of the ERDT header: the highest class of service the
+         * platform supports, so the classes are 0 through max_clos
+         */
         uint32_t max_clos;
         uint32_t num_cpu_agents;
         uint32_t num_dev_agents;

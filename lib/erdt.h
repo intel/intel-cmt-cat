@@ -339,6 +339,38 @@ channels_domains_init(unsigned int num_channels,
 PQOS_LOCAL void channels_domains_fini(void);
 
 /**
+ * @brief Number of allocation classes the ERDT describes
+ *
+ * The header's Max CLOS is the highest class of service the platform
+ * supports, as the highest COS number of CPUID is, so the classes are 0
+ * through Max CLOS and there is one more of them than the field says.
+ *
+ * @param [in] erdt ERDT information
+ *
+ * @return number of classes
+ */
+PQOS_LOCAL unsigned erdt_num_clos(const struct pqos_erdt_info *erdt);
+
+/**
+ * @brief Checks that the ERDT's classes fit the register blocks it describes
+ *
+ * The MMIO interface programs the classes 0 through Max CLOS in the blocks
+ * the MARC and CARD structures describe, so each class has to have its
+ * register there: a bank of an MBA block holds 64 classes, and the I/O L3 CAT
+ * registers of a CARD page start at its CAT Register Offset. A field at the
+ * type's maximum describes no countable number of classes at all. The parse
+ * does not refuse such a table, as the other interfaces read it for the
+ * domains alone; the MMIO interface refuses to start on it.
+ *
+ * @param [in] erdt ERDT information
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK every class has its register
+ * @retval PQOS_RETVAL_ERROR a class does not, or the field cannot be counted
+ */
+PQOS_LOCAL int erdt_classes_fit(const struct pqos_erdt_info *erdt);
+
+/**
  * @brief Initializes ERDT module
  *
  * Initialize ERDT module

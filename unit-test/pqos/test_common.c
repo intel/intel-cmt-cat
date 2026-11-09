@@ -185,6 +185,23 @@ test_cpu_sort_puts_unreadable_names_last(void **state)
         assert_int_equal(sort_names("cpu0abc", "cpu0abc"), 0);
 }
 
+/* the ERDT's Max CLOS is the highest class, so the classes are one more than
+ * the field says
+ */
+static void
+test_erdt_num_clos_is_one_more_than_max_clos(void **state)
+{
+        struct pqos_erdt_info erdt = {0};
+
+        (void)state;
+
+        assert_int_equal(pqos_erdt_num_clos(&erdt), 1);
+        erdt.max_clos = 15;
+        assert_int_equal(pqos_erdt_num_clos(&erdt), 16);
+        erdt.max_clos = UINT32_MAX - 1;
+        assert_int_equal(pqos_erdt_num_clos(&erdt), UINT32_MAX);
+}
+
 int
 main(void)
 {
@@ -195,6 +212,7 @@ main(void)
             cmocka_unit_test(test_cpu_sort_orders_by_number),
             cmocka_unit_test(test_cpu_sort_orders_numbers_beyond_int_range),
             cmocka_unit_test(test_cpu_sort_puts_unreadable_names_last),
+            cmocka_unit_test(test_erdt_num_clos_is_one_more_than_max_clos),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);

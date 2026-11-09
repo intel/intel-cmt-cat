@@ -294,6 +294,8 @@ __wrap_pqos_l3ca_get(const unsigned l3cat_id,
                      unsigned *num_ca,
                      struct pqos_l3ca *ca)
 {
+        const struct pqos_l3ca *src;
+        unsigned i;
         int ret;
 
         check_expected(l3cat_id);
@@ -307,8 +309,17 @@ __wrap_pqos_l3ca_get(const unsigned l3cat_id,
         assert_non_null(ca);
 
         *num_ca = mock_type(unsigned);
-        memcpy(ca, mock_ptr_type(struct pqos_l3ca *),
-               sizeof(struct pqos_l3ca) * *num_ca);
+        src = mock_ptr_type(struct pqos_l3ca *);
+
+        /* on the MMIO interface the caller names the domain of every entry it
+         * wants read, so a fixture that names domains checks that each entry
+         * it fills was asked for that domain
+         */
+        for (i = 0; i < *num_ca; i++)
+                if (src[i].domain_id != 0)
+                        assert_int_equal(ca[i].domain_id, src[i].domain_id);
+
+        memcpy(ca, src, sizeof(struct pqos_l3ca) * *num_ca);
         return ret;
 }
 

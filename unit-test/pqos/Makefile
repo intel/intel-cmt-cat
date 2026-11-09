@@ -193,6 +193,7 @@ $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
 		-Wl,--wrap=strdup \
+		-Wl,--wrap=calloc \
 		-Wl,--wrap=pqos_l3ca_get \
 		-Wl,--wrap=pqos_l2ca_get \
 		-Wl,--wrap=pqos_mba_get \
@@ -201,6 +202,7 @@ $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 		-Wl,--wrap=pqos_alloc_assoc_get \
 		-Wl,--wrap=pqos_mon_assoc_get \
 		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_sysconfig_get \
 		-Wl,--wrap=pqos_mba_set \
 		-Wl,--wrap=pqos_l3ca_set \
 		-Wl,--wrap=pqos_l2ca_set \

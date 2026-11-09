@@ -190,6 +190,41 @@ int get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
                                     l3_mbm_rmid_t *rmids_val);
 
 /**
+ * @brief Whether a class's MBA register lies within the MARC's register block
+ *
+ * A bank of four regions holds 64 classes of 8 bytes each, the banks follow
+ * each other, and the block is MBA Register Block Size pages. A class whose
+ * register would lie past the block, or in the next bank, is not one the
+ * platform has, whatever its ERDT's Max CLOS says.
+ *
+ * @param [in] marc MARC information
+ * @param [in] region_num memory region
+ * @param [in] clos_number class of service
+ *
+ * @retval 1 the register lies within the block
+ * @retval 0 it does not
+ */
+int mba_clos_in_block(const struct pqos_erdt_marc *marc,
+                      int region_num,
+                      unsigned int clos_number);
+
+/**
+ * @brief Whether a class's I/O L3 CAT register lies within a CARD block page
+ *
+ * The CAT registers of a page start at the CARD's CAT Register Offset and
+ * hold 8 bytes per class, and every page of the block carries the same
+ * registers, so the register has to lie within a page.
+ *
+ * @param [in] card CARD information
+ * @param [in] clos_number class of service
+ *
+ * @retval 1 the register lies within the page
+ * @retval 0 it does not
+ */
+int iol3_clos_in_block(const struct pqos_erdt_card *card,
+                       unsigned int clos_number);
+
+/**
  * @brief Get MBA optimal bandwidth value for a particular CLOS for a region
  * under a given resource management domain
  *

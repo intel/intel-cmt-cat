@@ -146,6 +146,19 @@ int pqos_parse_mem_regions(const char *arg, int *regions, unsigned max_regions);
 int pqos_platform_mem_regions(unsigned *num_mem_regions);
 
 /**
+ * @brief Number of allocation classes the ERDT describes
+ *
+ * The header's Max CLOS is the highest class of service the platform
+ * supports, so the classes are 0 through max_clos and there is one more of
+ * them than the field says.
+ *
+ * @param [in] erdt ERDT information
+ *
+ * @return number of classes
+ */
+unsigned pqos_erdt_num_clos(const struct pqos_erdt_info *erdt);
+
+/**
  * @brief Parse and validate a PCI identifier
  *
  * @param [in] arg PCI ID in [segment:]bus:device.function format
