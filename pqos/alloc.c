@@ -381,23 +381,29 @@ set_l3_clos(const unsigned class_id,
         for (i = 0; i < count; i++) {
                 unsigned j, num_ca;
                 struct pqos_l3ca ca;
+                unsigned sel_id;
 
                 ret = PQOS_RETVAL_OK;
                 memset(&ca, 0, sizeof(ca));
                 memset(sock_l3ca, 0, num_l3ca * sizeof(*sock_l3ca));
 
+                /* the id the library is given: a socket's L3 CAT id, or on
+                 * the MMIO interface the domain named, since the ids are the
+                 * CPUs' and the domains are --alloc-domain-id's, which may be
+                 * more than the ids and are not selected by them there
+                 */
                 if (interface == PQOS_INTER_MMIO) {
-                        for (j = 0; j < num_l3ca; j++) {
-                                sock_l3ca[j].domain_id =
-                                    sel_alloc_domain_id.domain_ids[i];
-                        }
-                }
+                        sel_id = (unsigned)sel_alloc_domain_id.domain_ids[i];
+                        for (j = 0; j < num_l3ca; j++)
+                                sock_l3ca[j].domain_id = sel_id;
+                } else
+                        sel_id = sock_ids[i];
 
                 /* get the current L3 definitions of this socket, or of this
                  * domain on the MMIO interface, where a socket does not select
                  * the L3 CAT registers
                  */
-                ret = pqos_l3ca_get(sock_ids[i], num_l3ca, &num_ca, sock_l3ca);
+                ret = pqos_l3ca_get(sel_id, num_l3ca, &num_ca, sock_l3ca);
                 if (ret != PQOS_RETVAL_OK) {
                         if (interface == PQOS_INTER_MMIO)
                                 printf("Failed to retrieve L3 classes of "
@@ -439,7 +445,7 @@ set_l3_clos(const unsigned class_id,
                         ca.u.ways_mask = mask;
 
                 /* set new L3 class definition */
-                ret = pqos_l3ca_set(sock_ids[i], 1, &ca);
+                ret = pqos_l3ca_set(sel_id, 1, &ca);
                 if ((cpu->vendor == PQOS_VENDOR_AMD ||
                      cpu->vendor == PQOS_VENDOR_HYGON) &&
                     interface != PQOS_INTER_MMIO)

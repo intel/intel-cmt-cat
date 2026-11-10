@@ -118,7 +118,7 @@ test_set_l3_clos_mmio_keeps_the_table_small_without_registers(void **state)
         expect_function_call(__wrap_pqos_sysconfig_get);
         will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_sysconfig_get, &sys);
-        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0x20);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, PQOS_MAX_L3CA_CLOS);
         will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_PARAM);
 
@@ -157,7 +157,9 @@ test_set_l3_clos_mmio_reports_the_domain(void **state)
         sel_alloc_domain_id.num_domain_ids = 1;
         sel_alloc_domain_id.domain_ids[0] = 0;
 
-        /* the table read is sized by the ERDT's classes, Max CLOS + 1 */
+        /* the table read is sized by the ERDT's classes, Max CLOS + 1, and
+         * asked for by the domain named, not by a CPU's L3 CAT id
+         */
         expect_function_call(__wrap_pqos_sysconfig_get);
         will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_sysconfig_get, &sys);
@@ -1129,12 +1131,12 @@ test_set_l3_clos_mmio_sets_a_class_past_sixteen(void **state)
         expect_function_call(__wrap_pqos_sysconfig_get);
         will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_sysconfig_get, &sys);
-        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0x10);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, DIM(l3ca));
         will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, DIM(l3ca));
         will_return(__wrap_pqos_l3ca_get, l3ca);
-        expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0x10);
         expect_value(__wrap_pqos_l3ca_set, num_clos, 1);
         expect_memory(__wrap_pqos_l3ca_set, ca, &expected, sizeof(expected));
         will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
@@ -1144,6 +1146,73 @@ test_set_l3_clos_mmio_sets_a_class_past_sixteen(void **state)
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("Domain ID 16 L3CA CLOS16 => MASK 0x3\n"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
+/* the domains named may be more than the CPUs' L3 CAT ids: each is read and
+ * set by its own id, and the id array, of one entry here, is not indexed by
+ * the domain's position
+ */
+static void
+test_set_l3_clos_mmio_names_each_domain(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_device_agent_info dev_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_sysconfig sys = {.erdt = &erdt};
+        struct pqos_l3ca l3ca[2][2];
+        struct pqos_l3ca expected[2];
+        unsigned sock_ids[1] = {0};
+        unsigned d, i;
+        int ret = 0;
+
+        erdt.max_clos = 1;
+        erdt.num_dev_agents = DIM(dev_agents);
+        erdt.dev_agents = dev_agents;
+        for (d = 0; d < DIM(dev_agents); d++) {
+                dev_agents[d].rmdd.domain_id = 0x10 + d;
+                dev_agents[d].card.reg_base_addr = 0xf0000000 + 0x1000 * d;
+                dev_agents[d].card.reg_block_size = 1;
+                for (i = 0; i < DIM(l3ca[d]); i++) {
+                        memset(&l3ca[d][i], 0, sizeof(l3ca[d][i]));
+                        l3ca[d][i].class_id = i;
+                        l3ca[d][i].domain_id = 0x10 + d;
+                        l3ca[d][i].u.ways_mask = 0xf;
+                }
+                memset(&expected[d], 0, sizeof(expected[d]));
+                expected[d].class_id = 1;
+                expected[d].domain_id = 0x10 + d;
+                expected[d].u.ways_mask = 0x3;
+        }
+
+        mock_inter_get(PQOS_INTER_MMIO, 1);
+        sel_alloc_domain_id.num_domain_ids = DIM(dev_agents);
+        sel_alloc_domain_id.domain_ids[0] = 0x10;
+        sel_alloc_domain_id.domain_ids[1] = 0x11;
+
+        expect_function_call(__wrap_pqos_sysconfig_get);
+        will_return(__wrap_pqos_sysconfig_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_sysconfig_get, &sys);
+        for (d = 0; d < DIM(dev_agents); d++) {
+                expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0x10 + d);
+                expect_value(__wrap_pqos_l3ca_get, max_num_ca, DIM(l3ca[d]));
+                will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_l3ca_get, DIM(l3ca[d]));
+                will_return(__wrap_pqos_l3ca_get, l3ca[d]);
+                expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0x10 + d);
+                expect_value(__wrap_pqos_l3ca_set, num_clos, 1);
+                expect_memory(__wrap_pqos_l3ca_set, ca, &expected[d],
+                              sizeof(expected[d]));
+                will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
+        }
+
+        run_function(set_l3_clos, ret, 1, 0x3, sock_ids, 1,
+                     CAT_UPDATE_SCOPE_BOTH, data->cpu_info);
+
+        assert_int_equal(ret, 2);
+        assert_true(output_has_text("Domain ID 16 L3CA CLOS1 => MASK 0x3\n"));
+        assert_true(output_has_text("Domain ID 17 L3CA CLOS1 => MASK 0x3\n"));
 
         sel_alloc_domain_id.num_domain_ids = 0;
 }
@@ -2723,6 +2792,7 @@ main(void)
             cmocka_unit_test(
                 test_print_domain_alloc_config_no_table_without_registers),
             cmocka_unit_test(test_set_l3_clos_mmio_sets_a_class_past_sixteen),
+            cmocka_unit_test(test_set_l3_clos_mmio_names_each_domain),
             cmocka_unit_test(test_alloc_apply_mba),
             cmocka_unit_test(test_alloc_apply_mba_max),
             cmocka_unit_test(test_alloc_apply_mba_mmio_domains_in_one_request),
