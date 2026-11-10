@@ -436,6 +436,32 @@ test_iordt_assoc_write_error(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+/* the class is checked at its full width against the register's: on the
+ * 16-bit register 0xffff is written whole, and 0x10000, which the writer's
+ * own type would have cut to 0, is refused before the block is mapped
+ */
+static void
+test_iordt_assoc_write_refuses_class_past_register(void **state
+                                                   __attribute__((unused)))
+{
+        const pqos_channel_t channel = 0x10200;
+        const uint64_t address = 0x8765432112347000LLU;
+        uint8_t mimo[0x1000] = {0};
+        int ret;
+
+        expect_value(__wrap_pqos_mmap_write, address, address);
+        expect_value(__wrap_pqos_mmap_write, size, 0x10);
+        will_return(__wrap_pqos_mmap_write, mimo);
+
+        ret = iordt_assoc_write(channel, 0xffff);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(*(uint16_t *)(void *)mimo, 0xffff);
+
+        ret = iordt_assoc_write(channel, 0x10000);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(*(uint16_t *)(void *)mimo, 0xffff);
+}
+
 /* ======== iordt_assoc_read ======== */
 
 static void
@@ -515,6 +541,8 @@ main(void)
             cmocka_unit_test(test_iordt_assoc_write_param),
             cmocka_unit_test(test_iordt_assoc_write),
             cmocka_unit_test(test_iordt_assoc_write_error),
+            cmocka_unit_test(
+                test_iordt_assoc_write_refuses_class_past_register),
             cmocka_unit_test(test_iordt_assoc_read_param),
             cmocka_unit_test(test_iordt_assoc_read),
             cmocka_unit_test(test_iordt_assoc_read_error)};

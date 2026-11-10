@@ -853,10 +853,19 @@ _assoc_write(pqos_channel_t channel, unsigned class_id, unsigned enable)
         if (PQOS_IRDT_CHAN(channel) >= MMIO_MAX_CHANNELS)
                 return PQOS_RETVAL_PARAM;
 
+        cef = enable && ((mmio->flags & RCS_FLAGS_CEF) != 0);
+
+        /* the class is checked at its full width here, against the
+         * register's width less its enable bit: the writer takes the
+         * register's type, so a class wider than the register would lose
+         * its upper bits at the call, before the writer's own check
+         */
+        if (class_id >= (1ULL << (MMIO_REGW(mmio) * 8 - cef)))
+                return PQOS_RETVAL_PARAM;
+
         addr = mmio->addr + mmio->clos_offset;
         size = MMIO_REGW(mmio) * MMIO_MAX_CHANNELS;
         index = PQOS_IRDT_CHAN(channel);
-        cef = enable && ((mmio->flags & RCS_FLAGS_CEF) != 0);
 
         mem = pqos_mmap_write(addr, size);
         if (mem == NULL)
