@@ -154,7 +154,9 @@ int pqos_platform_mem_regions(unsigned *num_mem_regions);
  *
  * @param [in] erdt ERDT information
  *
- * @return number of classes
+ * @return number of classes, or 0 for a field of 0xFFFFFFFF, which counts
+ *         none; the library refuses to start the MMIO interface on such a
+ *         table
  */
 unsigned pqos_erdt_num_clos(const struct pqos_erdt_info *erdt);
 

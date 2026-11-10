@@ -352,15 +352,19 @@ parse_and_fit(struct fixture *f, const uint32_t max_clos)
 }
 /* the classes are 0 through Max CLOS, so a field at the type's maximum
  * describes no countable number of them: the table parses, as every interface
- * reads it, and the MMIO interface refuses to start on it
+ * reads it, and the MMIO interface refuses to start on it. The table has no
+ * register block, so that only the field's own check can refuse it
  */
 static void
 test_an_uncountable_max_clos_does_not_fit(void **state __attribute__((unused)))
 {
         struct fixture f;
+        struct pqos_erdt_info uncountable = {.max_clos = UINT32_MAX};
 
-        init(&f);
+        init_marc(&f, 0);
         assert_int_equal(parse_and_fit(&f, UINT32_MAX), PQOS_RETVAL_ERROR);
+        /* and it counts no classes rather than a wrapped number */
+        assert_int_equal(erdt_num_clos(&uncountable), 0);
 
         /* one below it is counted, as 0xFFFFFFFF classes, where no register
          * block bounds them: a table of domains enumerated for monitoring

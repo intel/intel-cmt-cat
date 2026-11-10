@@ -347,7 +347,9 @@ PQOS_LOCAL void channels_domains_fini(void);
  *
  * @param [in] erdt ERDT information
  *
- * @return number of classes
+ * @return number of classes, or 0 for a field of 0xFFFFFFFF, which counts
+ *         none: erdt_classes_fit() refuses such a table, and a caller that
+ *         counts down from the number has to refuse 0 rather than wrap
  */
 PQOS_LOCAL unsigned erdt_num_clos(const struct pqos_erdt_info *erdt);
 

@@ -61,6 +61,12 @@ pqos_erdt_num_clos(const struct pqos_erdt_info *erdt)
 {
         ASSERT(erdt != NULL);
 
+        /* a field at the type's maximum counts no classes: none, rather than
+         * a wrapped count, so that nothing is sized or printed from one
+         */
+        if (erdt->max_clos == UINT32_MAX)
+                return 0;
+
         return erdt->max_clos + 1;
 }
 

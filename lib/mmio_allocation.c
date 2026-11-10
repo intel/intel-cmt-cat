@@ -442,6 +442,11 @@ mba_classes_fit(const struct pqos_erdt_info *erdt,
 {
         const unsigned num_clos = erdt_num_clos(erdt);
 
+        if (num_clos == 0) {
+                LOG_ERROR("The ERDT's Max CLOS counts no classes\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
         if (num_mem_regions == 0)
                 return PQOS_RETVAL_OK;
 
@@ -742,7 +747,7 @@ mmio_mba_get(const unsigned mba_id,
                 num_mem_regions = (int)supported;
 
         clos_count = erdt_num_clos(erdt);
-        if (clos_count > max_num_clos)
+        if (clos_count == 0 || clos_count > max_num_clos)
                 return PQOS_RETVAL_ERROR;
 
         cpu_agent = get_mmio_cpu_agent_by_domain(erdt, mba_tab[0].domain_id);
@@ -957,7 +962,7 @@ mmio_l3ca_get(const unsigned l3cat_id,
         UNUSED_PARAM(l3cat_id);
 
         clos_count = erdt_num_clos(erdt);
-        if (clos_count > max_num_ca)
+        if (clos_count == 0 || clos_count > max_num_ca)
                 return PQOS_RETVAL_ERROR;
 
         // Check if all domains are valid
@@ -1006,6 +1011,11 @@ static int
 cat_classes_fit(const struct pqos_erdt_info *erdt)
 {
         const unsigned num_clos = erdt_num_clos(erdt);
+
+        if (num_clos == 0) {
+                LOG_ERROR("The ERDT's Max CLOS counts no classes\n");
+                return PQOS_RETVAL_ERROR;
+        }
 
         for (unsigned domain = 0; domain < erdt->num_dev_agents; domain++) {
                 const struct pqos_device_agent_info *agent =

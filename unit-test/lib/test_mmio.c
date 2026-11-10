@@ -2220,6 +2220,31 @@ test_mba_set_rejects_class_past_bank(void **state __attribute__((unused)))
         assert_non_null(strstr(test_log, "lies past"));
 }
 
+/* a table whose field counts no classes is refused before any register */
+static void
+test_mba_reset_rejects_uncountable_classes(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        int ret;
+
+        erdt.max_clos = UINT32_MAX;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        memset(&mba_regs, 0, sizeof(mba_regs));
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        test_log[0] = '\0';
+
+        ret = mmio_alloc_reset_mba();
+
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_non_null(strstr(test_log, "counts no classes"));
+}
+
 static void
 test_mba_reset_rejects_class_past_bank(void **state __attribute__((unused)))
 {
@@ -2579,6 +2604,7 @@ main(void)
             cmocka_unit_test(test_mmio_l3ca_get_rejects_class_past_page),
             cmocka_unit_test(test_mba_set_rejects_class_past_bank),
             cmocka_unit_test(test_mba_reset_rejects_class_past_bank),
+            cmocka_unit_test(test_mba_reset_rejects_uncountable_classes),
             cmocka_unit_test(test_mmio_l3ca_set_rejects_class_past_page),
             cmocka_unit_test(test_alloc_reset_cat_rejects_class_past_page)};
 

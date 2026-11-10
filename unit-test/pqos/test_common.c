@@ -200,6 +200,11 @@ test_erdt_num_clos_is_one_more_than_max_clos(void **state)
         assert_int_equal(pqos_erdt_num_clos(&erdt), 16);
         erdt.max_clos = UINT32_MAX - 1;
         assert_int_equal(pqos_erdt_num_clos(&erdt), UINT32_MAX);
+        /* the field at the type's maximum counts none, not a wrapped 0 by
+         * accident but 0 by contract
+         */
+        erdt.max_clos = UINT32_MAX;
+        assert_int_equal(pqos_erdt_num_clos(&erdt), 0);
 }
 
 int
