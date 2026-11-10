@@ -674,81 +674,6 @@ error_exit:
 }
 
 /**
- * @brief Caps the number of L3 CAT and MBA classes at the ERDT's
- *
- * L3 CAT and MBA capabilities are discovered through CPUID, which reports the
- * class count usable via the MSR interface, halved for L3 CAT when CDP is on.
- * The MMIO allocation paths program the classes the ERDT describes instead, 0
- * through its Max CLOS, so a larger CPUID count would be advertised by -d and
- * accepted for an association while -e rejected it.
- *
- * Only a CPUID count above the ERDT's is reduced. The capability's count is
- * what a core can be associated with and how many mask MSRs a reset writes,
- * which CPUID bounds and CDP halves, so a smaller count stays: raised to the
- * ERDT's, a reset under CDP would write mask registers the platform does not
- * have. The MMIO paths count the ERDT's classes themselves.
- *
- * @param [in,out] cap detected capabilities
- * @param [in] erdt ERDT information
- */
-PQOS_STATIC void
-cap_limit_num_classes_to_erdt(struct pqos_cap *cap,
-                              const struct pqos_erdt_info *erdt)
-{
-        unsigned i;
-        unsigned num_clos;
-
-        if (cap == NULL || erdt == NULL)
-                return;
-
-        num_clos = erdt_num_clos(erdt);
-
-        for (i = 0; i < cap->num_cap; i++) {
-                unsigned *num_classes;
-
-                switch (cap->capabilities[i].type) {
-                case PQOS_CAP_TYPE_L3CA:
-                        num_classes = &cap->capabilities[i].u.l3ca->num_classes;
-                        break;
-                case PQOS_CAP_TYPE_MBA:
-                        num_classes = &cap->capabilities[i].u.mba->num_classes;
-                        break;
-                default:
-                        continue;
-                }
-
-                if (*num_classes > num_clos) {
-                        LOG_INFO("Number of classes reduced from %u to the "
-                                 "ERDT value %u\n",
-                                 *num_classes, num_clos);
-                        *num_classes = num_clos;
-                }
-        }
-}
-
-/**
- * @brief Puts the ERDT's cap on the class counts back after a rediscovery
- *
- * A CDP change discovers the L3 CAT capability again, from CPUID. On the MMIO
- * interface the ERDT caps that count, as it did at initialization, so the cap
- * is applied again; the other interfaces keep the discovery's count.
- *
- * @param [in,out] cap detected capabilities
- * @param [in] interface the interface in use
- * @param [in] erdt ERDT information, NULL without a table
- */
-PQOS_STATIC void
-cap_restore_erdt_num_classes(struct pqos_cap *cap,
-                             const enum pqos_interface interface,
-                             const struct pqos_erdt_info *erdt)
-{
-        if (interface != PQOS_INTER_MMIO)
-                return;
-
-        cap_limit_num_classes_to_erdt(cap, erdt);
-}
-
-/**
  * @brief Converts enumeration value into string
  *
  * @param interface interface
@@ -1058,8 +983,6 @@ pqos_init(const struct pqos_config *config)
                         erdt_fini();
                         goto machine_init_error;
                 }
-
-                cap_limit_num_classes_to_erdt(cap, erdt);
 
                 /* Set Region Aware MBM and MBA mode, if MMIO interface is
                  * selected and ERDT table is present
@@ -1472,8 +1395,6 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 
         if (ret == PQOS_RETVAL_OK) {
                 *l3_cap = cap;
-                cap_restore_erdt_num_classes(m_sysconf.cap, interface,
-                                             m_sysconf.erdt);
                 return;
         }
 

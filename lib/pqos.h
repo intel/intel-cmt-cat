@@ -535,6 +535,12 @@ struct pqos_hybrid_capabilities {
 
 /**
  * L3 Cache Allocation (CA) capability structure
+ *
+ * num_classes is the CPU's count of classes, CPUID's, halved when CDP is on.
+ * On the MMIO interface the I/O L3 CAT registers of a device domain have the
+ * ERDT's classes, 0 through pqos_erdt_info::max_clos, which pqos_l3ca_set()
+ * checks such a request against and pqos_l3ca_get() sizes its table by;
+ * where the two counts differ, each describes its own registers.
  */
 struct pqos_cap_l3ca {
         unsigned mem_size;           /**< byte size of the structure */
@@ -567,6 +573,12 @@ struct pqos_cap_l2ca {
 
 /**
  * Memory Bandwidth Allocation capability structure
+ *
+ * num_classes is the CPU's count of classes, CPUID's. On the MMIO interface
+ * the MBA registers of a memory region have the ERDT's classes, 0 through
+ * pqos_erdt_info::max_clos, which pqos_mba_set() checks a request against and
+ * pqos_mba_get() sizes its table by; where the two counts differ, each
+ * describes its own registers.
  */
 struct pqos_cap_mba {
         unsigned mem_size;      /**< byte size of the structure */
@@ -942,7 +954,12 @@ struct pqos_device_agent_info {
 struct pqos_erdt_info {
         /**
          * Max CLOS of the ERDT header: the highest class of service the
-         * platform supports, so the classes are 0 through max_clos
+         * platform supports, so the classes are 0 through max_clos. They are
+         * the classes of the I/O L3 CAT and MBA registers the MMIO interface
+         * programs, max_clos + 1 of them per domain, which is the size
+         * pqos_l3ca_get() and pqos_mba_get() need for their tables there.
+         * The counts of pqos_cap_l3ca and pqos_cap_mba are the CPU's, from
+         * CPUID.
          */
         uint32_t max_clos;
         uint32_t num_cpu_agents;
@@ -2359,8 +2376,14 @@ struct pqos_l3ca {
  * @param [in] num_clos number of classes of service at \a ca
  * @param [in] ca table with class of service definitions
  *
+ * On the MMIO interface a device domain's I/O L3 CAT classes are the ERDT's,
+ * 0 through pqos_erdt_info::max_clos: an entry whose class is past it is
+ * refused, and nothing is written for the request.
+ *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM on an invalid request, a class past the
+ *         interface's count among them
  */
 int pqos_l3ca_set(const unsigned l3cat_id,
                   const unsigned num_clos,
@@ -2371,7 +2394,9 @@ int pqos_l3ca_set(const unsigned l3cat_id,
  *
  * @param [in] l3cat_id L3 CAT resource id
  * @param [in] max_num_ca maximum number of classes of service
- *             that can be accommodated at \a ca
+ *             that can be accommodated at \a ca; on the MMIO interface
+ *             the table read has pqos_erdt_info::max_clos + 1 entries,
+ *             and a smaller \a max_num_ca is refused
  * @param [out] num_ca number of classes of service read into \a ca
  * @param [out] ca table with read classes of service
  *
@@ -2508,9 +2533,11 @@ struct pqos_mba {
  * @param [in]  requested table with class of service definitions
  * @param [out] actual table with class of service definitions
  *
- * On the MMIO interface every requested bandwidth value is checked against
- * its domain's range (see pqos_mba_mem_region) before any register is
- * written. A table read by pqos_mba_get() from caps programmed outside that
+ * On the MMIO interface a memory region's MBA classes are the ERDT's, 0
+ * through pqos_erdt_info::max_clos, and a request for one past it is refused.
+ * Every requested bandwidth value is checked against its domain's range (see
+ * pqos_mba_mem_region) before any register is written. A table read by
+ * pqos_mba_get() from caps programmed outside that
  * range, as earlier releases' resets left them at 0x1FF, is refused, however
  * often it is given and whatever is reset meanwhile: replace its values that
  * are out of range, or read the table again after an allocation reset has
@@ -2530,7 +2557,9 @@ int pqos_mba_set(const unsigned mba_id,
  *
  * @param [in]  mba_id MBA resource id
  * @param [in]  max_num_clos maximum number of classes of service
- *              that can be accommodated at \a mba_tab
+ *              that can be accommodated at \a mba_tab; on the MMIO
+ *              interface the table read has pqos_erdt_info::max_clos + 1
+ *              entries, and a smaller \a max_num_clos is refused
  * @param [out] num_clos number of classes of service read into \a mba_tab
  * @param [out] mba_tab table with read classes of service
  *
@@ -2583,9 +2612,13 @@ int pqos_alloc_assoc_get_dev(const uint16_t segment,
  * @brief Associates \a channel with given class of service
  *
  * @param [in] channel Control channel id
- * @param [in] class_id class of service
+ * @param [in] class_id class of service: on the MMIO interface 0 through
+ *             pqos_erdt_info::max_clos, the classes of the I/O L3 CAT
+ *             registers, and below the L3 CAT capability's count elsewhere
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_PARAM on a class past that, or past the association
+ *         register's width
  */
 int pqos_alloc_assoc_set_channel(const pqos_channel_t channel,
                                  const unsigned class_id);
@@ -2972,6 +3005,10 @@ int pqos_cap_get_event(const struct pqos_cap *cap,
  * @brief Retrieves number of L3 allocation classes of service from
  *        \a cap structure.
  *
+ * The count is the CPU's, from CPUID, halved when CDP is on. The I/O L3 CAT
+ * registers of the MMIO interface are counted by pqos_erdt_info::max_clos +
+ * 1 instead.
+ *
  * @param [in] cap platform QoS capabilities structure
  *                 returned by \a pqos_cap_get
  * @param [out] clos_num place to store number of classes of service
@@ -2997,6 +3034,10 @@ int pqos_l2ca_get_clos_num(const struct pqos_cap *cap, unsigned *clos_num);
 /**
  * @brief Retrieves number of memory B/W allocation classes of service from
  *        \a cap structure.
+ *
+ * The count is the CPU's, from CPUID. The MBA registers of the MMIO
+ * interface's memory regions are counted by pqos_erdt_info::max_clos + 1
+ * instead.
  *
  * @param [in] cap platform QoS capabilities structure
  *                 returned by \a pqos_cap_get

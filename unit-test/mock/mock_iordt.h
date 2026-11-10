@@ -36,6 +36,12 @@
 #include "iordt.h"
 #include "pqos.h"
 
+/**
+ * The device table __wrap_iordt_init() hands out when a case sets it, for an
+ * init that goes on to use it; NULL leaves the table untouched
+ */
+extern struct pqos_devinfo *mock_iordt_init_devinfo;
+
 int __wrap_iordt_init(const struct pqos_cap *cap,
                       struct pqos_devinfo **devinfo);
 int __wrap_iordt_fini(void);

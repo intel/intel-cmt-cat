@@ -1144,6 +1144,10 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=erdt_init \
 		-Wl,--wrap=erdt_fini \
 		-Wl,--wrap=cores_domains_init \
+		-Wl,--wrap=cores_domains_fini \
+		-Wl,--wrap=channels_domains_init \
+		-Wl,--wrap=mrrm_init \
+		-Wl,--wrap=mem_regions_init \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

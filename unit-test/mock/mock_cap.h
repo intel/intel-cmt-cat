@@ -57,11 +57,6 @@ enum pqos_interface __wrap__pqos_get_inter(void);
 int _pqos_api_init(void);
 int _pqos_api_exit(void);
 const char *_cap_interface_to_string(enum pqos_interface interface);
-void cap_limit_num_classes_to_erdt(struct pqos_cap *cap,
-                                   const struct pqos_erdt_info *erdt);
-void cap_restore_erdt_num_classes(struct pqos_cap *cap,
-                                  const enum pqos_interface interface,
-                                  const struct pqos_erdt_info *erdt);
 int cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
                       const struct pqos_cpuinfo *cpu,
                       const enum pqos_interface iface);

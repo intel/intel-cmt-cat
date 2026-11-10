@@ -43,6 +43,10 @@ struct pqos_cap;
 struct pqos_cpuinfo;
 struct pqos_erdt_info;
 struct pqos_cores_domains;
+struct pqos_channels_domains;
+struct pqos_devinfo;
+struct pqos_mrrm_info;
+struct pqos_mem_regions;
 
 /* test_cap wraps these, and calls the originals outside its MMIO case */
 int __real_erdt_init(const struct pqos_cap *cap,
@@ -52,5 +56,14 @@ void __real_erdt_fini(void);
 int __real_cores_domains_init(unsigned int num_cores,
                               const struct pqos_erdt_info *erdt,
                               struct pqos_cores_domains **cores_domains);
+void __real_cores_domains_fini(void);
+int
+__real_channels_domains_init(unsigned int num_channels,
+                             const struct pqos_erdt_info *erdt,
+                             const struct pqos_devinfo *devinfo,
+                             struct pqos_channels_domains **channels_domains);
+int __real_mrrm_init(const struct pqos_cap *cap, struct pqos_mrrm_info **mrrm);
+int __real_mem_regions_init(const struct pqos_mrrm_info *mrrm,
+                            struct pqos_mem_regions **regions);
 
 #endif /* TEST_CAP_H_ */

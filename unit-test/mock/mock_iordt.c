@@ -35,12 +35,18 @@
 #include "mock_test.h"
 #include "pqos.h"
 
+/* the device table an init is given, where a case sets one */
+struct pqos_devinfo *mock_iordt_init_devinfo;
+
 int
 __wrap_iordt_init(const struct pqos_cap *cap, struct pqos_devinfo **devinfo)
 {
         function_called();
         assert_non_null(cap);
         assert_non_null(devinfo);
+
+        if (mock_iordt_init_devinfo != NULL)
+                *devinfo = mock_iordt_init_devinfo;
 
         return mock_type(int);
 }
