@@ -1109,6 +1109,8 @@ $(BIN_DIR)/test_hw_alloc_assoc_channel: test_hw_alloc_assoc_channel.c $(LIB_OBJS
 		-Wl,--wrap=pqos_l3ca_iordt_enabled \
 		-Wl,--wrap=iordt_assoc_read \
 		-Wl,--wrap=iordt_assoc_write \
+		-Wl,--wrap=_pqos_get_inter \
+		-Wl,--wrap=_pqos_get_erdt \
 		-Wl,--start-group \
 		-Wl,--wrap=_pqos_get_cap \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@

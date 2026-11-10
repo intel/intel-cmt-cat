@@ -44,6 +44,7 @@
 #include "cap.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "erdt.h"
 #include "iordt.h"
 #include "log.h"
 #include "machine.h"
@@ -1841,6 +1842,17 @@ hw_alloc_assoc_set_channel(const pqos_channel_t channel,
         ret = pqos_l3ca_get_clos_num(cap, &num_l3_clos);
         if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
+
+        /* on the MMIO interface the class tags an I/O L3 CAT register the
+         * ERDT describes, 0 through its Max CLOS; elsewhere the classes are
+         * CPUID's
+         */
+        if (_pqos_get_inter() == PQOS_INTER_MMIO) {
+                const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+                if (erdt != NULL)
+                        num_l3_clos = erdt_num_clos(erdt);
+        }
 
         if (class_id != 0 && class_id >= num_l3_clos)
                 /* class_id is out of bounds */
