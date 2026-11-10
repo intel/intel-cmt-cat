@@ -405,6 +405,7 @@ $(BIN_DIR)/test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_l2cdp_change \
 		-Wl,--wrap=_pqos_cap_mba40_change \
 		-Wl,--wrap=_pqos_cap_mba40_refresh \
+		-Wl,--wrap=_pqos_cap_l3iordt_change \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

@@ -31,6 +31,7 @@
  */
 
 #include "allocation.h"
+#include "cap.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
 #include "mock_cap.h"
@@ -135,6 +136,47 @@ hw_alloc_reset_clos(const unsigned msr_start,
 int
 hw_alloc_reset_assoc(void)
 {
+        return mock_type(int);
+}
+
+/* the library's record of I/O RDT allocation, kept in the capability the
+ * cases give it: the library keeps it in a copy of its own, which these cases
+ * do not have, so the change is made where the cases look for it
+ */
+void
+__wrap__pqos_cap_l3iordt_change(const enum pqos_iordt_config iordt)
+{
+        const struct pqos_cap *cap = _pqos_get_cap();
+        unsigned i;
+
+        for (i = 0; cap != NULL && i < cap->num_cap; i++) {
+                struct pqos_cap_l3ca *l3ca;
+
+                if (cap->capabilities[i].type != PQOS_CAP_TYPE_L3CA)
+                        continue;
+                l3ca = cap->capabilities[i].u.l3ca;
+                if (iordt == PQOS_REQUIRE_IORDT_ON)
+                        l3ca->iordt_on = 1;
+                else if (iordt == PQOS_REQUIRE_IORDT_OFF)
+                        l3ca->iordt_on = 0;
+        }
+}
+
+/* the channels' association reset, which resets them only where the
+ * capability says allocation is on: a case that expects it has it called with
+ * allocation on, and gives it its status
+ */
+int
+hw_alloc_reset_assoc_channels(void)
+{
+        int enabled = 0;
+
+        function_called();
+        assert_int_equal(
+            pqos_l3ca_iordt_enabled(_pqos_get_cap(), NULL, &enabled),
+            PQOS_RETVAL_OK);
+        assert_int_equal(enabled, 1);
+
         return mock_type(int);
 }
 
@@ -1510,6 +1552,100 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
                 free(l3cat_ids);
 }
 
+/**
+ * @brief The expectations of a reset of an L3 CAT capability that turns I/O
+ *        RDT allocation on: the classes and the cores, the enable, and the
+ *        channels' reset, which says what @a assoc_ret gives
+ */
+static void
+expect_l3iordt_enable(struct test_data *data, const int assoc_ret)
+{
+        unsigned *l3cat_ids;
+        unsigned l3cat_id_num = 0;
+        unsigned i;
+
+        l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
+        assert_non_null(l3cat_ids);
+        for (i = 0; i < l3cat_id_num; ++i) {
+                unsigned coreid;
+
+                assert_int_equal(pqos_cpu_get_one_by_l3cat_id(
+                                     data->cpu, l3cat_ids[i], &coreid),
+                                 PQOS_RETVAL_OK);
+                expect_value(hw_alloc_reset_clos, msr_start,
+                             PQOS_MSR_L3CA_MASK_START);
+                expect_value(hw_alloc_reset_clos, msr_num,
+                             data->cap_l3ca.num_classes);
+                expect_value(hw_alloc_reset_clos, coreid, coreid);
+                expect_value(hw_alloc_reset_clos, msr_val,
+                             (1 << data->cap_l3ca.num_ways) - 1ULL);
+                will_return(hw_alloc_reset_clos, PQOS_RETVAL_OK);
+        }
+        free(l3cat_ids);
+
+        will_return(hw_alloc_reset_assoc, PQOS_RETVAL_OK);
+        expect_value(__wrap__pqos_cap_l3cdp_change, cdp, PQOS_REQUIRE_CDP_ANY);
+        expect_value(hw_alloc_reset_l3iordt, enable, 1);
+        will_return(hw_alloc_reset_l3iordt, PQOS_RETVAL_OK);
+        expect_function_call(hw_alloc_reset_assoc_channels);
+        will_return(hw_alloc_reset_assoc_channels, assoc_ret);
+}
+
+/* turning I/O RDT allocation on resets the channels' classes: the reset of
+ * the associations before the enable found allocation off and passed them
+ * over, so they are reset after it, with the capability saying allocation is
+ * on, as the channels' reset needs
+ */
+static void
+test_hw_alloc_reset_l3iordt_enable_resets_the_channels(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_alloc_config cfg;
+        int ret;
+
+        data->cap_l3ca.cdp = 0;
+        data->cap_l3ca.iordt = 1;
+        data->cap_l3ca.iordt_on = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
+        expect_l3iordt_enable(data, PQOS_RETVAL_OK);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+        ret = hw_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(data->cap_l3ca.iordt_on, 1);
+
+        data->cap_l3ca.iordt_on = 0;
+}
+
+/* a channel reset that fails fails the reset, as any other step does */
+static void
+test_hw_alloc_reset_l3iordt_enable_fails_with_the_channels(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_alloc_config cfg;
+        int ret;
+
+        data->cap_l3ca.cdp = 0;
+        data->cap_l3ca.iordt = 1;
+        data->cap_l3ca.iordt_on = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
+        expect_l3iordt_enable(data, PQOS_RETVAL_ERROR);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+        ret = hw_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+
+        data->cap_l3ca.iordt_on = 0;
+}
+
 static void
 test_hw_alloc_reset_l3cdp_disable(void **state)
 {
@@ -1929,7 +2065,11 @@ main(void)
             cmocka_unit_test(test_hw_alloc_reset_unsupported_l3iordt),
             cmocka_unit_test(test_hw_alloc_reset_l3ca),
             cmocka_unit_test(test_hw_alloc_reset_l3cdp_enable),
-            cmocka_unit_test(test_hw_alloc_reset_l3cdp_disable)};
+            cmocka_unit_test(test_hw_alloc_reset_l3cdp_disable),
+            cmocka_unit_test(
+                test_hw_alloc_reset_l3iordt_enable_resets_the_channels),
+            cmocka_unit_test(
+                test_hw_alloc_reset_l3iordt_enable_fails_with_the_channels)};
 
         const struct CMUnitTest tests_l2ca[] = {
             cmocka_unit_test(test_hw_l2ca_set),

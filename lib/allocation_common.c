@@ -482,8 +482,20 @@ alloc_reset(const struct pqos_alloc_config *cfg)
                                 goto pqos_alloc_reset_exit;
                         }
 
-                        /* reset channel assoc - initialize mmio tables */
+                        /* the channels are reset only where the capability
+                         * says allocation is on, and the association reset
+                         * above found it off: the capability is told first,
+                         * as the hardware now is, so that no channel keeps
+                         * the class it was left with while allocation was
+                         * off
+                         */
+                        _pqos_cap_l3iordt_change(PQOS_REQUIRE_IORDT_ON);
                         ret = hw_alloc_reset_assoc_channels();
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("I/O RDT channel association reset "
+                                          "error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
                 }
 
                 if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_OFF &&
