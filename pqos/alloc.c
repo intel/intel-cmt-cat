@@ -898,6 +898,7 @@ set_mba_clos(const unsigned class_id,
  * @param sock_ids Array of socket ID's to set class definition
  * @param sock_num Number of socket ID's in the array
  * @param ctrl Flag indicating a use of MBA controller
+ * @param cap_smba SMBA capability, NULL where the platform has none
  * @param cpu pqos_cpuinfo list containing all the cores
  *
  * @return Number of classes set
@@ -909,15 +910,26 @@ set_smba_clos(const unsigned class_id,
               const unsigned *sock_ids,
               const unsigned sock_num,
               int ctrl,
+              const struct pqos_capability *cap_smba,
               const struct pqos_cpuinfo *cpu)
 {
         unsigned i, set = 0;
         struct pqos_mba smba, actual;
 
+        /* without SMBA, the library would take the class for an MBA one */
+        if (cap_smba == NULL) {
+                printf("SMBA allocation capability not detected!\n");
+                return -1;
+        }
         if (sock_ids == NULL || available_bw == 0) {
                 printf("Failed to set MBA configuration!\n");
                 return -1;
         }
+        memset(&smba, 0, sizeof(struct pqos_mba));
+        memset(&actual, 0, sizeof(struct pqos_mba));
+        /* Initialize memory regions info with invalid values */
+        memset(&smba.mem_regions[0], -1, sizeof(smba.mem_regions));
+        memset(&actual.mem_regions[0], -1, sizeof(actual.mem_regions));
         smba.ctrl = ctrl;
         smba.class_id = class_id;
         smba.mb_max = available_bw;
@@ -972,6 +984,7 @@ set_smba_clos(const unsigned class_id,
  * @param res_ids array of resource ID's to set CLOS definition
  * @param res_num number of resource ID's in array
  * @param type allocation type (L2/L3/MBA/MBA CTRL)
+ * @param cap_smba SMBA capability, NULL where the platform has none
  * @param cpu pointer to cpu topology structure
  *
  * @return Number of classes set
@@ -984,6 +997,7 @@ set_allocation_clos(char *str,
                     const unsigned res_num,
                     const enum sel_alloc_type type,
                     struct sel_alloc_mem_regions_info *mem_regions,
+                    const struct pqos_capability *cap_smba,
                     const struct pqos_cpuinfo *cpu)
 {
         char *p = NULL;
@@ -1034,7 +1048,8 @@ set_allocation_clos(char *str,
                         printf("Failed to retrieve socket info!\n");
                         return -1;
                 }
-                ret = set_smba_clos(class_id, mask, ids, n, ctrl, cpu);
+                ret =
+                    set_smba_clos(class_id, mask, ids, n, ctrl, cap_smba, cpu);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
@@ -1072,6 +1087,7 @@ set_allocation_clos(char *str,
  *        from text string into internal configuration and sets selected classes
  *
  * @param str string passed to -e command line option
+ * @param cap_smba SMBA capability, NULL where the platform has none
  * @param cpu pointer to cpu topology structure
  *
  * @return Number of classes set
@@ -1081,6 +1097,7 @@ set_allocation_clos(char *str,
 static int
 set_allocation_class(char *str,
                      struct sel_alloc_mem_regions_info *mem_regions,
+                     const struct pqos_capability *cap_smba,
                      const struct pqos_cpuinfo *cpu)
 {
         int ret = -1;
@@ -1169,7 +1186,8 @@ set_allocation_class(char *str,
                 token = strtok_r(p, ",", &saveptr);
                 if (token == NULL)
                         break;
-                ret = set_allocation_clos(token, sp, n, type, mem_regions, cpu);
+                ret = set_allocation_clos(token, sp, n, type, mem_regions,
+                                          cap_smba, cpu);
                 if (ret <= 0)
                         break;
         }
@@ -1275,8 +1293,25 @@ alloc_check_options(const int class_pending)
 }
 
 /**
+ * @brief Tells whether a class definition given with -e is of the SMBA type
+ *
+ * @param [in] opt the definition
+ *
+ * @return 1 where its type, the text before its ids or its classes, as
+ *         set_allocation_class() reads it, is smba, and 0 otherwise
+ */
+static int
+alloc_opt_is_smba(const char *opt)
+{
+        const size_t len = strcspn(opt, "@:");
+
+        return len == strlen("smba") && strncasecmp(opt, "smba", len) == 0;
+}
+
+/**
  * @brief Parse and apply selected allocation options
  *
+ * @param cap_smba SMBA capability, NULL where the platform has none
  * @param cpu CPU topology structure
  *
  * @return Number of modified classes
@@ -1284,18 +1319,30 @@ alloc_check_options(const int class_pending)
  * @retval Negative on error
  */
 static int
-set_alloc(const struct pqos_cpuinfo *cpu)
+set_alloc(const struct pqos_capability *cap_smba,
+          const struct pqos_cpuinfo *cpu)
 {
         int ret = -1;
         unsigned i;
+        int refused = 0;
 
         if (!sel_alloc_opt_num)
                 return 0;
 
+        /* without SMBA, an SMBA class refuses the whole command before any
+         * class of it is set: refused where it is reached, it would leave
+         * the classes defined before it set
+         */
+        for (i = 0; cap_smba == NULL && i < sel_alloc_opt_num && !refused; i++)
+                refused =
+                    alloc_opts[i] != NULL && alloc_opt_is_smba(alloc_opts[i]);
+        if (refused)
+                printf("SMBA allocation capability not detected!\n");
+
         /* for each alloc option set selected class definitions */
-        for (i = 0; i < sel_alloc_opt_num; i++) {
-                ret = set_allocation_class(alloc_opts[i],
-                                           &sel_alloc_mem_regions, cpu);
+        for (i = 0; i < sel_alloc_opt_num && !refused; i++) {
+                ret = set_allocation_class(
+                    alloc_opts[i], &sel_alloc_mem_regions, cap_smba, cpu);
                 if (ret <= 0)
                         break;
         }
@@ -3072,7 +3119,7 @@ alloc_apply(const struct pqos_capability *cap_l3ca,
                  */
                 int ret_assoc = 0, ret_clos = 0;
 
-                ret_clos = set_alloc(cpu);
+                ret_clos = set_alloc(cap_smba, cpu);
                 if (ret_clos < 0) {
                         printf("Allocation configuration error!\n");
                         return -1;

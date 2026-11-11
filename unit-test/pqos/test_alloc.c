@@ -1669,6 +1669,104 @@ test_alloc_apply_mba_max(void **state)
         sel_alloc_opt_num = 0;
 }
 
+/* an SMBA class reaches the library with every field of its request set,
+ * its MMIO domain and memory regions those of no request
+ */
+static void
+test_alloc_apply_smba(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba smba_cap;
+        struct pqos_capability cap_smba;
+        struct pqos_mba requested;
+        struct pqos_mba actual;
+        int ret = 0;
+
+        memset(&smba_cap, 0, sizeof(smba_cap));
+        memset(&cap_smba, 0, sizeof(cap_smba));
+        cap_smba.type = PQOS_CAP_TYPE_SMBA;
+        cap_smba.u.smba = &smba_cap;
+
+        /* match set_smba_clos() initialization */
+        memset(&requested, 0, sizeof(requested));
+        memset(requested.mem_regions, -1, sizeof(requested.mem_regions));
+        requested.class_id = 2;
+        requested.mb_max = 10;
+        requested.smba = 1;
+        actual = requested;
+
+        sel_alloc_opt_num = 1;
+        alloc_opts[0] = strdup("smba@1:2=10");
+
+        expect_value(__wrap_pqos_mba_set, mba_id, 1);
+        expect_value(__wrap_pqos_mba_set, num_clos, 1);
+        expect_memory(__wrap_pqos_mba_set, requested, &requested,
+                      sizeof(struct pqos_mba));
+        will_return(__wrap_pqos_mba_set, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_mba_set, &actual);
+
+        mock_inter_get(PQOS_INTER_MSR, 1);
+        run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                     data->cap_mba, &cap_smba, data->cpu_info, NULL);
+
+        assert_int_equal(ret, 1);
+        assert_true(output_has_text(
+            "SOCKET 1 SMBA CLOS2 => 10%% requested, 10%% applied"));
+        assert_true(output_has_text("Allocation configuration altered"));
+
+        sel_alloc_opt_num = 0;
+}
+
+/* an SMBA class is refused where the platform has no SMBA, before the
+ * library is asked: its MBA paths but AMD's would take it for an MBA class
+ */
+static void
+test_alloc_apply_smba_without_the_capability(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret = 0;
+
+        sel_alloc_opt_num = 1;
+        alloc_opts[0] = strdup("smba@1:2=10");
+
+        run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                     data->cap_mba, NULL, data->cpu_info, NULL);
+
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("SMBA allocation capability not detected!"));
+        assert_true(output_has_text("Allocation configuration error!"));
+
+        sel_alloc_opt_num = 0;
+}
+
+/* without SMBA, an SMBA class after an MBA one refuses the whole command
+ * before either is set: the MBA class is not left set by a command that
+ * fails
+ */
+static void
+test_alloc_apply_smba_after_mba_without_the_capability(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret = 0;
+
+        sel_alloc_opt_num = 2;
+        alloc_opts[0] = strdup("mba:1=10");
+        alloc_opts[1] = strdup("SMBA@1:2=10");
+
+        /* no pqos_mba_set() is expected: a call would fail the case */
+        run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
+                     data->cap_mba, NULL, data->cpu_info, NULL);
+
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("SMBA allocation capability not detected!"));
+        assert_false(output_has_text("MBA CLOS1 =>"));
+        assert_true(output_has_text("Allocation configuration error!"));
+
+        sel_alloc_opt_num = 0;
+}
+
 static void
 test_alloc_apply_l3ca(void **state)
 {
@@ -2795,6 +2893,10 @@ main(void)
             cmocka_unit_test(test_set_l3_clos_mmio_names_each_domain),
             cmocka_unit_test(test_alloc_apply_mba),
             cmocka_unit_test(test_alloc_apply_mba_max),
+            cmocka_unit_test(test_alloc_apply_smba),
+            cmocka_unit_test(test_alloc_apply_smba_without_the_capability),
+            cmocka_unit_test(
+                test_alloc_apply_smba_after_mba_without_the_capability),
             cmocka_unit_test(test_alloc_apply_mba_mmio_domains_in_one_request),
             cmocka_unit_test(
                 test_alloc_apply_mba_mmio_refused_writes_no_domain),
