@@ -1125,6 +1125,11 @@ test_hw_mba_get(void **state)
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
+        /* a table that held SMBA classes before, as a caller may reuse one */
+        memset(mba_tab, 0, sizeof(mba_tab));
+        for (class_id = 0; class_id < DIM(mba_tab); ++class_id)
+                mba_tab[class_id].smba = 1;
+
         for (class_id = 0; class_id < data->cap_mba.num_classes; ++class_id) {
                 expect_value(__wrap_msr_read, lcore, 0);
                 expect_value(__wrap_msr_read, reg,
@@ -1141,7 +1146,94 @@ test_hw_mba_get(void **state)
                 assert_int_equal(mba_tab[class_id].class_id, class_id);
                 assert_int_equal(mba_tab[class_id].ctrl, 0);
                 assert_int_equal(mba_tab[class_id].mb_max, 100 - class_id * 10);
+                /* an MBA class, which pqos_mba_set() takes back */
+                assert_int_equal(mba_tab[class_id].smba, 0);
         }
+}
+
+static void
+test_hw_mba_get_amd(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned mba_id = 0;
+        unsigned max_num_clos = data->cap_mba.num_classes;
+        unsigned num_clos;
+        struct pqos_mba mba_tab[4];
+        unsigned class_id;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* the first class asks for MBA ones; the others held SMBA classes */
+        memset(mba_tab, 0, sizeof(mba_tab));
+        for (class_id = 1; class_id < DIM(mba_tab); ++class_id)
+                mba_tab[class_id].smba = 1;
+
+        for (class_id = 0; class_id < data->cap_mba.num_classes; ++class_id) {
+                expect_value(__wrap_msr_read, lcore, 0);
+                expect_value(__wrap_msr_read, reg,
+                             PQOS_MSR_MBA_MASK_START_AMD + class_id);
+                will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, class_id * 10);
+        }
+
+        ret = hw_mba_get_amd(mba_id, max_num_clos, &num_clos, mba_tab);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(num_clos, data->cap_mba.num_classes);
+
+        for (class_id = 0; class_id < data->cap_mba.num_classes; ++class_id) {
+                assert_int_equal(mba_tab[class_id].class_id, class_id);
+                assert_int_equal(mba_tab[class_id].mb_max, class_id * 10);
+                assert_int_equal(mba_tab[class_id].smba, 0);
+        }
+}
+
+static void
+test_hw_smba_get_amd(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned smba_id = 1;
+        unsigned num_clos;
+        struct pqos_mba smba_tab[4];
+        unsigned class_id, i;
+
+        /* the platform has SMBA, on the sockets' SMBA ids */
+        data->cap_smba = data->cap_mba;
+        data->cap->capabilities[data->cap->num_cap].type = PQOS_CAP_TYPE_SMBA;
+        data->cap->capabilities[data->cap->num_cap].u.smba = &data->cap_smba;
+        data->cap->num_cap++;
+        for (i = 0; i < data->cpu->num_cores; ++i)
+                data->cpu->cores[i].smba_id = data->cpu->cores[i].socket;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* the first class asks for SMBA ones; the others held MBA classes */
+        memset(smba_tab, 0, sizeof(smba_tab));
+        smba_tab[0].smba = 1;
+
+        for (class_id = 0; class_id < data->cap_smba.num_classes; ++class_id) {
+                expect_value(__wrap_msr_read, lcore, data->cpu->num_cores / 2);
+                expect_value(__wrap_msr_read, reg,
+                             PQOS_MSR_SMBA_MASK_START_AMD + class_id);
+                will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, class_id * 10);
+        }
+
+        ret = hw_mba_get_amd(smba_id, DIM(smba_tab), &num_clos, smba_tab);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(num_clos, data->cap_smba.num_classes);
+
+        /* each an SMBA class, which pqos_mba_set() sets back as one */
+        for (class_id = 0; class_id < data->cap_smba.num_classes; ++class_id) {
+                assert_int_equal(smba_tab[class_id].class_id, class_id);
+                assert_int_equal(smba_tab[class_id].mb_max, class_id * 10);
+                assert_int_equal(smba_tab[class_id].smba, 1);
+        }
+
+        data->cap->num_cap--;
 }
 
 /* ======== hw_alloc_assoc_set ======== */
@@ -2110,7 +2202,9 @@ main(void)
             cmocka_unit_test(test_hw_mba_set_actual),
             cmocka_unit_test(test_hw_mba_set_non_linear),
             cmocka_unit_test(test_hw_mba_set_param),
-            cmocka_unit_test(test_hw_mba_get)};
+            cmocka_unit_test(test_hw_mba_get),
+            cmocka_unit_test(test_hw_mba_get_amd),
+            cmocka_unit_test(test_hw_smba_get_amd)};
 
         const struct CMUnitTest tests_unsupported[] = {
             cmocka_unit_test(test_hw_l3ca_set_unsupported),

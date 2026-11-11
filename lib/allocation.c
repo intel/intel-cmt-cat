@@ -1118,6 +1118,11 @@ hw_mba_get(const unsigned mba_id,
                         return PQOS_RETVAL_ERROR;
 
                 mba_tab[i].ctrl = 0;
+                /* an MBA class, whatever the table held before: one given
+                 * back to pqos_mba_set() with smba set would be refused
+                 * where there is no SMBA
+                 */
+                mba_tab[i].smba = 0;
                 mba_tab[i].class_id = i;
                 mba_tab[i].mb_max = (unsigned)PQOS_MBA_LINEAR_MAX - val;
         }
@@ -1166,6 +1171,7 @@ hw_mba_get_amd(const unsigned mba_id,
                         return PQOS_RETVAL_ERROR;
 
                 mba_tab[i].ctrl = 0;
+                mba_tab[i].smba = 0;
                 mba_tab[i].class_id = i;
                 mba_tab[i].mb_max = val;
         }
@@ -1209,6 +1215,8 @@ hw_smba_get_amd(const unsigned smba_id,
                         return PQOS_RETVAL_ERROR;
 
                 smba_tab[i].ctrl = 0;
+                /* an SMBA class, as the table is given back to set it */
+                smba_tab[i].smba = 1;
                 smba_tab[i].class_id = i;
                 smba_tab[i].mb_max = val;
         }

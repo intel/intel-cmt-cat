@@ -1447,6 +1447,7 @@ test_pqos_mba_set_os(void **state __attribute__((unused)))
         unsigned num_clos = 1;
         struct pqos_mba requested[1];
 
+        memset(requested, 0, sizeof(requested));
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         will_return(__wrap_cpuinfo_get_config, &config);
@@ -1477,6 +1478,7 @@ test_pqos_mba_set_os_ctrl(void **state __attribute__((unused)))
         unsigned num_clos = 1;
         struct pqos_mba requested[1];
 
+        memset(requested, 0, sizeof(requested));
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         will_return(__wrap_cpuinfo_get_config, &config);
@@ -1507,6 +1509,7 @@ test_pqos_mba_set_hw(void **state __attribute__((unused)))
         unsigned num_clos = 1;
         struct pqos_mba requested[1];
 
+        memset(requested, 0, sizeof(requested));
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         will_return(__wrap_cpuinfo_get_config, &config);
@@ -1537,6 +1540,7 @@ test_pqos_mba_set_param(void **state __attribute__((unused)))
         unsigned num_clos = 1;
         struct pqos_mba requested[1];
 
+        memset(requested, 0, sizeof(requested));
         config.mba_max = 100;
 
         requested[0].class_id = 1;
@@ -1574,6 +1578,70 @@ test_pqos_mba_set_param(void **state __attribute__((unused)))
 
         ret = pqos_mba_set(mba_id, num_clos, requested, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* a class with smba set is refused where the platform has no SMBA
+ * capability, before any interface's path is reached: those paths would set
+ * it as an MBA class
+ */
+static void
+test_pqos_mba_set_smba_without_the_capability(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mba requested[2];
+        int ret;
+
+        memset(requested, 0, sizeof(requested));
+        requested[0].class_id = 1;
+        requested[0].mb_max = 50;
+        requested[1].class_id = 2;
+        requested[1].mb_max = 50;
+        requested[1].smba = 1;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
+        will_return(__wrap__pqos_get_cap, data->cap);
+
+        ret = pqos_mba_set(1, 2, requested, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+/* where the platform has the SMBA capability, an SMBA class goes on to the
+ * interface's path
+ */
+static void
+test_pqos_mba_set_smba_with_the_capability(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct cpuinfo_config config;
+        struct pqos_mba requested[1];
+        int ret;
+
+        memset(requested, 0, sizeof(requested));
+        requested[0].class_id = 1;
+        requested[0].mb_max = 50;
+        requested[0].smba = 1;
+        config.mba_max = 100;
+
+        data->cap->capabilities[data->cap->num_cap].type = PQOS_CAP_TYPE_SMBA;
+        data->cap->capabilities[data->cap->num_cap].u.smba = &data->cap_smba;
+        data->cap->num_cap++;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
+        will_return(__wrap__pqos_get_cap, data->cap);
+        will_return(__wrap_cpuinfo_get_config, &config);
+
+        expect_value(__wrap_os_mba_set, mba_id, 1);
+        expect_value(__wrap_os_mba_set, num_clos, 1);
+        expect_value(__wrap_os_mba_set, requested, &requested);
+        expect_value(__wrap_os_mba_set, actual, NULL);
+        will_return(__wrap_os_mba_set, PQOS_RETVAL_OK);
+
+        ret = pqos_mba_set(1, 1, requested, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        data->cap->num_cap--;
 }
 
 /* ======== pqos_mba_get ======== */
@@ -3560,6 +3628,8 @@ main(void)
             cmocka_unit_test(test_pqos_l2ca_get_min_cbm_bits_os),
             cmocka_unit_test(test_pqos_mba_set_os),
             cmocka_unit_test(test_pqos_mba_set_os_ctrl),
+            cmocka_unit_test(test_pqos_mba_set_smba_without_the_capability),
+            cmocka_unit_test(test_pqos_mba_set_smba_with_the_capability),
             cmocka_unit_test(test_pqos_mba_get_os),
             cmocka_unit_test(test_pqos_mon_reset_os),
             cmocka_unit_test(test_pqos_mon_reset_config_os),

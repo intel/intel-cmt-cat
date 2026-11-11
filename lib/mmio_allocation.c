@@ -769,6 +769,8 @@ mmio_mba_get(const unsigned mba_id,
 
         for (unsigned i = 0; i < clos_count; i++) {
                 mba_tab[i].ctrl = 0;
+                /* an MBA class, as hw_mba_get() gives one */
+                mba_tab[i].smba = 0;
                 mba_tab[i].class_id = i;
                 mba_tab[i].mb_max = 0;
                 mba_tab[i].domain_id = mba_tab[0].domain_id;

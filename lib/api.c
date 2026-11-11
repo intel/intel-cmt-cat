@@ -679,6 +679,26 @@ pqos_mba_set(const unsigned mba_id,
         }
 
         /**
+         * An SMBA class needs the SMBA capability: the MBA paths of a
+         * platform without it would program the class as an MBA one
+         */
+        for (i = 0; i < num_clos; i++) {
+                const struct pqos_capability *smba_cap = NULL;
+
+                if (!requested[i].smba)
+                        continue;
+                if (pqos_cap_get_type(_pqos_get_cap(), PQOS_CAP_TYPE_SMBA,
+                                      &smba_cap) != PQOS_RETVAL_OK) {
+                        LOG_ERROR("SMBA CLOS%u requested, but SMBA is not "
+                                  "supported!\n",
+                                  requested[i].class_id);
+                        lock_release();
+                        return PQOS_RETVAL_RESOURCE;
+                }
+                break;
+        }
+
+        /**
          * Check if MBA rate is within allowed range
          */
         for (i = 0; i < num_clos && interface != PQOS_INTER_MMIO; i++) {

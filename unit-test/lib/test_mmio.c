@@ -941,6 +941,54 @@ test_mba_get_uses_mrrm_count(void **state __attribute__((unused)))
 }
 
 static void
+test_mba_get_gives_mba_classes(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba mba_tab[1] = {0};
+        unsigned num_clos = 0;
+        const uint8_t supported = 1;
+        const int num_reads = supported;
+        int ret;
+
+        erdt.max_clos = 0;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        mba_tab[0].domain_id = cpu_agent.rmdd.domain_id;
+        /* a table that held an SMBA class before, as a caller may reuse one */
+        mba_tab[0].smba = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, supported);
+        expect_value_count(__wrap_get_mba_optimal_bw_region_clos_v1, marc,
+                           &cpu_agent.marc, num_reads);
+        expect_any_count(__wrap_get_mba_optimal_bw_region_clos_v1, region_num,
+                         num_reads);
+        expect_any_count(__wrap_get_mba_optimal_bw_region_clos_v1, clos_number,
+                         num_reads);
+        expect_value_count(__wrap_get_mba_min_bw_region_clos_v1, marc,
+                           &cpu_agent.marc, num_reads);
+        expect_any_count(__wrap_get_mba_min_bw_region_clos_v1, region_num,
+                         num_reads);
+        expect_any_count(__wrap_get_mba_min_bw_region_clos_v1, clos_number,
+                         num_reads);
+        expect_value_count(__wrap_get_mba_max_bw_region_clos_v1, marc,
+                           &cpu_agent.marc, num_reads);
+        expect_any_count(__wrap_get_mba_max_bw_region_clos_v1, region_num,
+                         num_reads);
+        expect_any_count(__wrap_get_mba_max_bw_region_clos_v1, clos_number,
+                         num_reads);
+
+        ret = mmio_mba_get(0, 1, &num_clos, mba_tab);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        /* an MBA class, which pqos_mba_set() takes back */
+        assert_int_equal(mba_tab[0].smba, 0);
+}
+
+static void
 test_mba_get_rejects_unsupported_num_regions(void **state
                                              __attribute__((unused)))
 {
@@ -2557,6 +2605,7 @@ main(void)
             cmocka_unit_test(test_mba_set_validates_before_write),
             cmocka_unit_test(test_mba_get_ignores_num_clos_input),
             cmocka_unit_test(test_mba_get_uses_mrrm_count),
+            cmocka_unit_test(test_mba_get_gives_mba_classes),
             cmocka_unit_test(test_mba_get_rejects_unsupported_num_regions),
             cmocka_unit_test(test_mba_reset_uses_mrrm_count),
             cmocka_unit_test(test_mba_reset_writes_each_domain_range),

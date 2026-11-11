@@ -2517,7 +2517,7 @@ struct pqos_mba {
                               (with MBA controller), depending on ctrl
                               flag */
         int ctrl;          /**< MBA controller flag */
-        int smba;          /**< SMBA clos */
+        int smba;          /**< SMBA clos, 0 for an MBA one */
         /* MMIO section */
         uint16_t domain_id;  /**< RMDD, resource management domain id */
         int num_mem_regions; /**< Total regions from command line */
@@ -2543,9 +2543,15 @@ struct pqos_mba {
  * are out of range, or read the table again after an allocation reset has
  * put the caps in range.
  *
+ * A class whose pqos_mba::smba is set is an SMBA class: on any interface it
+ * is refused where the platform has no SMBA capability, rather than set as an
+ * MBA class.
+ *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_PARAM on an invalid or out of range request
+ * @retval PQOS_RETVAL_RESOURCE on an SMBA class where the platform has no
+ *         SMBA capability
  */
 int pqos_mba_set(const unsigned mba_id,
                  const unsigned num_clos,
