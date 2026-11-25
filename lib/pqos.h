@@ -63,7 +63,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       70100 /**< version 7.1.0 */
+#define PQOS_VERSION       80000 /**< version 8.0.0 */
 #define PQOS_MAX_CLOS      16    /**< 16 x CLOS */
 #define PQOS_MAX_L3CA_CLOS PQOS_MAX_CLOS
 #define PQOS_MAX_L2CA_CLOS PQOS_MAX_CLOS
